@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Buddy — Analytics</title>
+  <script src="js/theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-3xl mx-auto">
+    <a href="index.html" class="logo">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="9.5" stroke="#5e8a65" stroke-width="1.5"/>
+        <circle cx="11" cy="11" r="5.5" stroke="#5e8a65" stroke-width="1.5"/>
+        <circle cx="11" cy="11" r="2" fill="#5e8a65"/>
+      </svg>
+      <h1>Focus Buddy</h1>
+    </a>
+    <nav class="page-nav" aria-label="Main navigation">
+      <a href="index.html">Today</a>
+      <a href="analytics.html" class="active" aria-current="page">Analytics</a>
+      <a href="settings.html" aria-label="Settings" title="Settings">⚙</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-6 py-8">
+  <div id="sessions-list" class="flex flex-col gap-5">
+    <p style="color:var(--text-muted)" class="text-sm text-center py-10">Loading sessions…</p>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+  const COLORS = {
+    focused: '#5e8a65', distracted: '#b35c3a',
+    uncertain: '#b08a38', away: '#8a7a6c',
+  };
+
+  function formatSeconds(s) {
+    const m   = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}m ${sec}s`;
+  }
+
+  function formatDuration(started, ended) {
+    return formatSeconds(Math.round((new Date(ended) - new Date(started)) / 1000));
+  }
+
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function parseTimeline(timelineJson) {
+    try {
+      const parsed = JSON.parse(timelineJson || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function buildTimeline(timelineJson, totalSeconds) {
+    const timeline     = parseTimeline(timelineJson);
+    const totalMinutes = Math.ceil(totalSeconds / 60);
+    if (totalMinutes === 0) return document.createElement('div');
+
+    const minuteMap = {};
+    const validStates = new Set(['focused', 'distracted', 'uncertain', 'away']);
+    timeline.forEach(({ minute, state }) => {
+      if (Number.isInteger(minute) && validStates.has(state)) {
+        minuteMap[minute] = state;
+      }
+    });
+
+    const bar = document.createElement('div');
+    bar.className = 'timeline-bar';
+    for (let m = 0; m < totalMinutes; m++) {
+      const seg = document.createElement('div');
+      seg.className = `timeline-segment ${minuteMap[m] || 'uncertain'}`;
+      seg.style.flex = '1';
+      seg.title = `Minute ${m}: ${minuteMap[m] || 'uncertain'}`;
+      bar.appendChild(seg);
+    }
+    return bar;
+  }
+
+  function buildChart(session, size) {
+    const ctx   = document.getElementById(`chart-${session.id}`).getContext('2d');
+    const total = session.seconds_focused + session.seconds_distracted +
+                  session.seconds_uncertain + session.seconds_away;
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Focused', 'Distracted', 'Uncertain', 'Away'],
+        datasets: [{
+          data: total === 0
+            ? [0, 0, 1, 0]
+            : [session.seconds_focused, session.seconds_distracted,
+               session.seconds_uncertain, session.seconds_away],
+          backgroundColor: [COLORS.focused, COLORS.distracted, COLORS.uncertain, COLORS.away],
+          borderWidth: 0,
+          hoverOffset: 4,
+        }],
+      },
+      options: {
+        cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => `${c.label}: ${formatSeconds(c.raw)}` } },
+        },
+        animation: { duration: 0 },
+      },
+    });
+  }
+
+  function renderSessionRow(session) {
+    const total    = session.seconds_focused + session.seconds_distracted +
+                     session.seconds_uncertain + session.seconds_away;
+    const safePct  = s => total > 0 ? Math.round(s / total * 100) : 0;
+    const focusPct = safePct(session.seconds_focused);
+
+    const row = document.createElement('div');
+    row.style.cssText = `
+      padding-top: 1rem;
+      margin-top: 1rem;
+      border-top: 1px solid var(--border);
+    `;
+
+    row.innerHTML = `
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <p class="text-xs" style="color:var(--text-muted)">${formatDate(session.started_at)}</p>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                style="background:var(--sage-soft);color:var(--sage);font-variant-numeric:tabular-nums">
+            ${focusPct}% focused
+          </span>
+          <span class="text-xs px-2 py-0.5 rounded-full"
+                style="background:var(--surface-2);color:var(--text-muted);font-variant-numeric:tabular-nums">
+            ${formatDuration(session.started_at, session.ended_at)}
+          </span>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-center mb-3">
+        <div class="relative flex-shrink-0" style="width:76px;height:76px">
+          <canvas id="chart-${session.id}" width="76" height="76"></canvas>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+            <span style="font-size:0.85rem;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1">
+              ${focusPct}%
+            </span>
+          </div>
+        </div>
+        <div class="flex flex-col gap-1.5 text-xs w-full">
+          <div class="flex items-center justify-between">
+            <span class="flex items-center"><span class="dot dot-focused"></span>Focused</span>
+            <span style="color:var(--text-muted);font-variant-numeric:tabular-nums">${formatSeconds(session.seconds_focused)} · ${safePct(session.seconds_focused)}%</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="flex items-center"><span class="dot dot-distracted"></span>Distracted</span>
+            <span style="color:var(--text-muted);font-variant-numeric:tabular-nums">${formatSeconds(session.seconds_distracted)} · ${safePct(session.seconds_distracted)}%</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="flex items-center"><span class="dot dot-uncertain"></span>Uncertain</span>
+            <span style="color:var(--text-muted);font-variant-numeric:tabular-nums">${formatSeconds(session.seconds_uncertain)} · ${safePct(session.seconds_uncertain)}%</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="flex items-center"><span class="dot dot-away"></span>Away</span>
+            <span style="color:var(--text-muted);font-variant-numeric:tabular-nums">${formatSeconds(session.seconds_away)} · ${safePct(session.seconds_away)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="section-label">Minute-by-minute</p>
+        <div id="timeline-${session.id}"></div>
+        <div class="flex justify-between mt-1" style="color:var(--text-faint);font-size:0.7rem;font-variant-numeric:tabular-nums">
+          <span>0m</span>
+          <span>${formatSeconds(total)}</span>
+        </div>
+      </div>
+    `;
+
+    return row;
+  }
+
+  function renderGroup(taskName, groupSessions) {
+    const aggFocused    = groupSessions.reduce((s, x) => s + x.seconds_focused, 0);
+    const aggDistracted = groupSessions.reduce((s, x) => s + x.seconds_distracted, 0);
+    const aggUncertain  = groupSessions.reduce((s, x) => s + x.seconds_uncertain, 0);
+    const aggAway       = groupSessions.reduce((s, x) => s + x.seconds_away, 0);
+    const aggTotal      = aggFocused + aggDistracted + aggUncertain + aggAway;
+    const aggFocusPct   = aggTotal > 0 ? Math.round(aggFocused / aggTotal * 100) : 0;
+    const count         = groupSessions.length;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const header = document.createElement('div');
+    header.className = 'flex items-start justify-between gap-3';
+    header.innerHTML = `
+      <div class="min-w-0">
+        <h2 class="serif leading-tight" style="font-size:1rem;font-weight:600;color:var(--text);margin:0">
+          ${escapeHtml(taskName)}
+        </h2>
+        <p class="text-xs mt-1" style="color:var(--text-faint)">
+          ${count} session${count !== 1 ? 's' : ''}
+          &bull;
+          <span style="font-variant-numeric:tabular-nums">${formatSeconds(aggTotal)}</span> total
+        </p>
+      </div>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
+            style="background:var(--sage-soft);color:var(--sage);font-variant-numeric:tabular-nums">
+        ${aggFocusPct}% focused
+      </span>
+    `;
+    card.appendChild(header);
+
+    groupSessions.forEach(session => {
+      card.appendChild(renderSessionRow(session));
+    });
+
+    return card;
+  }
+
+  async function loadSessions() {
+    const listEl = document.getElementById('sessions-list');
+    try {
+      const sessions = await getSessions();
+      listEl.innerHTML = '';
+
+      if (sessions.length === 0) {
+        listEl.innerHTML = `
+          <div class="card text-center py-10">
+            <p class="font-medium text-sm" style="color:var(--text)">No sessions yet</p>
+            <p class="text-xs mt-1" style="color:var(--text-muted)">
+              Complete a session on the <a href="index.html" style="color:var(--accent)">Tasks</a> page.
+            </p>
+          </div>`;
+        return;
+      }
+
+      const groupMap = new Map();
+      sessions.forEach(s => {
+        const key = (s.task_name || '').trim().toLowerCase();
+        if (!groupMap.has(key)) groupMap.set(key, { name: s.task_name, sessions: [] });
+        groupMap.get(key).sessions.push(s);
+      });
+
+      groupMap.forEach(({ name, sessions: groupSessions }) => {
+        const card = renderGroup(name, groupSessions);
+        listEl.appendChild(card);
+
+        groupSessions.forEach(session => {
+          buildChart(session);
+          const timelineEl = document.getElementById(`timeline-${session.id}`);
+          const total = session.seconds_focused + session.seconds_distracted +
+                        session.seconds_uncertain + session.seconds_away;
+          timelineEl.appendChild(buildTimeline(session.timeline_json, total));
+        });
+      });
+
+    } catch {
+      listEl.innerHTML = `
+        <div class="card text-center py-6" style="border-color:var(--terracotta-soft)">
+          <p class="text-sm font-medium" style="color:var(--terracotta)">Backend not running</p>
+          <p class="text-xs mt-1" style="color:var(--text-muted)">
+            <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px">uvicorn backend.main:app --reload</code>
+          </p>
+        </div>`;
+    }
+  }
+
+  loadSessions();
+</script>
+</body>
+</html>

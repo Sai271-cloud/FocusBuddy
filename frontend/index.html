@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Buddy — Today</title>
+  <script src="js/theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-5xl mx-auto">
+    <a href="index.html" class="logo">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="9.5" stroke="#5e8a65" stroke-width="1.5"/>
+        <circle cx="11" cy="11" r="5.5" stroke="#5e8a65" stroke-width="1.5"/>
+        <circle cx="11" cy="11" r="2" fill="#5e8a65"/>
+      </svg>
+      <h1>Focus Buddy</h1>
+    </a>
+    <nav class="page-nav" aria-label="Main navigation">
+      <a href="index.html" class="active" aria-current="page">Today</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="settings.html" aria-label="Settings" title="Settings">⚙</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-6 py-8">
+  <div class="today-grid">
+
+    <section class="flex flex-col gap-5">
+      <div class="card">
+        <p class="section-label">New task</p>
+        <form id="add-form" class="flex flex-col gap-3">
+          <div>
+            <label for="task-input" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">Task name</label>
+            <input id="task-input" class="input" type="text" placeholder="e.g. Read chapter 5"
+                   autocomplete="off" required aria-label="Task name" />
+          </div>
+          <div>
+            <label for="task-desc" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
+              Description <span class="font-normal" style="color:var(--text-faint)"> — optional</span>
+            </label>
+            <textarea id="task-desc" class="input" rows="2"
+                      placeholder="What specifically are you trying to accomplish?"
+                      style="resize:vertical;min-height:58px;line-height:1.5" aria-label="Task description"></textarea>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="btn-primary">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Add Task
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div>
+        <p class="section-label">Tasks</p>
+        <div id="task-list" class="flex flex-col gap-3"></div>
+        <p id="active-empty" class="text-sm text-center py-8" style="color:var(--text-muted)">
+          No tasks yet — add one above to get started.
+        </p>
+
+        <button id="completed-header" class="completed-header collapsed" style="display:none" aria-expanded="false">
+          <span class="chev">▾</span> <span id="completed-label">Completed (0)</span>
+        </button>
+        <div id="completed-list" class="flex flex-col gap-3" style="display:none"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="flex items-center justify-between mb-2">
+        <p class="section-label" style="margin:0">Today</p>
+        <p id="cal-date" class="text-xs" style="color:var(--text-faint)"></p>
+      </div>
+      <div class="calendar" id="calendar">
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <p id="cal-empty" class="text-xs text-center mt-2" style="color:var(--text-faint);display:none">
+        No sessions today yet — start one from a task.
+      </p>
+    </section>
+
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+  const HOUR_HEIGHT = 52;
+  const MIN_BLOCK = 18;
+
+  const taskListEl     = document.getElementById('task-list');
+  const completedListEl = document.getElementById('completed-list');
+  const completedHeader = document.getElementById('completed-header');
+  const completedLabel  = document.getElementById('completed-label');
+  const activeEmpty     = document.getElementById('active-empty');
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+  function formatSeconds(s) {
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}m ${sec}s`;
+  }
+
+  function renderTaskCard(task) {
+    const card = document.createElement('div');
+    card.className = 'card card-hover flex items-center gap-3';
+    if (!task.completed) {
+      card.style.borderLeft = '3px solid var(--sage)';
+      card.style.paddingLeft = '1.25rem';
+    }
+    const startBtn = task.completed ? '' :
+      `<a href="tracker.html?taskId=${encodeURIComponent(task.id)}"
+          class="btn-primary text-sm flex-shrink-0"
+          aria-label="Start session for ${escapeHtml(task.name)}">Start →</a>`;
+    card.innerHTML = `
+      <button class="check ${task.completed ? 'done' : ''}"
+              data-id="${task.id}" data-completed="${task.completed}"
+              aria-label="${task.completed ? 'Mark task incomplete' : 'Mark task complete'}"
+              title="${task.completed ? 'Mark incomplete' : 'Mark complete'}"></button>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium text-sm leading-snug ${task.completed ? 'task-title-done' : ''}"
+           ${task.completed ? '' : 'style="color:var(--text)"'}>${escapeHtml(task.name)}</p>
+        ${task.description
+          ? `<p class="text-xs mt-0.5 leading-relaxed" style="color:var(--text-faint)">${escapeHtml(task.description)}</p>`
+          : ''}
+      </div>
+      ${startBtn}
+    `;
+    return card;
+  }
+
+  async function toggleComplete(id, currentlyCompleted) {
+    try {
+      await updateTask(id, { completed: !currentlyCompleted });
+      await loadTasks();
+    } catch {
+      alert('Could not update the task — is the backend running?');
+    }
+  }
+
+  function onListClick(e) {
+    const btn = e.target.closest('.check');
+    if (!btn) return;
+    toggleComplete(parseInt(btn.dataset.id, 10), btn.dataset.completed === 'true');
+  }
+  taskListEl.addEventListener('click', onListClick);
+  completedListEl.addEventListener('click', onListClick);
+
+  completedHeader.addEventListener('click', () => {
+    const collapsed = completedHeader.classList.toggle('collapsed');
+    completedHeader.setAttribute('aria-expanded', String(!collapsed));
+    completedListEl.style.display = collapsed ? 'none' : 'flex';
+  });
+
+  async function loadTasks() {
+    try {
+      const tasks = await getTasks();
+      const active = tasks.filter(t => !t.completed);
+      const done   = tasks.filter(t => t.completed);
+
+      taskListEl.innerHTML = '';
+      completedListEl.innerHTML = '';
+      activeEmpty.style.display = active.length ? 'none' : 'block';
+      activeEmpty.textContent = done.length
+        ? 'All tasks completed — add another above to keep going.'
+        : 'No tasks yet — add one above to get started.';
+
+      active.forEach(t => taskListEl.appendChild(renderTaskCard(t)));
+      done.forEach(t => completedListEl.appendChild(renderTaskCard(t)));
+
+      if (done.length) {
+        completedHeader.style.display = 'flex';
+        completedLabel.textContent = `Completed (${done.length})`;
+      } else {
+        completedHeader.style.display = 'none';
+        completedListEl.style.display = 'none';
+        completedHeader.classList.add('collapsed');
+      }
+    } catch {
+      activeEmpty.style.display = 'none';
+      taskListEl.innerHTML = `
+        <div class="card text-center py-6" style="border-color: var(--terracotta-soft)">
+          <p class="text-sm font-medium" style="color:var(--terracotta)">Backend not running</p>
+          <p class="text-xs mt-1" style="color:var(--text-muted)">
+            Start it with: <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px">uvicorn backend.main:app --reload</code>
+          </p>
+        </div>`;
+    }
+  }
+
+  function isToday(d) {
+    const n = new Date();
+    return d.getFullYear() === n.getFullYear()
+        && d.getMonth() === n.getMonth()
+        && d.getDate() === n.getDate();
+  }
+  function hourLabel(h) {
+    const ampm = h < 12 ? 'AM' : 'PM';
+    let hr = h % 12; if (hr === 0) hr = 12;
+    return `${hr} ${ampm}`;
+  }
+  function dominantState(s) {
+    const states = ['focused', 'distracted', 'uncertain', 'away'];
+    const vals = [s.seconds_focused, s.seconds_distracted, s.seconds_uncertain, s.seconds_away];
+    let max = -1, idx = 2;
+    vals.forEach((v, i) => { if (v > max) { max = v; idx = i; } });
+    return max <= 0 ? 'uncertain' : states[idx];
+  }
+
+  function placeNowLine(grid) {
+    let line = grid.querySelector('.cal-now-line');
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'cal-now-line';
+      grid.appendChild(line);
+    }
+    const now = new Date();
+    line.style.top = ((now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT) + 'px';
+    return parseFloat(line.style.top);
+  }
+
+  async function loadCalendar() {
+    const grid = document.getElementById('cal-grid');
+    grid.style.height = (24 * HOUR_HEIGHT) + 'px';
+    grid.innerHTML = '';
+
+    for (let h = 0; h < 24; h++) {
+      const row = document.createElement('div');
+      row.className = 'cal-hour-row';
+      row.style.top = (h * HOUR_HEIGHT) + 'px';
+      row.innerHTML = `<span class="cal-hour-label">${hourLabel(h)}</span>`;
+      grid.appendChild(row);
+    }
+
+    let count = 0;
+    try {
+      const sessions = await getSessions();
+      sessions.forEach(s => {
+        const start = new Date(s.started_at);
+        if (!isToday(start)) return;
+        let end = new Date(s.ended_at);
+        if (!(end > start)) end = new Date(start.getTime() + 60000);
+
+        const startMin = start.getHours() * 60 + start.getMinutes() + start.getSeconds() / 60;
+        const top = startMin / 60 * HOUR_HEIGHT;
+        const durMin = (end - start) / 60000;
+        let height = Math.max(MIN_BLOCK, durMin / 60 * HOUR_HEIGHT);
+        if (top + height > 24 * HOUR_HEIGHT) height = 24 * HOUR_HEIGHT - top;
+
+        const total = s.seconds_focused + s.seconds_distracted + s.seconds_uncertain + s.seconds_away;
+        const pct = total > 0 ? Math.round(s.seconds_focused / total * 100) : 0;
+
+        const block = document.createElement('div');
+        block.className = `cal-block ${dominantState(s)}`;
+        block.style.top = top + 'px';
+        block.style.height = height + 'px';
+        block.title = `${s.task_name} · ${pct}% focused · ${formatSeconds(total)}`;
+        block.innerHTML = `<span class="font-medium">${escapeHtml(s.task_name)}</span> <span class="cal-block-pct">${pct}%</span>`;
+        block.addEventListener('click', () => { location.href = 'analytics.html'; });
+        grid.appendChild(block);
+        count++;
+      });
+    } catch {
+    }
+
+    const nowTop = placeNowLine(grid);
+    document.getElementById('cal-empty').style.display = count ? 'none' : 'block';
+
+    const cal = document.getElementById('calendar');
+    cal.scrollTop = Math.max(0, nowTop - 140);
+  }
+
+  document.getElementById('cal-date').textContent =
+    new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+
+  document.getElementById('add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('task-input');
+    const name = input.value.trim();
+    if (!name) return;
+    const desc = document.getElementById('task-desc').value.trim();
+    const btn = e.submitter;
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+    try {
+      await createTask(name, desc);
+      input.value = '';
+      document.getElementById('task-desc').value = '';
+      await loadTasks();
+    } catch {
+      alert('Failed to create task — make sure the backend is running.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Add Task`;
+    }
+  });
+
+  loadTasks();
+  loadCalendar();
+  setInterval(() => {
+    const grid = document.getElementById('cal-grid');
+    if (grid) placeNowLine(grid);
+  }, 60000);
+</script>
+</body>
+</html>

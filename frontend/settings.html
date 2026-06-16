@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Buddy — Settings</title>
+  <script src="js/theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-2xl mx-auto">
+    <a href="index.html" class="logo">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="9.5" stroke="#5e8a65" stroke-width="1.5"/>
+        <circle cx="11" cy="11" r="5.5" stroke="#5e8a65" stroke-width="1.5"/>
+        <circle cx="11" cy="11" r="2" fill="#5e8a65"/>
+      </svg>
+      <h1>Focus Buddy</h1>
+    </a>
+    <nav class="page-nav" aria-label="Main navigation">
+      <a href="index.html">Today</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="settings.html" class="active" aria-current="page">Settings</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-6 py-8">
+  <div class="card">
+    <p class="section-label">Appearance</p>
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <p class="font-medium text-sm" style="color:var(--text)">Dark mode</p>
+        <p class="text-xs mt-0.5" style="color:var(--text-muted)">
+          Switch between the light and dark theme. Your choice is remembered on this device.
+        </p>
+      </div>
+      <label class="switch" title="Toggle dark mode">
+        <input type="checkbox" id="dark-toggle" aria-label="Dark mode" />
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+</main>
+
+<script>
+  const toggle = document.getElementById('dark-toggle');
+  toggle.checked = (window.getTheme() === 'dark');
+  toggle.addEventListener('change', () => {
+    window.setTheme(toggle.checked ? 'dark' : 'light');
+  });
+</script>
+</body>
+</html>

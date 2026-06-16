@@ -1,0 +1,23 @@
+# Secrets — never commit your API keys
+.env
+.env.local
+
+# Database — generated data, not source code
+*.db
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+
+.vscode/
+
+# Claude Code — local config / skills and project memory
+.claude/
+CLAUDE.md

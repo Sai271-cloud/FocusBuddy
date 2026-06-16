@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Buddy — Session</title>
+  <script src="js/theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 min-w-0">
+      <a href="index.html" class="btn-ghost" style="padding:0.35rem 0.75rem;font-size:0.8rem">← Tasks</a>
+      <span style="color:var(--border)">|</span>
+      <div class="min-w-0">
+        <h1 id="task-name" class="text-sm font-medium leading-tight truncate" style="font-family:var(--font-sans);letter-spacing:0;margin:0;max-width:280px">
+          Loading…
+        </h1>
+        <p id="task-desc-header" class="text-xs leading-tight truncate hidden" style="color:var(--text-muted);max-width:280px;margin-top:1px"></p>
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5 text-xs" style="color:var(--text-muted)">
+      <span class="live-dot" aria-hidden="true"></span>
+      <span>Live</span>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-6 py-6 flex flex-col gap-5">
+
+  <div class="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" style="background:var(--hero-bg);border-color:transparent;box-shadow:var(--shadow-lg)">
+    <div>
+      <p class="section-label" style="color:rgba(245,241,236,0.45)">Session time</p>
+      <p class="timer-display" id="timer" style="color:var(--hero-on)">00:00:00</p>
+    </div>
+    <span id="state-badge" class="badge badge-uncertain" style="font-size:0.85rem;padding:6px 15px 6px 11px">
+      Analyzing…
+    </span>
+  </div>
+
+  <div class="grid gap-5 md:grid-cols-2">
+
+    <div class="flex flex-col gap-3">
+      <div style="border-radius:var(--radius-md);overflow:hidden;background:#1a1614;border:1px solid #2c2420;box-shadow:var(--shadow-md)">
+        <video id="webcam-video" autoplay muted playsinline
+          style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;border-radius:0"></video>
+      </div>
+      <div id="webcam-error" class="hidden card text-sm" style="color:var(--terracotta);border-color:var(--terracotta-soft);padding:0.875rem 1rem">
+        <strong>Camera access denied.</strong> Focus detection paused — timer still running.
+      </div>
+    </div>
+
+    <div class="card flex flex-col items-center gap-5">
+      <canvas id="focus-chart" width="180" height="180" aria-label="Focus breakdown chart"></canvas>
+      <div class="w-full flex flex-col gap-2">
+        <div class="flex items-center justify-between text-sm">
+          <span class="flex items-center"><span class="dot dot-focused" aria-hidden="true"></span>Focused</span>
+          <span id="legend-focused" style="color:var(--text-muted);font-variant-numeric:tabular-nums">0m 0s</span>
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="flex items-center"><span class="dot dot-distracted" aria-hidden="true"></span>Distracted</span>
+          <span id="legend-distracted" style="color:var(--text-muted);font-variant-numeric:tabular-nums">0m 0s</span>
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="flex items-center"><span class="dot dot-uncertain" aria-hidden="true"></span>Uncertain</span>
+          <span id="legend-uncertain" style="color:var(--text-muted);font-variant-numeric:tabular-nums">0m 0s</span>
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="flex items-center"><span class="dot dot-away" aria-hidden="true"></span>Away</span>
+          <span id="legend-away" style="color:var(--text-muted);font-variant-numeric:tabular-nums">0m 0s</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="flex gap-3">
+    <button id="pause-btn" class="btn-ghost flex-1">Pause</button>
+    <button id="stop-btn" class="btn-danger flex-1">Stop &amp; Save</button>
+  </div>
+
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/focus-engine.js"></script>
+<script src="js/focus-detector.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const taskId = Number.parseInt(params.get('taskId'), 10);
+  if (!Number.isInteger(taskId) || taskId <= 0) location.href = 'index.html';
+
+  const totals = { focused: 0, distracted: 0, uncertain: 0, away: 0 };
+  const validStates = new Set(['focused', 'distracted', 'uncertain', 'away']);
+  let currentState = 'uncertain';
+  let sessionStart = null;
+  let sessionId = null;
+  let taskName = 'Loading task...';
+  let taskDescription = '';
+  let elapsedSeconds = 0;
+  let timerInterval = null;
+  let autosaveInterval = null;
+  let pendingSave = Promise.resolve();
+  let isPaused = false;
+  let timeline = [];
+  let lastRecordedMinute = -1;
+  let lastTickMs = null;
+  let pausedMs = 0;
+  let pauseStartedAt = null;
+
+  const COLORS = {
+    focused: '#5e8a65', distracted: '#b35c3a',
+    uncertain: '#b08a38', away: '#8a7a6c',
+  };
+
+  const chart = new Chart(
+    document.getElementById('focus-chart').getContext('2d'),
+    {
+      type: 'doughnut',
+      data: {
+        labels: ['Focused', 'Distracted', 'Uncertain', 'Away'],
+        datasets: [{
+          data: [0, 0, 1, 0],
+          backgroundColor: [COLORS.focused, COLORS.distracted, COLORS.uncertain, COLORS.away],
+          borderWidth: 0,
+          hoverOffset: 5,
+        }],
+      },
+      options: {
+        cutout: '70%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => `${c.label}: ${formatSeconds(c.raw)}` } },
+        },
+        animation: { duration: 150 },
+      },
+    }
+  );
+
+  function formatSeconds(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}m ${sec}s`;
+  }
+
+  function formatTimer(s) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return [h, m, sec].map(n => String(n).padStart(2, '0')).join(':');
+  }
+
+  function updateChart() {
+    const total = Object.values(totals).reduce((a, b) => a + b, 0);
+    chart.data.datasets[0].data = total === 0
+      ? [0, 0, 1, 0]
+      : [totals.focused, totals.distracted, totals.uncertain, totals.away];
+    chart.update('none');
+  }
+
+  function updateLegend() {
+    const total = Math.max(1, Object.values(totals).reduce((a, b) => a + b, 0));
+    ['focused', 'distracted', 'uncertain', 'away'].forEach(state => {
+      const el = document.getElementById(`legend-${state}`);
+      if (el) el.textContent = `${formatSeconds(totals[state])} (${Math.round(totals[state] / total * 100)}%)`;
+    });
+  }
+
+  function setState(state) {
+    if (!validStates.has(state)) state = 'uncertain';
+    currentState = state;
+    const badge = document.getElementById('state-badge');
+    badge.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+    badge.className = `badge badge-${state}`;
+    badge.style.cssText = 'font-size:0.85rem;padding:6px 15px 6px 11px';
+  }
+
+  function tick() {
+    if (isPaused || sessionStart === null) return;
+
+    const now = Date.now();
+    if (lastTickMs === null) lastTickMs = now;
+
+    totals[currentState] += (now - lastTickMs) / 1000;
+    lastTickMs = now;
+
+    elapsedSeconds = Math.max(0, Math.floor((now - sessionStart.getTime() - pausedMs) / 1000));
+
+    const minute = Math.floor(elapsedSeconds / 60);
+    if (minute > lastRecordedMinute) {
+      lastRecordedMinute = minute;
+      timeline.push({ minute, state: currentState });
+    }
+
+    document.getElementById('timer').textContent = formatTimer(elapsedSeconds);
+    updateChart();
+    updateLegend();
+  }
+
+  function sessionPayload() {
+    return {
+      ended_at: new Date().toISOString(),
+      seconds_focused: Math.round(totals.focused),
+      seconds_distracted: Math.round(totals.distracted),
+      seconds_uncertain: Math.round(totals.uncertain),
+      seconds_away: Math.round(totals.away),
+      timeline_json: JSON.stringify(timeline),
+    };
+  }
+
+  function enqueueSessionSave(finish = false) {
+    if (!sessionId) return Promise.resolve();
+    const payload = sessionPayload();
+    pendingSave = pendingSave
+      .catch(() => {})
+      .then(() => finish ? finishSession(sessionId, payload) : updateSession(sessionId, payload));
+    return pendingSave;
+  }
+
+  function showStartupError(message) {
+    const errorEl = document.getElementById('webcam-error');
+    errorEl.innerHTML = `<strong>Session could not start.</strong> ${message}`;
+    errorEl.classList.remove('hidden');
+  }
+
+  async function init() {
+    const videoEl = document.getElementById('webcam-video');
+
+    try {
+      const task = await getTask(taskId);
+      taskName = task.name;
+      taskDescription = task.description || '';
+
+      document.getElementById('task-name').textContent = taskName;
+      document.title = `Focus Buddy — ${taskName}`;
+
+      if (taskDescription) {
+        const descEl = document.getElementById('task-desc-header');
+        descEl.textContent = taskDescription;
+        descEl.classList.remove('hidden');
+      }
+
+      const session = await startSession(taskId);
+      sessionId = session.id;
+      sessionStart = new Date(session.started_at);
+      timerInterval = setInterval(tick, 1000);
+      autosaveInterval = setInterval(() => enqueueSessionSave(false), 5000);
+
+      await startDetection(videoEl, taskName, taskDescription, setState);
+    } catch (err) {
+      console.warn('Session startup issue:', err);
+      if (!sessionId) {
+        showStartupError('Check that the backend is running and the task still exists.');
+        return;
+      }
+      document.getElementById('webcam-error').classList.remove('hidden');
+    }
+  }
+
+  const pauseBtn = document.getElementById('pause-btn');
+  pauseBtn.addEventListener('click', () => {
+    isPaused = !isPaused;
+    if (isPaused) {
+      pauseStartedAt = Date.now();
+      pauseDetection();
+      pauseBtn.textContent = 'Resume';
+      pauseBtn.className = 'btn-primary flex-1';
+    } else {
+      if (pauseStartedAt !== null) {
+        pausedMs += Date.now() - pauseStartedAt;
+        pauseStartedAt = null;
+      }
+      lastTickMs = Date.now();
+      resumeDetection();
+      pauseBtn.textContent = 'Pause';
+      pauseBtn.className = 'btn-ghost flex-1';
+    }
+  });
+
+  document.getElementById('stop-btn').addEventListener('click', async () => {
+    if (!window.confirm('End this session and view your analytics?')) return;
+    clearInterval(timerInterval);
+    clearInterval(autosaveInterval);
+    stopDetection();
+
+    const stopBtn = document.getElementById('stop-btn');
+    stopBtn.textContent = 'Saving…';
+    stopBtn.disabled = true;
+
+    try {
+      await enqueueSessionSave(true);
+      location.href = 'index.html';
+    } catch (err) {
+      console.error('Save failed:', err);
+      stopBtn.textContent = 'Save Failed — Retry';
+      stopBtn.disabled = false;
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') enqueueSessionSave(false);
+  });
+
+  init();
+</script>
+</body>
+</html>
