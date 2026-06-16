@@ -37,15 +37,15 @@
         <form id="add-form" class="flex flex-col gap-3">
           <div>
             <label for="task-input" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">Task name</label>
-            <input id="task-input" class="input" type="text" placeholder="e.g. Read chapter 5"
+            <input id="task-input" class="input" type="text" placeholder=""
                    autocomplete="off" required aria-label="Task name" />
           </div>
           <div>
             <label for="task-desc" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
-              Description <span class="font-normal" style="color:var(--text-faint)"> — optional</span>
+              Description <span class="font-normal" style="color:var(--text-faint)"> - Add details about your envirnoment and what specific task you are in order for the best prediction results</span>
             </label>
             <textarea id="task-desc" class="input" rows="2"
-                      placeholder="What specifically are you trying to accomplish?"
+                      placeholder="Please add context or details about this task."
                       style="resize:vertical;min-height:58px;line-height:1.5" aria-label="Task description"></textarea>
           </div>
           <div class="flex justify-end">
