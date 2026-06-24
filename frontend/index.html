@@ -13,17 +13,22 @@
 <header class="page-header">
   <div class="page-header-row max-w-5xl mx-auto">
     <a href="index.html" class="logo">
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-        <circle cx="11" cy="11" r="9.5" stroke="#5e8a65" stroke-width="1.5"/>
-        <circle cx="11" cy="11" r="5.5" stroke="#5e8a65" stroke-width="1.5"/>
-        <circle cx="11" cy="11" r="2" fill="#5e8a65"/>
+      <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <circle cx="13" cy="13" r="11.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="6.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="2" fill="var(--accent)"/>
       </svg>
       <h1>Focus Buddy</h1>
     </a>
     <nav class="page-nav" aria-label="Main navigation">
       <a href="index.html" class="active" aria-current="page">Today</a>
       <a href="analytics.html">Analytics</a>
-      <a href="settings.html" aria-label="Settings" title="Settings">⚙</a>
+      <a href="#" id="about-nav" role="button">About me</a>
+      <div class="settings-menu" style="position:relative">
+        <button id="settings-btn" class="settings-trigger" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
     </nav>
   </div>
 </header>
@@ -37,19 +42,20 @@
         <form id="add-form" class="flex flex-col gap-3">
           <div>
             <label for="task-input" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">Task name</label>
-            <input id="task-input" class="input" type="text" placeholder=""
+            <input id="task-input" class="input" type="text" placeholder="What do you want to focus on?"
                    autocomplete="off" required aria-label="Task name" />
           </div>
           <div>
             <label for="task-desc" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
-              Description <span class="font-normal" style="color:var(--text-faint)"> - Add details about your envirnoment and what specific task you are in order for the best prediction results</span>
+              Description <span class="font-normal" style="color:var(--text-faint)"> — Add details about the task. This can can include the needed websites, tools, or any other context that might be helpful for focus analysis</span>
             </label>
-            <textarea id="task-desc" class="input" rows="2"
+            <textarea id="task-desc" class="input" rows="3"
                       placeholder="Please add context or details about this task."
                       style="resize:vertical;min-height:58px;line-height:1.5" aria-label="Task description"></textarea>
           </div>
           <div class="flex justify-end">
-            <button type="submit" class="btn-primary">
+            <button id="add-btn" type="submit" class="btn-primary" disabled
+                    style="opacity:0.5;cursor:not-allowed">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                 <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
@@ -62,12 +68,14 @@
       <div>
         <p class="section-label">Tasks</p>
         <div id="task-list" class="flex flex-col gap-3"></div>
-        <p id="active-empty" class="text-sm text-center py-8" style="color:var(--text-muted)">
-          No tasks yet — add one above to get started.
-        </p>
+        <div id="active-empty" class="flex flex-col items-center gap-2 text-center py-10">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8M13 12h8M13 18h8"/></svg>
+          <p class="font-medium text-sm" style="color:var(--text)">No active tasks</p>
+          <p id="active-empty-sub" class="text-sm" style="color:var(--text-faint)">Add a task above to start your first focus session.</p>
+        </div>
 
         <button id="completed-header" class="completed-header collapsed" style="display:none" aria-expanded="false">
-          <span class="chev">▾</span> <span id="completed-label">Completed (0)</span>
+          <span class="chev" style="display:inline-flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 9l6 6 6-6"/></svg></span> <span id="completed-label">Completed (0)</span>
         </button>
         <div id="completed-list" class="flex flex-col gap-3" style="display:none"></div>
       </div>
@@ -81,15 +89,33 @@
       <div class="calendar" id="calendar">
         <div class="cal-grid" id="cal-grid"></div>
       </div>
-      <p id="cal-empty" class="text-xs text-center mt-2" style="color:var(--text-faint);display:none">
-        No sessions today yet — start one from a task.
-      </p>
+      <div id="cal-empty" class="flex flex-col items-center gap-2 text-center mt-3" style="display:none">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+        <p class="text-xs" style="color:var(--text-faint)">No sessions today yet — start one from a task.</p>
+      </div>
     </section>
 
   </div>
 </main>
 
+<!-- Edit-task modal -->
+<div id="edit-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title" style="max-width:420px">
+    <h2 id="edit-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0 0 14px">Edit task</h2>
+    <label for="edit-name" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">Task name</label>
+    <input id="edit-name" class="input" type="text" autocomplete="off" aria-label="Task name" />
+    <label for="edit-desc" class="block text-xs font-medium mb-1.5 mt-3" style="color:var(--text-muted)">Description</label>
+    <textarea id="edit-desc" class="input" rows="3" style="resize:vertical" aria-label="Task description"></textarea>
+    <div class="flex gap-3 justify-end mt-4">
+      <button id="edit-cancel" class="btn-ghost">Cancel</button>
+      <button id="edit-save" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/api.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/settings-menu.js"></script>
 <script>
   const HOUR_HEIGHT = 52;
   const MIN_BLOCK = 18;
@@ -110,33 +136,57 @@
     return `${m}m ${sec}s`;
   }
 
+  const ICON_PENCIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const ICON_TRASH  = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
+
   function renderTaskCard(task) {
+    if (task.completed) {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-3';
+      row.style.cssText = 'padding:0.45rem 0.5rem';
+      row.innerHTML = `
+        <button class="check done" data-id="${task.id}" data-completed="true" data-action="toggle"
+                aria-label="Mark &quot;${escapeHtml(task.name)}&quot; as not done"
+                title="Mark incomplete"></button>
+        <span class="serif task-title-done flex-1 min-w-0 truncate" style="font-size:0.95rem">${escapeHtml(task.name)}</span>
+        <button class="icon-btn danger" data-id="${task.id}" data-action="delete"
+                aria-label="Delete &quot;${escapeHtml(task.name)}&quot;" title="Delete">${ICON_TRASH}</button>
+      `;
+      return row;
+    }
+
     const card = document.createElement('div');
     card.className = 'card card-hover flex items-center gap-3';
-    if (!task.completed) {
-      card.style.borderLeft = '3px solid var(--sage)';
-      card.style.paddingLeft = '1.25rem';
-    }
-    const startBtn = task.completed ? '' :
-      `<a href="tracker.html?taskId=${encodeURIComponent(task.id)}"
-          class="btn-primary text-sm flex-shrink-0"
-          aria-label="Start session for ${escapeHtml(task.name)}">Start →</a>`;
+    card.style.cssText = 'position:relative;overflow:hidden;padding-left:1.25rem';
     card.innerHTML = `
-      <button class="check ${task.completed ? 'done' : ''}"
-              data-id="${task.id}" data-completed="${task.completed}"
-              aria-label="${task.completed ? 'Mark task incomplete' : 'Mark task complete'}"
-              title="${task.completed ? 'Mark incomplete' : 'Mark complete'}"></button>
+      <span aria-hidden="true" style="position:absolute;left:0;top:0;height:100%;width:4px;background:var(--accent)"></span>
+      <button class="check" data-id="${task.id}" data-completed="false" data-action="toggle"
+              aria-label="Mark &quot;${escapeHtml(task.name)}&quot; as done"
+              title="Mark complete"></button>
       <div class="min-w-0 flex-1">
-        <p class="font-medium text-sm leading-snug ${task.completed ? 'task-title-done' : ''}"
-           ${task.completed ? '' : 'style="color:var(--text)"'}>${escapeHtml(task.name)}</p>
+        <p class="serif" style="font-size:0.95rem;font-weight:500;color:var(--text);line-height:1.35">${escapeHtml(task.name)}</p>
         ${task.description
           ? `<p class="text-xs mt-0.5 leading-relaxed" style="color:var(--text-faint)">${escapeHtml(task.description)}</p>`
           : ''}
       </div>
-      ${startBtn}
+      <button class="icon-btn" data-id="${task.id}" data-action="edit"
+              aria-label="Edit &quot;${escapeHtml(task.name)}&quot;" title="Edit">${ICON_PENCIL}</button>
+      <button class="icon-btn danger" data-id="${task.id}" data-action="delete"
+              aria-label="Delete &quot;${escapeHtml(task.name)}&quot;" title="Delete">${ICON_TRASH}</button>
+      <a href="tracker.html?taskId=${encodeURIComponent(task.id)}"
+         class="btn-primary text-sm flex-shrink-0"
+         aria-label="Start session for ${escapeHtml(task.name)}">
+        Start
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
     `;
     return card;
   }
+
+  let _tasks = [];
+  let editId = null;
 
   async function toggleComplete(id, currentlyCompleted) {
     try {
@@ -147,10 +197,40 @@
     }
   }
 
+  async function deleteTaskFlow(id) {
+    const t = _tasks.find(x => x.id === id);
+    const name = t ? t.name : 'this task';
+    const ok = await confirmDialog(
+      `Delete "${name}" and its sessions? This can't be undone.`,   // confirmDialog escapes internally
+      { danger: true, confirmText: 'Delete' });
+    if (!ok) return;
+    try {
+      await deleteTask(id);
+      await loadTasks();
+      await loadCalendar();
+    } catch {
+      alert('Could not delete the task — is the backend running?');
+    }
+  }
+
+  function openEdit(id) {
+    const t = _tasks.find(x => x.id === id);
+    if (!t) return;
+    editId = id;
+    document.getElementById('edit-name').value = t.name;
+    document.getElementById('edit-desc').value = t.description || '';
+    document.getElementById('edit-overlay').style.display = 'flex';
+    document.getElementById('edit-name').focus();
+  }
+
   function onListClick(e) {
-    const btn = e.target.closest('.check');
-    if (!btn) return;
-    toggleComplete(parseInt(btn.dataset.id, 10), btn.dataset.completed === 'true');
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const id = parseInt(el.dataset.id, 10);
+    const action = el.dataset.action;
+    if (action === 'toggle') toggleComplete(id, el.dataset.completed === 'true');
+    else if (action === 'delete') deleteTaskFlow(id);
+    else if (action === 'edit') openEdit(id);
   }
   taskListEl.addEventListener('click', onListClick);
   completedListEl.addEventListener('click', onListClick);
@@ -164,15 +244,17 @@
   async function loadTasks() {
     try {
       const tasks = await getTasks();
+      _tasks = tasks;
       const active = tasks.filter(t => !t.completed);
-      const done   = tasks.filter(t => t.completed);
+      // "Completed" resets daily: only show tasks completed today (local date).
+      const done   = tasks.filter(t => t.completed && t.completed_at && isToday(new Date(t.completed_at)));
 
       taskListEl.innerHTML = '';
       completedListEl.innerHTML = '';
-      activeEmpty.style.display = active.length ? 'none' : 'block';
-      activeEmpty.textContent = done.length
+      activeEmpty.style.display = active.length ? 'none' : 'flex';
+      document.getElementById('active-empty-sub').textContent = done.length
         ? 'All tasks completed — add another above to keep going.'
-        : 'No tasks yet — add one above to get started.';
+        : 'Add a task above to start your first focus session.';
 
       active.forEach(t => taskListEl.appendChild(renderTaskCard(t)));
       done.forEach(t => completedListEl.appendChild(renderTaskCard(t)));
@@ -242,6 +324,7 @@
     }
 
     let count = 0;
+    let loadFailed = false;
     try {
       const sessions = await getSessions();
       sessions.forEach(s => {
@@ -270,10 +353,18 @@
         count++;
       });
     } catch {
+      loadFailed = true;
     }
 
     const nowTop = placeNowLine(grid);
-    document.getElementById('cal-empty').style.display = count ? 'none' : 'block';
+    const emptyEl = document.getElementById('cal-empty');
+    const emptyMsg = emptyEl.querySelector('p');
+    if (emptyMsg) {
+      emptyMsg.textContent = loadFailed
+        ? "Couldn't load today's sessions — is the backend running?"
+        : 'No sessions today yet — start one from a task.';
+    }
+    emptyEl.style.display = count ? 'none' : 'flex';
 
     const cal = document.getElementById('calendar');
     cal.scrollTop = Math.max(0, nowTop - 140);
@@ -282,25 +373,61 @@
   document.getElementById('cal-date').textContent =
     new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
+  const addBtn   = document.getElementById('add-btn');
+  const nameInput = document.getElementById('task-input');
+  const ADD_LABEL = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Add Task`;
+
+  function setAddEnabled(enabled) {
+    addBtn.disabled = !enabled;
+    addBtn.style.opacity = enabled ? '1' : '0.5';
+    addBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  }
+  nameInput.addEventListener('input', () => setAddEnabled(nameInput.value.trim().length > 0));
+
   document.getElementById('add-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const input = document.getElementById('task-input');
-    const name = input.value.trim();
+    const name = nameInput.value.trim();
     if (!name) return;
     const desc = document.getElementById('task-desc').value.trim();
-    const btn = e.submitter;
-    btn.disabled = true;
-    btn.textContent = 'Adding…';
+    setAddEnabled(false);
+    addBtn.textContent = 'Adding…';
     try {
       await createTask(name, desc);
-      input.value = '';
+      nameInput.value = '';
       document.getElementById('task-desc').value = '';
       await loadTasks();
     } catch {
       alert('Failed to create task — make sure the backend is running.');
     } finally {
-      btn.disabled = false;
-      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Add Task`;
+      addBtn.innerHTML = ADD_LABEL;
+      setAddEnabled(nameInput.value.trim().length > 0);
+    }
+  });
+
+  // Edit-task modal wiring
+  const editOverlay = document.getElementById('edit-overlay');
+  function closeEdit() { editOverlay.style.display = 'none'; editId = null; }
+  document.getElementById('edit-cancel').addEventListener('click', closeEdit);
+  editOverlay.addEventListener('click', e => { if (e.target === editOverlay) closeEdit(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && editOverlay.style.display === 'flex') closeEdit(); });
+  document.getElementById('edit-save').addEventListener('click', async () => {
+    const name = document.getElementById('edit-name').value.trim();
+    if (!name) { document.getElementById('edit-name').focus(); return; }
+    const description = document.getElementById('edit-desc').value.trim();
+    try {
+      await updateTask(editId, { name, description });
+      closeEdit();
+      await loadTasks();
+    } catch {
+      alert('Could not save the task — is the backend running?');
+    }
+  });
+
+  // Ctrl/Cmd+Enter in the description box submits the add-task form
+  document.getElementById('task-desc').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      document.getElementById('add-form').requestSubmit();
     }
   });
 

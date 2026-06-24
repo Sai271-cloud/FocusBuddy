@@ -11,6 +11,7 @@ __pycache__/
 *.pyc
 venv/
 .venv/
+.venv.broken-*/
 
 # OS / editor junk
 .DS_Store
@@ -18,6 +19,17 @@ Thumbs.db
 
 .vscode/
 
+# Generated/context-heavy project artifacts
+promptlab/out/
+v0-export/
+.pnpm-store/
+promptlab/
+tools/
+docs/
+.agents/
+.codex/
+
 # Claude Code — local config / skills and project memory
 .claude/
 CLAUDE.md
+AGENTS.md

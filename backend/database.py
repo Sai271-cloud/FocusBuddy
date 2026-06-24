@@ -23,6 +23,47 @@ def init_db():
 
     Base.metadata.create_all(bind=engine)
     _repair_sqlite_schema()
+    _prune_empty_sessions()
+    _init_pattern_memory()
+
+
+def _init_pattern_memory():
+    """Startup maintenance for the Pattern Memory:
+    - seed the starter hypotheses + 24-hour focus profile on a fresh DB (no-op once seeded),
+    - one-time cleanup of the obsolete time-of-day seeds on older DBs (idempotent),
+    - decay notes not touched in 30+ days (so stale habits fade)."""
+    from . import crud
+
+    db = SessionLocal()
+    try:
+        crud.seed_observations(db)
+        crud.seed_hourly_focus(db)
+        crud.cleanup_legacy_time_observations(db)
+        crud.decay_stale_observations(db)
+    finally:
+        db.close()
+
+
+def _prune_empty_sessions():
+    """Remove abandoned sessions — ones opened then closed before a single tick
+    was recorded (started_at == ended_at and all four second-counts are 0).
+    Any session that recorded time (autosave bumped ended_at) is left untouched."""
+    inspector = inspect(engine)
+    if "focus_sessions" not in inspector.get_table_names():
+        return
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                DELETE FROM focus_sessions
+                WHERE started_at = ended_at
+                  AND COALESCE(seconds_focused, 0) = 0
+                  AND COALESCE(seconds_distracted, 0) = 0
+                  AND COALESCE(seconds_uncertain, 0) = 0
+                  AND COALESCE(seconds_away, 0) = 0
+                """
+            )
+        )
 
 
 def _repair_sqlite_schema():
@@ -64,8 +105,29 @@ def _repair_sqlite_schema():
     if any(focus_columns.get(column) != "INTEGER" for column in second_columns):
         _rebuild_focus_sessions_with_integer_seconds()
 
+    # Add journal_json to existing DBs (re-inspect in case a rebuild just ran).
+    journal_cols = {c["name"] for c in inspect(engine).get_columns("focus_sessions")}
+    if "journal_json" not in journal_cols:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE focus_sessions ADD COLUMN journal_json VARCHAR DEFAULT '[]'")
+            )
+
+    # Add ai_recap to existing work_periods tables (stores the saved AI daily recap).
+    if "work_periods" in inspect(engine).get_table_names():
+        wp_cols = {c["name"] for c in inspect(engine).get_columns("work_periods")}
+        if "ai_recap" not in wp_cols:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE work_periods ADD COLUMN ai_recap VARCHAR DEFAULT ''")
+                )
+
 
 def _rebuild_focus_sessions_with_integer_seconds():
+    # Preserve journal_json if the old table already has it (so a rebuild never
+    # drops journal history). The new table always gets the column.
+    has_journal = "journal_json" in {c["name"] for c in inspect(engine).get_columns("focus_sessions")}
+    journal_select = "COALESCE(journal_json, '[]')" if has_journal else "'[]'"
     with engine.begin() as connection:
         connection.execute(text("DROP TABLE IF EXISTS focus_sessions_new"))
         connection.execute(
@@ -82,6 +144,7 @@ def _rebuild_focus_sessions_with_integer_seconds():
                     seconds_uncertain INTEGER,
                     seconds_away INTEGER,
                     timeline_json VARCHAR,
+                    journal_json VARCHAR,
                     PRIMARY KEY (id),
                     FOREIGN KEY(task_id) REFERENCES tasks (id)
                 )
@@ -90,7 +153,7 @@ def _rebuild_focus_sessions_with_integer_seconds():
         )
         connection.execute(
             text(
-                """
+                f"""
                 INSERT INTO focus_sessions_new (
                     id,
                     task_id,
@@ -101,7 +164,8 @@ def _rebuild_focus_sessions_with_integer_seconds():
                     seconds_distracted,
                     seconds_uncertain,
                     seconds_away,
-                    timeline_json
+                    timeline_json,
+                    journal_json
                 )
                 SELECT
                     id,
@@ -113,7 +177,8 @@ def _rebuild_focus_sessions_with_integer_seconds():
                     CAST(COALESCE(seconds_distracted, 0) AS INTEGER),
                     CAST(COALESCE(seconds_uncertain, 0) AS INTEGER),
                     CAST(COALESCE(seconds_away, 0) AS INTEGER),
-                    COALESCE(timeline_json, '[]')
+                    COALESCE(timeline_json, '[]'),
+                    {journal_select}
                 FROM focus_sessions
                 """
             )

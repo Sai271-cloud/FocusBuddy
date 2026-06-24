@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Focus Buddy — Website Awareness",
+  "version": "1.0.0",
+  "description": "Reports your active tab's URL to your locally-running Focus Buddy app so it can judge whether the site fits your current task. Sends only to your own machine (127.0.0.1).",
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
