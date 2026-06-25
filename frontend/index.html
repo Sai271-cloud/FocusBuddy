@@ -21,6 +21,7 @@
       <h1>Focus Buddy</h1>
     </a>
     <nav class="page-nav" aria-label="Main navigation">
+      <a href="plan.html">Plan</a>
       <a href="index.html" class="active" aria-current="page">Today</a>
       <a href="analytics.html">Analytics</a>
       <a href="#" id="about-nav" role="button">About me</a>
@@ -82,6 +83,7 @@
     </section>
 
     <section>
+      <div id="focus-goal-card" class="card focus-goal-card mb-4"></div>
       <div class="flex items-center justify-between mb-2">
         <p class="section-label" style="margin:0">Today</p>
         <p id="cal-date" class="text-xs" style="color:var(--text-faint)"></p>
@@ -116,6 +118,7 @@
 <script src="js/api.js"></script>
 <script src="js/notify.js"></script>
 <script src="js/settings-menu.js"></script>
+<script src="js/planning-insights.js"></script>
 <script>
   const HOUR_HEIGHT = 52;
   const MIN_BLOCK = 18;
@@ -138,6 +141,35 @@
 
   const ICON_PENCIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const ICON_TRASH  = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
+  let _todayPlan = null;
+  let _todayReality = null;
+  let _recommendedEntry = null;
+  let _allSessions = [];
+
+  function planEntryForTask(taskId) {
+    return (window.PlanningInsights ? PlanningInsights.parsePlanEntries(_todayPlan) : [])
+      .find(e => e.task_id === Number(taskId)) || null;
+  }
+
+  function trackerHref(task) {
+    const entry = planEntryForTask(task.id);
+    const params = new URLSearchParams({ taskId: String(task.id) });
+    if (entry) {
+      params.set('planDate', PlanningInsights.localDayKey());
+      params.set('plannedEstimate', String(entry.estimate_min || 0));
+      if (Number.isInteger(entry.scheduled_min)) params.set('plannedStart', String(entry.scheduled_min));
+      if (_recommendedEntry && _recommendedEntry.task_id === entry.task_id) params.set('recommended', '1');
+    }
+    return `tracker.html?${params.toString()}`;
+  }
+
+  function fmtClock(min) {
+    min = ((Number(min) % 1440) + 1440) % 1440;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    const ap = h < 12 ? 'am' : 'pm';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')}${ap}`;
+  }
 
   function renderTaskCard(task) {
     if (task.completed) {
@@ -156,8 +188,13 @@
     }
 
     const card = document.createElement('div');
-    card.className = 'card card-hover flex items-center gap-3';
+    const entry = planEntryForTask(task.id);
+    const suggested = _recommendedEntry && _recommendedEntry.task_id === Number(task.id);
+    card.className = `card card-hover flex items-center gap-3 ${suggested ? 'is-plan-suggested' : ''}`;
     card.style.cssText = 'position:relative;overflow:hidden;padding-left:1.25rem';
+    const planChip = entry
+      ? `<span class="plan-handoff-chip ${suggested ? 'suggested' : ''}">${suggested ? 'Next up' : 'Today plan'}${Number.isInteger(entry.scheduled_min) ? ` - ${fmtClock(entry.scheduled_min)}` : ''}</span>`
+      : '';
     card.innerHTML = `
       <span aria-hidden="true" style="position:absolute;left:0;top:0;height:100%;width:4px;background:var(--accent)"></span>
       <button class="check" data-id="${task.id}" data-completed="false" data-action="toggle"
@@ -165,6 +202,7 @@
               title="Mark complete"></button>
       <div class="min-w-0 flex-1">
         <p class="serif" style="font-size:0.95rem;font-weight:500;color:var(--text);line-height:1.35">${escapeHtml(task.name)}</p>
+        ${planChip}
         ${task.description
           ? `<p class="text-xs mt-0.5 leading-relaxed" style="color:var(--text-faint)">${escapeHtml(task.description)}</p>`
           : ''}
@@ -173,10 +211,10 @@
               aria-label="Edit &quot;${escapeHtml(task.name)}&quot;" title="Edit">${ICON_PENCIL}</button>
       <button class="icon-btn danger" data-id="${task.id}" data-action="delete"
               aria-label="Delete &quot;${escapeHtml(task.name)}&quot;" title="Delete">${ICON_TRASH}</button>
-      <a href="tracker.html?taskId=${encodeURIComponent(task.id)}"
+      <a href="${trackerHref(task)}"
          class="btn-primary text-sm flex-shrink-0"
          aria-label="Start session for ${escapeHtml(task.name)}">
-        Start
+        ${suggested ? 'Start next' : 'Start'}
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -187,6 +225,55 @@
 
   let _tasks = [];
   let editId = null;
+
+  function renderFocusGoal(sessions = _allSessions) {
+    const box = document.getElementById('focus-goal-card');
+    if (!box || !window.PlanningInsights) return;
+    const goal = PlanningInsights.focusGoalMin();
+    const todayKey = PlanningInsights.localDayKey();
+    const progress = PlanningInsights.focusGoalProgress(sessions, todayKey, goal);
+    const streak = PlanningInsights.focusStreak(sessions, goal, todayKey);
+    const options = [
+      [0, 'Off'],
+      [30, '30m'],
+      [60, '60m'],
+      [90, '90m'],
+      [120, '120m'],
+    ].map(([value, label]) => `<option value="${value}" ${goal === value ? 'selected' : ''}>${label}</option>`).join('');
+    const line = goal <= 0
+      ? 'Daily focus goal is off.'
+      : progress.met
+        ? 'Goal met today.'
+        : `${Math.max(0, goal - progress.focused_min)}m left for today's focus goal.`;
+    const streakLine = goal <= 0
+      ? 'Turn it on when a daily target would help.'
+      : streak.count
+        ? `${streak.count}-day rhythm${streak.includes_today ? ' including today' : ' through yesterday'}.`
+        : 'Fresh start today.';
+    const goalAria = goal > 0
+      ? `${progress.focused_min} of ${goal} focused minutes`
+      : 'Daily focus goal off';
+    box.innerHTML = `
+      <div class="focus-goal-head">
+        <div>
+          <p class="section-label" style="margin:0 0 2px">Focus goal</p>
+          <p class="text-xs" style="color:var(--text-muted);margin:0">${escapeHtml(line)}</p>
+        </div>
+        <select id="focus-goal-select" class="input focus-goal-select" aria-label="Daily focus goal">${options}</select>
+      </div>
+      <div class="focus-goal-meter" role="progressbar" aria-valuemin="0" aria-valuemax="${Math.max(1, goal)}"
+           aria-valuenow="${goal > 0 ? progress.focused_min : 0}" aria-label="${escapeHtml(goalAria)}">
+        <span style="width:${goal > 0 ? progress.pct : 0}%"></span>
+      </div>
+      <p class="text-xs" style="color:var(--text-faint);margin:8px 0 0">
+        ${goal > 0 ? `${progress.focused_min}/${goal} focused minutes - ` : ''}${escapeHtml(streakLine)}
+      </p>`;
+    const select = document.getElementById('focus-goal-select');
+    if (select) select.addEventListener('change', () => {
+      PlanningInsights.setFocusGoalMin(parseInt(select.value, 10));
+      renderFocusGoal(sessions);
+    });
+  }
 
   async function toggleComplete(id, currentlyCompleted) {
     try {
@@ -245,6 +332,23 @@
     try {
       const tasks = await getTasks();
       _tasks = tasks;
+      const todayKey = window.PlanningInsights ? PlanningInsights.localDayKey() : null;
+      _todayPlan = null;
+      _todayReality = null;
+      _recommendedEntry = null;
+      if (todayKey && window.getPlan) {
+        try {
+          _todayPlan = await getPlan(todayKey);
+          if (_todayPlan && window.getPlanReality) {
+            _todayReality = await getPlanReality(todayKey, PlanningInsights.dayBounds(todayKey));
+          }
+          _recommendedEntry = PlanningInsights.recommendedPlanEntry(_todayPlan, tasks, _todayReality);
+        } catch {
+          _todayPlan = null;
+          _todayReality = null;
+          _recommendedEntry = null;
+        }
+      }
       const active = tasks.filter(t => !t.completed);
       // "Completed" resets daily: only show tasks completed today (local date).
       const done   = tasks.filter(t => t.completed && t.completed_at && isToday(new Date(t.completed_at)));
@@ -327,6 +431,8 @@
     let loadFailed = false;
     try {
       const sessions = await getSessions();
+      _allSessions = sessions || [];
+      renderFocusGoal(_allSessions);
       sessions.forEach(s => {
         const start = new Date(s.started_at);
         if (!isToday(start)) return;
@@ -432,6 +538,7 @@
   });
 
   loadTasks();
+  renderFocusGoal([]);
   loadCalendar();
   setInterval(() => {
     const grid = document.getElementById('cal-grid');

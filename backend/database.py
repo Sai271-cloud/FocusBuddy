@@ -89,6 +89,16 @@ def _repair_sqlite_schema():
                 text("ALTER TABLE tasks ADD COLUMN completed_at DATETIME")
             )
 
+    # Add advice_json to older Chunk A daily_plans tables. `create_all` creates it
+    # for fresh DBs, but SQLite needs ALTER TABLE for an existing table.
+    if "daily_plans" in inspect(engine).get_table_names():
+        plan_cols = {c["name"] for c in inspect(engine).get_columns("daily_plans")}
+        if "advice_json" not in plan_cols:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE daily_plans ADD COLUMN advice_json VARCHAR")
+                )
+
     if "focus_sessions" not in table_names:
         return
 
@@ -106,11 +116,16 @@ def _repair_sqlite_schema():
         _rebuild_focus_sessions_with_integer_seconds()
 
     # Add journal_json to existing DBs (re-inspect in case a rebuild just ran).
-    journal_cols = {c["name"] for c in inspect(engine).get_columns("focus_sessions")}
-    if "journal_json" not in journal_cols:
+    focus_cols = {c["name"] for c in inspect(engine).get_columns("focus_sessions")}
+    if "journal_json" not in focus_cols:
         with engine.begin() as connection:
             connection.execute(
                 text("ALTER TABLE focus_sessions ADD COLUMN journal_json VARCHAR DEFAULT '[]'")
+            )
+    if "intention" not in focus_cols:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE focus_sessions ADD COLUMN intention VARCHAR DEFAULT ''")
             )
 
     # Add ai_recap to existing work_periods tables (stores the saved AI daily recap).
@@ -121,13 +136,20 @@ def _repair_sqlite_schema():
                 connection.execute(
                     text("ALTER TABLE work_periods ADD COLUMN ai_recap VARCHAR DEFAULT ''")
                 )
-
+        if "plan_reality_json" not in wp_cols:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE work_periods ADD COLUMN plan_reality_json VARCHAR DEFAULT ''")
+                )
 
 def _rebuild_focus_sessions_with_integer_seconds():
     # Preserve journal_json if the old table already has it (so a rebuild never
     # drops journal history). The new table always gets the column.
-    has_journal = "journal_json" in {c["name"] for c in inspect(engine).get_columns("focus_sessions")}
+    old_cols = {c["name"] for c in inspect(engine).get_columns("focus_sessions")}
+    has_journal = "journal_json" in old_cols
+    has_intention = "intention" in old_cols
     journal_select = "COALESCE(journal_json, '[]')" if has_journal else "'[]'"
+    intention_select = "COALESCE(intention, '')" if has_intention else "''"
     with engine.begin() as connection:
         connection.execute(text("DROP TABLE IF EXISTS focus_sessions_new"))
         connection.execute(
@@ -145,6 +167,7 @@ def _rebuild_focus_sessions_with_integer_seconds():
                     seconds_away INTEGER,
                     timeline_json VARCHAR,
                     journal_json VARCHAR,
+                    intention VARCHAR,
                     PRIMARY KEY (id),
                     FOREIGN KEY(task_id) REFERENCES tasks (id)
                 )
@@ -165,7 +188,8 @@ def _rebuild_focus_sessions_with_integer_seconds():
                     seconds_uncertain,
                     seconds_away,
                     timeline_json,
-                    journal_json
+                    journal_json,
+                    intention
                 )
                 SELECT
                     id,
@@ -178,7 +202,8 @@ def _rebuild_focus_sessions_with_integer_seconds():
                     CAST(COALESCE(seconds_uncertain, 0) AS INTEGER),
                     CAST(COALESCE(seconds_away, 0) AS INTEGER),
                     COALESCE(timeline_json, '[]'),
-                    {journal_select}
+                    {journal_select},
+                    {intention_select}
                 FROM focus_sessions
                 """
             )

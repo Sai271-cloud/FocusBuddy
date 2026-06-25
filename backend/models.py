@@ -30,6 +30,7 @@ class FocusSession(Base):
 
     timeline_json = Column(String, default="[]")
     journal_json = Column(String, default="[]")
+    intention = Column(String, nullable=True, default="")
 
 
 class WorkPeriod(Base):
@@ -50,6 +51,7 @@ class WorkPeriod(Base):
 
     reflection = Column(String, nullable=True, default="")
     ai_recap = Column(String, nullable=True, default="")  # saved AI daily/weekly recap JSON/text
+    plan_reality_json = Column(String, nullable=True, default="")  # saved deterministic plan-vs-reality report
 
 
 class UserProfile(Base):
@@ -88,3 +90,20 @@ class HourlyFocus(Base):
     hour = Column(Integer, primary_key=True)          # 0-23 (local)
     focus_pct = Column(Float, default=0.0, nullable=False)   # running average, 0-100
     sessions = Column(Integer, default=0, nullable=False)    # sessions that touched this hour
+
+
+class DailyPlan(Base):
+    """One day's optional plan: the tasks the user chose for a local day, each with an
+    estimate + difficulty, plus how much time they have. Keyed by the frontend-computed
+    local date (YYYY-MM-DD) so it groups the same way analytics does. `advice_json` holds
+    the AI scheduling advice (null until generated). The plan and the advice are saved by
+    separate paths, so `crud.upsert_plan` preserves whichever field the caller leaves None."""
+    __tablename__ = "daily_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    period_key = Column(String, nullable=False, unique=True)   # local YYYY-MM-DD (frontend-computed)
+    available_min = Column(Integer, default=0, nullable=False)  # "time available today", minutes
+    plan_json = Column(String, default="[]")                   # [{task_id, name, estimate_min, difficulty}]
+    advice_json = Column(String, nullable=True, default=None)  # saved AI advice JSON; null until generated
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())

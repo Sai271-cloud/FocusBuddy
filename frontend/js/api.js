@@ -166,6 +166,57 @@ async function getHourlyFocus() {
   return requestJson(`${API}/hourly-focus`);
 }
 
+async function getPlan(periodKey) {
+  // Today's Plan for a local day (YYYY-MM-DD). Returns null when the day isn't planned
+  // (the backend returns 200/null, never 404, so this isn't an error path).
+  return requestJson(`${API}/plan/${periodKey}`);
+}
+
+async function getPlanReality(periodKey, bounds) {
+  const params = new URLSearchParams({
+    day_start: bounds.day_start,
+    day_end: bounds.day_end,
+  });
+  return requestJson(`${API}/plan/${periodKey}/reality?${params.toString()}`);
+}
+
+async function getPlanCalibration(limit = 14) {
+  return requestJson(`${API}/plan/calibration?limit=${encodeURIComponent(limit)}`);
+}
+
+async function savePlan(data) {
+  // Upsert a day's plan. Fields left out are preserved server-side (None = leave as-is),
+  // so a plan-only save and an advice-only save don't clobber each other.
+  return requestJson(`${API}/plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+async function deletePlan(periodKey) {
+  return requestJson(`${API}/plan/${periodKey}`, { method: 'DELETE' });
+}
+
+async function getPlanAdvice(payload) {
+  // AI scheduling advice for a day's plan (when to do each task + over-plan flag).
+  // Best-effort: callers handle failure gracefully.
+  return requestJson(`${API}/plan/advice`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function getPlanReschedule(payload) {
+  // Deterministic mid-day refit for remaining planned tasks. No AI call.
+  return requestJson(`${API}/plan/reschedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
 async function analyzeFocus(frameBase64, taskName, description = '', activity = null, explain = false, sensors = null) {
   const r = await fetch(`${API}/focus/analyze`, {
     method: 'POST',

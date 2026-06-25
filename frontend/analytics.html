@@ -22,6 +22,7 @@
       <h1>Focus Buddy</h1>
     </a>
     <nav class="page-nav" aria-label="Main navigation">
+      <a href="plan.html">Plan</a>
       <a href="index.html">Today</a>
       <a href="analytics.html" class="active" aria-current="page">Analytics</a>
       <a href="#" id="about-nav" role="button">About me</a>
@@ -44,12 +45,28 @@
   </div>
 </main>
 
+<!-- Session replay modal -->
+<div id="replay-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="replay-title" style="max-width:620px">
+    <div class="flex items-start justify-between gap-3 mb-1">
+      <div>
+        <h2 id="replay-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0">Session replay</h2>
+        <p id="replay-subtitle" class="text-xs" style="color:var(--text-faint);margin:3px 0 0"></p>
+      </div>
+      <button id="replay-close" aria-label="Close replay" class="btn-ghost" style="padding:2px 9px;border:none;font-size:1rem;color:var(--text-muted)">x</button>
+    </div>
+    <div id="replay-body" style="margin-top:12px"></div>
+  </div>
+</div>
+
 <!-- Unwind ritual modal -->
 <div id="unwind-overlay" class="modal-overlay" style="display:none">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="unwind-title">
     <div class="flex items-start justify-between gap-3 mb-1">
       <h2 id="unwind-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0">Daily Unwind</h2>
-      <button id="unwind-close" aria-label="Close" class="btn-ghost" style="padding:2px 9px;border:none;font-size:1rem;color:var(--text-muted)">✕</button>
+      <button id="unwind-close" aria-label="Close" class="btn-ghost" style="padding:2px 9px;border:none;font-size:1rem;color:var(--text-muted)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
     </div>
     <div class="flex items-center justify-between gap-3 mb-4">
       <p id="unwind-subtitle" class="text-xs" style="color:var(--text-faint);margin:0"></p>
@@ -65,9 +82,12 @@
 
 <script src="js/api.js"></script>
 <script src="js/notify.js"></script>
+<script src="js/session-replay.js"></script>
 <script src="js/settings-menu.js"></script>
+<script src="js/planning-insights.js"></script>
 <script>
   const ICON_TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
+  const ICON_REPLAY = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4V8z"/></svg>';
 
   const COLORS = {
     focused: '#5e8a65', distracted: '#b35c3a',
@@ -194,6 +214,9 @@
 
   /* ---------- dashboard renderers ---------- */
   function computeStreak() {
+    if (window.PlanningInsights) {
+      return PlanningInsights.focusStreak(allSessions, PlanningInsights.focusGoalMin(), localDayKey(new Date())).count;
+    }
     const set = new Set(allSessions.map(s => localDayKey(new Date(s.started_at))));
     if (set.size === 0) return 0;
     const t = new Date();
@@ -222,8 +245,16 @@
     const weekKey = weekKeyOf(new Date());
     const week = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey);
     const wSum = sumStates(week);
-    const streak = computeStreak();
+    const goal = window.PlanningInsights ? PlanningInsights.focusGoalMin() : 0;
+    const progress = window.PlanningInsights ? PlanningInsights.focusGoalProgress(allSessions, todayKey, goal) : null;
+    const streak = goal > 0 ? computeStreak() : 0;
     const best = personalBest();
+    const goalValue = goal > 0 && progress ? `${progress.focused_min}/${goal}m` : 'Off';
+    const goalSub = goal > 0
+      ? (progress.met
+        ? (streak ? `${streak}-day rhythm` : 'Goal met today')
+        : `${Math.max(0, goal - progress.focused_min)}m left today`)
+      : 'Set on Today';
 
     const tile = (label, value, sub) => `
       <div class="card" style="padding:1rem 1.1rem">
@@ -235,7 +266,7 @@
     document.getElementById('tiles').innerHTML =
       tile('Today', focusPct(tSum) + '%', formatHM(tSum.focused) + ' focused') +
       tile('This week', focusPct(wSum) + '%', formatHM(wSum.focused) + ' focused') +
-      tile('Streak', '🔥 ' + streak, streak === 0 ? 'Start today' : (streak === 1 ? 'day in a row' : 'days in a row')) +
+      tile('Focus goal', goalValue, goalSub) +
       tile('Personal best', best > 0 ? formatHM(best) : '0m', best > 0 ? 'focused in a day' : 'No focus yet');
   }
 
@@ -247,6 +278,10 @@
     const period = findPeriod('day', todayKey);
     const has = today.length > 0;
     const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    let savedReality = null;
+    if (period && period.plan_reality_json) {
+      try { savedReality = JSON.parse(period.plan_reality_json); } catch (e) { savedReality = null; }
+    }
 
     el.innerHTML = `
       <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -257,10 +292,11 @@
           </p>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
-          ${period ? '<span class="badge badge-focused">Unwound ✓</span>' : ''}
+          ${period ? '<span class="badge badge-focused">Unwound</span>' : ''}
           <button id="end-day-btn" class="btn-primary" ${has ? '' : 'disabled style="opacity:0.5;cursor:not-allowed"'}>${period ? 'Re-open unwind' : 'End day · Daily Unwind'} →</button>
         </div>
       </div>
+      ${savedReality && savedReality.summary ? `<p class="text-xs mt-3 plan-reality-echo"><strong>Plan vs reality:</strong> ${escapeHtml(savedReality.summary)}</p>` : ''}
       ${period && period.reflection ? `<p class="text-xs mt-3" style="color:var(--text-muted);border-left:3px solid var(--sage);padding-left:0.6rem;line-height:1.5">${escapeHtml(period.reflection)}</p>` : ''}`;
 
     if (has) document.getElementById('end-day-btn').addEventListener('click', () => openUnwind('day'));
@@ -281,7 +317,7 @@
     el.innerHTML = `
       <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <p class="section-label" style="margin:0">Focus by day · ${rangeStr}</p>
-        ${period ? '<span class="badge badge-focused">Week unwound ✓</span>' : ''}
+        ${period ? '<span class="badge badge-focused">Week unwound</span>' : ''}
       </div>
       ${weekBarsHtml(days)}
       <div class="flex justify-end mt-4">
@@ -311,6 +347,7 @@
         </div>
         <span style="width:36px;text-align:right;color:var(--text);font-variant-numeric:tabular-nums">${pct}%</span>
         <span style="width:54px;text-align:right;color:var(--text-faint);font-variant-numeric:tabular-nums">${formatSeconds(total)}</span>
+        <button class="icon-btn" data-replay-session="${session.id}" aria-label="View session replay" title="View replay">${ICON_REPLAY}</button>
         <button class="icon-btn danger" data-del-session="${session.id}" aria-label="Delete this session" title="Delete session">${ICON_TRASH}</button>
       </div>`;
     return row;
@@ -380,7 +417,7 @@
   /* ---------- Unwind ritual (unchanged) ---------- */
   let unwind = { kind: null, step: 0, reflection: '', snapshot: null, finished: false };
 
-  function openUnwind(kind) {
+  async function openUnwind(kind) {
     const todayKey = localDayKey(new Date());
     const weekKey  = weekKeyOf(new Date());
     let sessions, periodKey;
@@ -388,9 +425,10 @@
     else                { sessions = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey); periodKey = weekKey; }
     const sum = sumStates(sessions);
     const existing = findPeriod(kind, periodKey);
+    const planReality = kind === 'day' ? await loadPlanReality(periodKey, existing) : null;
     let aiRecap = null;
     if (existing && existing.ai_recap) { try { aiRecap = JSON.parse(existing.ai_recap); } catch (e) { aiRecap = null; } }
-    unwind = { kind, step: 0, reflection: existing && existing.reflection ? existing.reflection : '', snapshot: { sessions, periodKey, sum }, finished: false, aiRecap, aiState: 'idle' };
+    unwind = { kind, step: 0, reflection: existing && existing.reflection ? existing.reflection : '', snapshot: { sessions, periodKey, sum, planReality }, finished: false, aiRecap, aiState: 'idle' };
 
     document.getElementById('unwind-overlay').style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -407,6 +445,19 @@
   function syncReflection() {
     const ta = document.getElementById('unwind-reflection');
     if (ta) unwind.reflection = ta.value;
+  }
+
+  async function loadPlanReality(periodKey, existingPeriod = null) {
+    let saved = null;
+    if (existingPeriod && existingPeriod.plan_reality_json) {
+      try { saved = JSON.parse(existingPeriod.plan_reality_json); } catch (e) { saved = null; }
+    }
+    if (!window.PlanningInsights || !window.getPlanReality) return saved;
+    try {
+      return await getPlanReality(periodKey, PlanningInsights.dayBounds(periodKey));
+    } catch {
+      return saved;
+    }
   }
 
   // Daily unwind has an extra AI step; weekly is unchanged (3 steps).
@@ -440,10 +491,12 @@
         `<ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:5px">` +
         items.map(x => `<li class="text-sm" style="color:var(--text);line-height:1.45">${escapeHtml(x)}</li>`).join('') + `</ul>`
       : '';
-    const win = r.win ? `<p class="text-sm" style="color:var(--text);line-height:1.45;margin:10px 0 0;background:rgba(94,138,101,0.12);border-radius:8px;padding:8px 10px">🌱 <strong>Win:</strong> ${escapeHtml(r.win)}</p>` : '';
+    const win = r.win ? `<p class="text-sm" style="color:var(--text);line-height:1.45;margin:10px 0 0;background:rgba(94,138,101,0.12);border-radius:8px;padding:8px 10px"><strong>Win:</strong> ${escapeHtml(r.win)}</p>` : '';
+    const plan = r.plan_echo ? `<p class="text-sm plan-reality-echo"><strong>Plan vs reality:</strong> ${escapeHtml(r.plan_echo)}</p>` : '';
     const next = r.next_action ? `<p class="text-sm" style="color:var(--text);line-height:1.45;margin:12px 0 0;border-left:3px solid var(--sage);padding-left:10px"><strong>Tomorrow:</strong> ${escapeHtml(r.next_action)}</p>` : '';
     const shutdown = r.shutdown_question ? `<p class="text-sm" style="color:var(--text-muted);font-style:italic;line-height:1.5;margin:14px 0 0">${escapeHtml(r.shutdown_question)}</p>` : '';
     return `${r.summary ? `<p class="text-sm" style="color:var(--text);line-height:1.55;margin:0">${escapeHtml(r.summary)}</p>` : ''}
+      ${plan}
       ${win}
       ${section('Today vs your patterns', r.pattern_notes)}
       ${section('Advice', r.advice)}
@@ -464,11 +517,60 @@
       </div>`;
   }
 
+  function fmtMinuteOfDay(min) {
+    if (!Number.isFinite(min)) return 'unscheduled';
+    min = ((min % 1440) + 1440) % 1440;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    const ap = h < 12 ? 'am' : 'pm';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')}${ap}`;
+  }
+
+  function statusLabel(status) {
+    return {
+      not_started: 'Not started',
+      on_track: 'Close to plan',
+      started_late: 'Started late',
+      started_early: 'Started early',
+      ran_short: 'Ran short',
+      ran_long: 'Ran long',
+      unscheduled_work: 'Unplanned work',
+    }[status] || 'Logged';
+  }
+
+  function planRealityHtml(report) {
+    if (!report || (!report.has_plan && !(report.rows || []).length)) return '';
+    const rows = (report.rows || []).map(row => {
+      const planned = row.status === 'unscheduled_work'
+        ? 'Unplanned'
+        : `${fmtMinuteOfDay(row.planned_start_min)} / ${row.planned_estimate_min || 0}m`;
+      const actual = row.actual_total_min > 0
+        ? `${fmtMinuteOfDay(row.actual_start_min)} / ${row.actual_total_min}m`
+        : 'No session';
+      const statusClass = String(row.status || 'logged').replace(/[^a-z0-9_-]/gi, '-');
+      return `<div class="plan-reality-row">
+        <span data-label="Task">${escapeHtml(row.name || 'Untitled')}</span>
+        <span data-label="Planned">${escapeHtml(planned)}</span>
+        <span data-label="Actual">${escapeHtml(actual)}</span>
+        <span data-label="Status"><span class="plan-reality-status ${statusClass}">${escapeHtml(statusLabel(row.status))}</span></span>
+      </div>`;
+    }).join('');
+    return `<div class="plan-reality-card">
+      <div class="flex items-center justify-between gap-3">
+        <p class="section-label" style="margin:0">Plan vs reality</p>
+        <p class="text-xs" style="color:var(--text-faint);margin:0">${report.planned_total_min || 0}m planned - ${report.actual_total_min || 0}m tracked</p>
+      </div>
+      <p class="text-xs" style="color:var(--text-muted);margin:6px 0 10px">${escapeHtml(report.summary || '')}</p>
+      <div class="plan-reality-head"><span>Task</span><span>Planned</span><span>Actual</span><span>Status</span></div>
+      ${rows}
+    </div>`;
+  }
+
   function aiStepBody() {
     if (dayTotalSecs() < 120) {
       return '<p class="text-sm" style="color:var(--text-muted);line-height:1.55">Not enough tracked time today yet for AI insights — do a session and check back.</p>';
     }
-    const stats = aiStatsHtml();
+    const stats = aiStatsHtml() + planRealityHtml(unwind.snapshot.planReality);
     if (unwind.aiState === 'loading') {
       return stats + '<p class="text-sm" style="color:var(--text-muted)">Thinking about your day…</p>';
     }
@@ -481,7 +583,7 @@
         <button id="unwind-regenerate" class="btn-ghost" style="margin-top:14px;font-size:0.85rem">↻ Regenerate</button>`;
     }
     return stats + `<p class="text-sm mb-3" style="color:var(--text-muted);line-height:1.55">Let the AI review today against your learned patterns, recent days, and your most-focused hours.</p>
-      <button id="unwind-generate" class="btn-primary">✨ Generate daily insights</button>`;
+      <button id="unwind-generate" class="btn-primary">Generate daily insights</button>`;
   }
 
   function generateUnwindAi() { return unwind.kind === 'day' ? generateDailyAi() : generateWeeklyAi(); }
@@ -539,7 +641,7 @@
     const theme = r.theme ? `<p class="serif" style="font-size:1.1rem;font-weight:700;color:var(--text);margin:0 0 6px">${escapeHtml(r.theme)}</p>` : '';
     const summary = r.summary ? `<p class="text-sm" style="color:var(--text);line-height:1.55;margin:0">${escapeHtml(r.summary)}</p>` : '';
     const pomoBtn = (r.pomodoro && r.pomodoro.recommend)
-      ? `<button id="open-pomo-suggest" class="btn-ghost" style="margin-top:14px;font-size:0.85rem">⏱️ Tune my Pomodoro →</button>` : '';
+      ? `<button id="open-pomo-suggest" class="btn-ghost" style="margin-top:14px;font-size:0.85rem">Tune my Pomodoro →</button>` : '';
     const nextWeek = r.next_week_focus
       ? `<p class="text-sm" style="color:var(--text);line-height:1.45;margin:12px 0 0;border-left:3px solid var(--sage);padding-left:10px"><strong>Focus for next week:</strong> ${escapeHtml(r.next_week_focus)}</p>` : '';
     return theme + summary + list('Insights', r.insights) + list('Areas to improve', r.improvements) +
@@ -560,7 +662,7 @@
         `<button id="unwind-regenerate" class="btn-ghost" style="margin-top:6px;font-size:0.85rem">↻ Regenerate</button>`;
     }
     return `<p class="text-sm mb-3" style="color:var(--text-muted);line-height:1.55">Let the AI review your whole week — your best day, trends, distraction patterns, and (if useful) better Pomodoro timings.</p>
-      <button id="unwind-generate" class="btn-primary">✨ Generate weekly insights</button>`;
+      <button id="unwind-generate" class="btn-primary">Generate weekly insights</button>`;
   }
 
   async function generateWeeklyAi() {
@@ -618,8 +720,10 @@
     function render() {
       el.innerHTML = `
         <div class="flex items-center justify-between" style="margin-bottom:6px">
-          <h3 class="serif" style="font-size:1.1rem;font-weight:700;margin:0;color:var(--text)">⏱️ Suggested Pomodoro</h3>
-          <button id="pomo-x" aria-label="Close" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:1.1rem">✕</button>
+          <h3 class="serif" style="font-size:1.1rem;font-weight:700;margin:0;color:var(--text)">Suggested Pomodoro</h3>
+          <button id="pomo-x" aria-label="Close" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:1.1rem">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         </div>
         <p class="text-xs" style="color:var(--text-muted);line-height:1.55;margin:0 0 8px">A Pomodoro alternates a focus block with a short break. Based on your week, the AI suggests these timings${pomo.why ? ':' : '.'}</p>
         ${pomo.why ? `<p class="text-xs" style="color:var(--text);line-height:1.5;margin:0 0 6px;border-left:3px solid var(--sage);padding-left:8px">${escapeHtml(pomo.why)}</p>` : ''}
@@ -657,9 +761,10 @@
         session_ids: unwind.snapshot.sessions.map(s => s.id),
         recent_avg_focus_pct: recentAvgFocusPct(unwind.snapshot.periodKey),
         period_key: unwind.snapshot.periodKey,
+        plan_reality_summary: unwind.snapshot.planReality ? unwind.snapshot.planReality.summary : null,
       });
       unwind.aiRecap = {
-        summary: r.summary || '', win: r.win || '', pattern_notes: r.pattern_notes || [],
+        summary: r.summary || '', plan_echo: r.plan_echo || '', win: r.win || '', pattern_notes: r.pattern_notes || [],
         advice: r.advice || [], next_action: r.next_action || '', shutdown_question: r.shutdown_question || '',
       };
       unwind.aiState = 'done';
@@ -671,6 +776,7 @@
           seconds_focused: sum.focused, seconds_distracted: sum.distracted,
           seconds_uncertain: sum.uncertain, seconds_away: sum.away,
           ai_recap: JSON.stringify(unwind.aiRecap),
+          plan_reality_json: unwind.snapshot.planReality ? JSON.stringify(unwind.snapshot.planReality) : null,
         });
         workPeriods = await getWorkPeriods();
       } catch (e) { /* save failed but still show the recap */ }
@@ -786,14 +892,17 @@
         kind, period_key: snapshot.periodKey, ended_at: new Date().toISOString(),
         seconds_focused: sum.focused, seconds_distracted: sum.distracted,
         seconds_uncertain: sum.uncertain, seconds_away: sum.away, reflection: reflection || '',
+        plan_reality_json: kind === 'day' && snapshot.planReality ? JSON.stringify(snapshot.planReality) : null,
       });
       workPeriods = await getWorkPeriods();
       unwind.finished = true;
       document.getElementById('unwind-dots').innerHTML = '';
       document.getElementById('unwind-body').innerHTML = `
         <div class="text-center py-6">
-          <div style="font-size:2rem">🌿</div>
-          <p class="serif" style="font-size:1.3rem;font-weight:700;margin:0.5rem 0 4px">${kind === 'day' ? 'Done for the day' : 'Week complete'} ✓</p>
+          <div style="width:42px;height:42px;border-radius:99px;background:var(--sage-soft);display:inline-flex;align-items:center;justify-content:center;color:var(--sage)" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <p class="serif" style="font-size:1.3rem;font-weight:700;margin:0.5rem 0 4px">${kind === 'day' ? 'Done for the day' : 'Week complete'}</p>
           <p class="text-sm" style="color:var(--text-muted)">${kind === 'day'
             ? `You focused for ${formatHM(sum.focused)} today. Rest well.`
             : `You focused for ${formatHM(sum.focused)} this week. Nicely done.`}</p>
@@ -820,6 +929,30 @@
   document.getElementById('unwind-overlay').addEventListener('click', e => { if (e.target.id === 'unwind-overlay') closeUnwind(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('unwind-overlay').style.display === 'flex') closeUnwind(); });
 
+  /* ---------- session replay ---------- */
+  const replayOverlay = document.getElementById('replay-overlay');
+  function closeReplay() {
+    replayOverlay.style.display = 'none';
+  }
+  function openReplay(session) {
+    document.getElementById('replay-title').textContent = 'Session replay';
+    document.getElementById('replay-subtitle').textContent =
+      `${session.task_name || 'Untitled'} · ${formatTime(session.started_at)} · ${formatSeconds(
+        (session.seconds_focused || 0) +
+        (session.seconds_distracted || 0) +
+        (session.seconds_uncertain || 0) +
+        (session.seconds_away || 0)
+      )}`;
+    document.getElementById('replay-body').innerHTML = window.FocusSessionReplay
+      ? FocusSessionReplay.render(session)
+      : '<p class="text-sm" style="color:var(--text-muted)">Replay is unavailable right now.</p>';
+    replayOverlay.style.display = 'flex';
+    document.getElementById('replay-close').focus();
+  }
+  document.getElementById('replay-close').addEventListener('click', closeReplay);
+  replayOverlay.addEventListener('click', e => { if (e.target.id === 'replay-overlay') closeReplay(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && replayOverlay.style.display === 'flex') closeReplay(); });
+
   /* ---------- boot ---------- */
   async function loadAll() {
     const main = document.getElementById('analytics-main');
@@ -840,6 +973,14 @@
 
   // Delete a session from any history row (delegated; #history-list persists across re-renders).
   document.getElementById('history-list').addEventListener('click', async (e) => {
+    const replay = e.target.closest('[data-replay-session]');
+    if (replay) {
+      const id = parseInt(replay.dataset.replaySession, 10);
+      const session = allSessions.find(s => s.id === id);
+      if (session) openReplay(session);
+      return;
+    }
+
     const del = e.target.closest('[data-del-session]');
     if (!del) return;
     const id = parseInt(del.dataset.delSession, 10);

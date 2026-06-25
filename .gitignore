@@ -23,6 +23,7 @@ Thumbs.db
 promptlab/out/
 v0-export/
 .pnpm-store/
+.playwright-mcp/
 promptlab/
 tools/
 docs/

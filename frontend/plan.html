@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Buddy — Plan</title>
+  <script src="js/theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-3xl mx-auto">
+    <a href="index.html" class="logo">
+      <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <circle cx="13" cy="13" r="11.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="6.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="2" fill="var(--accent)"/>
+      </svg>
+      <h1>Focus Buddy</h1>
+    </a>
+    <nav class="page-nav" aria-label="Main navigation">
+      <a href="plan.html" class="active" aria-current="page">Plan</a>
+      <a href="index.html">Today</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="#" id="about-nav" role="button">About me</a>
+      <div class="settings-menu" style="position:relative">
+        <button id="settings-btn" class="settings-trigger" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-6 py-8">
+  <div class="card" style="position:relative">
+    <!-- Always-available exit: leaves to Today, nothing saved. -->
+    <button id="plan-exit" class="btn-ghost" aria-label="Exit planning" title="Exit (Esc)"
+            style="position:absolute;top:13px;right:13px;width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+
+    <p class="section-label" style="margin:0 0 2px">Plan today’s focus — optional</p>
+    <div class="flex items-center justify-between gap-3 mb-4" style="padding-right:34px">
+      <h2 class="serif" id="plan-date" style="font-size:1.2rem;font-weight:600;margin:0"></h2>
+      <div class="step-dots" id="plan-dots"></div>
+    </div>
+
+    <div id="plan-body"></div>
+
+    <div id="plan-footer" class="flex items-center justify-between gap-3 mt-5">
+      <button id="plan-back" class="btn-ghost">Back</button>
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="text-sm" id="plan-skip" style="color:var(--text-faint)">Not today</a>
+        <button id="plan-next" class="btn-primary">Next</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/settings-menu.js"></script>
+<script src="js/planning-insights.js"></script>
+<script src="js/plan-calendar.js"></script>
+<script>
+  // ---- The Plan wizard (its own small step controller; not the analytics modal) ----
+  const STEP_KEYS = ['pick', 'size', 'schedule', 'confirm'];
+  const DIFFICULTIES = ['easy', 'medium', 'hard'];
+  const DIFF_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+  const DEFAULT_ESTIMATE = 30;     // minutes a freshly-picked task starts at
+  const DEFAULT_AVAILABLE = 180;   // minutes the "time available" slider starts at
+
+  const el = id => document.getElementById(id);
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+  // Local day key (YYYY-MM-DD) — same local-date convention analytics uses, never UTC.
+  function localDateKey(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  function fmtMins(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    if (h && m) return `${h}h ${m}m`;
+    if (h) return `${h}h`;
+    return `${m}m`;
+  }
+  function normalizeScheduledMin(entry, min, snap) {
+    if (!Number.isFinite(min) || !window.PlanCalendar || !window.PlanCalendar.normalizeScheduledMin) {
+      return min;
+    }
+    return window.PlanCalendar.normalizeScheduledMin(entry, min, snap);
+  }
+  function entryForSave(entry) {
+    const out = { ...entry };
+    if (Number.isFinite(out.scheduled_min)) {
+      out.scheduled_min = normalizeScheduledMin(out, out.scheduled_min, 5);
+    }
+    return out;
+  }
+
+  const periodKey = localDateKey();
+  const state = {
+    step: 0,
+    tasks: [],                 // active tasks from the backend
+    entries: new Map(),        // task_id -> { task_id, name, estimate_min, difficulty }
+    availableMin: DEFAULT_AVAILABLE,
+    existingPlan: false,       // a plan already existed today (we're editing it)
+    loadError: false,
+    planDirty: false,
+    hadSavedAdvice: false,
+    advice: null,              // AI scheduling advice; may be stale after edits until regenerated
+    adviceStale: false,
+    adviceGeneratedThisVisit: false,
+    dismissedAdviceIds: new Set(),
+    adviceLoading: false,
+    calibration: null,
+    reschedule: null,
+    rescheduleLoading: false,
+    saveStatus: '',
+    finished: false,           // set once the plan is saved (success screen shown)
+    hourly: new Map(),         // hour -> { focus_pct, sessions } for timeline shading
+  };
+
+  el('plan-date').textContent =
+    new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+  // Easy exit: the close button and Escape both return to Today with nothing saved. If a modal
+  // is open, its own Escape handler gets first chance instead of leaving Plan.
+  el('plan-exit').addEventListener('click', () => { location.href = 'index.html'; });
+  function visibleDialogOpen() {
+    return [...document.querySelectorAll('.modal-overlay, [role="dialog"]')].some(node => {
+      const box = node.classList && node.classList.contains('modal-overlay') ? node : node.closest('.modal-overlay') || node;
+      if (box.hidden) return false;
+      const style = window.getComputedStyle(box);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    });
+  }
+  function typingTarget(target) {
+    return !!(target && target.closest && target.closest('input, textarea, select, [contenteditable="true"]'));
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (visibleDialogOpen() || typingTarget(e.target)) return;
+    location.href = 'index.html';
+  });
+
+  function markPlanChanged(opts = {}) {
+    state.planDirty = true;
+    const staleAdvice = opts.adviceStale !== false;
+    if (staleAdvice) state.reschedule = null;
+    if (staleAdvice && (state.advice || state.hadSavedAdvice)) {
+      state.adviceStale = true;
+      state.dismissedAdviceIds.clear();
+    }
+  }
+
+  function hasCurrentAdvice() {
+    return !!(state.advice && !state.adviceStale);
+  }
+
+  function totalEstimate() {
+    let sum = 0;
+    state.entries.forEach(e => { sum += e.estimate_min; });
+    return sum;
+  }
+
+  function calibrationFor(entry) {
+    const cal = state.calibration;
+    if (!cal) return null;
+    const task = Array.isArray(cal.by_task)
+      ? cal.by_task.find(item => item.task_id === entry.task_id && item.tendency !== 'unknown')
+      : null;
+    const item = task || (cal.overall && cal.overall.tendency !== 'unknown' ? cal.overall : null);
+    if (!item || !item.message || !['under', 'over'].includes(item.tendency)) return null;
+    return item;
+  }
+
+  function calibrationNoteHtml(entry) {
+    const item = calibrationFor(entry);
+    if (!item) return '';
+    const tone = item.tendency === 'under' ? 'under' : 'over';
+    return `<p class="plan-calibration-note ${tone}">${escapeHtml(item.message)}</p>`;
+  }
+
+  function budgetMeterHtml() {
+    const used = totalEstimate();
+    const avail = state.availableMin;
+    const pct = avail > 0 ? Math.min(100, Math.round(used / avail * 100)) : 0;
+    const over = used > avail;
+    return `
+      <div class="budget-meter" role="img" aria-label="${used} of ${avail} minutes planned">
+        <div class="budget-fill ${over ? 'over' : ''}" style="width:${pct}%"></div>
+      </div>
+      <p class="text-xs mt-1.5" style="color:${over ? 'var(--ochre)' : 'var(--text-faint)'}" aria-live="polite">
+        ${fmtMins(used)} of ${fmtMins(avail)} planned${over ? ' — over your available time' : ''}
+      </p>`;
+  }
+
+  // The pick list = active tasks, plus any planned entry whose task was since deleted
+  // (shown by its snapshot name so the user can still see / uncheck it).
+  function pickList() {
+    const ids = new Set(state.tasks.map(t => t.id));
+    const ghosts = [...state.entries.values()]
+      .filter(e => !ids.has(e.task_id))
+      .map(e => ({ id: e.task_id, name: e.name }));
+    return [...state.tasks, ...ghosts];
+  }
+
+  // ---------- Phase bodies ----------
+  function stepBody() {
+    const key = STEP_KEYS[state.step];
+    if (key === 'pick') return pickBody();
+    if (key === 'size') return sizeBody();
+    if (key === 'schedule') return scheduleBody();
+    return confirmBody();
+  }
+
+  function pickBody() {
+    if (state.loadError) {
+      return `
+        <div class="card" style="background:var(--rose-soft);border-color:var(--terracotta)">
+          <p class="serif" style="font-size:1rem;font-weight:600;color:var(--text);margin:0 0 4px">Could not load your tasks.</p>
+          <p class="text-sm" style="color:var(--text-muted);margin:0">Make sure the backend is running.</p>
+        </div>`;
+    }
+    const list = pickList();
+    const rows = list.map(t => `
+      <label class="flex items-center gap-3" style="padding:0.5rem 0.1rem;cursor:pointer">
+        <input type="checkbox" data-task="${t.id}" ${state.entries.has(t.id) ? 'checked' : ''}
+               style="width:17px;height:17px;accent-color:var(--sage)" />
+        <span class="serif" style="font-size:0.95rem;color:var(--text)">${escapeHtml(t.name)}</span>
+      </label>`).join('');
+    const empty = list.length ? '' :
+      `<p class="text-sm" style="color:var(--text-faint);padding:0.4rem 0">No tasks yet — add one below.</p>`;
+    const helper = state.entries.size ? '' :
+      `<p class="text-xs mt-3" style="color:var(--text-faint)">Pick or add at least one task to continue.</p>`;
+    return `
+      <p class="text-sm mb-3" style="color:var(--text-muted)">
+        Choose the tasks you want to focus on today. Totally optional — you can leave anytime.
+      </p>
+      <div id="pick-list" class="flex flex-col">${rows}${empty}</div>
+      <form id="inline-add" class="flex gap-2 mt-3">
+        <input id="inline-name" class="input" type="text" placeholder="Add a task…"
+               autocomplete="off" aria-label="New task name" style="flex:1" />
+        <button class="btn-ghost" type="submit">Add</button>
+      </form>
+      ${helper}`;
+  }
+
+  function sizeBody() {
+    const entries = [...state.entries.values()];
+    if (!entries.length) {
+      return `<p class="text-sm" style="color:var(--text-muted)">No tasks picked yet — go back and choose at least one.</p>`;
+    }
+    const taskFields = entries.map(e => `
+      <div class="plan-task">
+        <p class="serif mb-2" style="font-size:0.95rem;font-weight:500;color:var(--text)">${escapeHtml(e.name)}</p>
+        <div class="plan-field-head">
+          <label for="est-${e.task_id}" class="text-xs" style="color:var(--text-muted)">Estimated time</label>
+          <span class="plan-field-val" id="estval-${e.task_id}" aria-live="polite">${fmtMins(e.estimate_min)}</span>
+        </div>
+        <input id="est-${e.task_id}" class="fb-range" type="range" min="10" max="120" step="5"
+               value="${e.estimate_min}" data-est="${e.task_id}" aria-label="Estimated minutes for ${escapeHtml(e.name)}" />
+        ${calibrationNoteHtml(e)}
+        <div class="flex items-center justify-between gap-3 mt-3">
+          <span class="text-xs" style="color:var(--text-muted)">Difficulty</span>
+          <div class="seg" role="group" aria-label="Difficulty for ${escapeHtml(e.name)}" data-diff="${e.task_id}">
+            ${DIFFICULTIES.map(d => `
+              <button type="button" class="seg-btn" data-d="${d}"
+                      aria-pressed="${e.difficulty === d ? 'true' : 'false'}">${DIFF_LABEL[d]}</button>`).join('')}
+          </div>
+        </div>
+      </div>`).join('');
+    return `
+      <div>${taskFields}</div>
+      <div class="plan-field" style="margin-top:1.2rem">
+        <div class="plan-field-head">
+          <label for="avail" class="text-xs" style="color:var(--text-muted)">Time available today</label>
+          <span class="plan-field-val" id="availval" aria-live="polite">${fmtMins(state.availableMin)}</span>
+        </div>
+        <input id="avail" class="fb-range" type="range" min="30" max="600" step="15"
+               value="${state.availableMin}" aria-label="Total time available today, in minutes" />
+      </div>
+      <div class="mt-3">${budgetMeterHtml()}</div>`;
+  }
+
+  function fmtClock(min) {
+    min = ((min % 1440) + 1440) % 1440;
+    const h = Math.floor(min / 60), m = min % 60;
+    const ap = h < 12 ? 'am' : 'pm';
+    let hr = h % 12; if (hr === 0) hr = 12;
+    return `${hr}:${String(m).padStart(2, '0')}${ap}`;
+  }
+
+  // Schedule step (Chunk C): the calendar + tray render into #plan-cal-root via
+  // plan-calendar.js (wired in bindStep). The AI-suggestions overlay arrives in Step 3.
+  function scheduleBody() {
+    const entries = [...state.entries.values()];
+    if (!entries.length) {
+      return `<p class="text-sm" style="color:var(--text-muted)">No tasks picked yet — go back and choose at least one.</p>`;
+    }
+    const adviceLabel = state.adviceLoading
+      ? 'Getting suggestions...'
+      : (state.advice ? 'Regenerate AI suggestions' : 'Get AI suggestions');
+    const adviceDisabled = state.adviceLoading ? 'disabled' : '';
+    const rescheduleDisabled = state.rescheduleLoading ? 'disabled' : '';
+    const rescheduleLabel = state.rescheduleLoading ? 'Refitting...' : 'Refit remaining day';
+    const adviceNote = state.adviceLoading
+      ? 'Asking the AI for suggested times.'
+      : state.reschedule
+        ? 'Revised times show as faint blocks. Apply the ones you want.'
+      : hasCurrentAdvice()
+        ? 'AI suggestions show as faint blocks. You choose what to use.'
+        : state.adviceStale
+          ? 'Your saved AI advice is stale after task or estimate changes. Regenerate when you want fresh suggestions.'
+          : 'Optional: ask the AI for suggested times after you place your own plan.';
+    const saveStatus = state.saveStatus
+      ? `<span id="plan-save-status" class="plan-save-status">${escapeHtml(state.saveStatus)}</span>`
+      : `<span id="plan-save-status" class="plan-save-status" aria-live="polite"></span>`;
+    return `
+      <p class="text-sm mb-3" style="color:var(--text-muted)">Place each task on your day. Optional — you can save without scheduling.</p>
+      <div class="plan-schedule-tools">
+        <button id="plan-advice-btn" type="button" class="btn-ghost text-xs" ${adviceDisabled}>${adviceLabel}</button>
+        <button id="plan-reschedule-btn" type="button" class="btn-ghost text-xs" ${rescheduleDisabled}>${rescheduleLabel}</button>
+        ${saveStatus}
+      </div>
+      <p class="text-xs mb-3" style="color:var(--text-faint)">${adviceNote}</p>
+      ${state.reschedule && state.reschedule.over_plan_note ? `<p class="plan-reschedule-note">${escapeHtml(state.reschedule.over_plan_note)}</p>` : ''}
+      <div id="plan-cal-root"></div>
+      <div class="mt-3">${budgetMeterHtml()}</div>`;
+  }
+
+  function confirmBody() {
+    const entries = [...state.entries.values()];
+    if (!entries.length) {
+      return `<p class="text-sm" style="color:var(--text-muted)">Pick at least one task before saving.</p>`;
+    }
+    const rows = entries.map(e => {
+      const when = Number.isFinite(e.scheduled_min)
+        ? `<span class="plan-confirm-time">${fmtClock(normalizeScheduledMin(e, e.scheduled_min, 5))}</span>`
+        : '<span class="plan-unscheduled-pill">Unscheduled</span>';
+      return `
+        <div class="plan-task flex items-center justify-between gap-3">
+          <span class="serif" style="font-size:0.95rem;color:var(--text)">${escapeHtml(e.name)}</span>
+          <span class="plan-confirm-meta">
+            ${when}
+            <span>${fmtMins(e.estimate_min)} · ${DIFF_LABEL[e.difficulty]}</span>
+          </span>
+        </div>`;
+    }).join('');
+    const clear = state.existingPlan
+      ? `<button id="plan-clear" class="btn-ghost text-sm" style="color:var(--terracotta)">Clear today’s plan</button>`
+      : '';
+    return `
+      <p class="text-sm mb-3" style="color:var(--text-muted)">
+        ${state.existingPlan ? 'Update today’s plan?' : 'Save this as today’s plan? You can edit or clear it anytime.'}
+      </p>
+      <div>${rows}</div>
+      <div class="mt-3">${budgetMeterHtml()}</div>
+      <div class="mt-4">${clear}</div>`;
+  }
+
+  // ---------- Render + per-step wiring ----------
+  function render() {
+    el('plan-dots').innerHTML = STEP_KEYS.map((_, i) =>
+      `<span class="step-dot ${i === state.step ? 'active' : ''}"></span>`).join('');
+    el('plan-body').innerHTML = stepBody();
+    el('plan-back').style.visibility = state.step === 0 ? 'hidden' : 'visible';
+
+    const last = state.step === STEP_KEYS.length - 1;
+    const next = el('plan-next');
+    next.textContent = last ? 'Save plan' : 'Next';
+    const blockNext = state.loadError || state.entries.size === 0 || state.adviceLoading;
+    next.disabled = blockNext;
+    next.style.opacity = blockNext ? '0.5' : '1';
+    next.style.cursor = blockNext ? 'not-allowed' : 'pointer';
+
+    bindStep();
+  }
+
+  function bindStep() {
+    const key = STEP_KEYS[state.step];
+    if (key === 'pick') {
+      if (state.loadError) return;
+      const listEl = el('pick-list');
+      const addForm = el('inline-add');
+      if (!listEl || !addForm) return;
+      listEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const id = parseInt(cb.dataset.task, 10);
+          if (cb.checked) {
+            const t = pickList().find(x => x.id === id);
+            state.entries.set(id, {
+              task_id: id, name: t ? t.name : '',
+              estimate_min: DEFAULT_ESTIMATE, difficulty: 'medium',
+            });
+          } else {
+            state.entries.delete(id);
+          }
+          markPlanChanged();
+          scheduleAutoSave();
+          render();
+        });
+      });
+      addForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = el('inline-name').value.trim();
+        if (!name) return;
+        try {
+          const task = await createTask(name);
+          state.tasks.unshift(task);
+          // auto-select the just-added task
+          state.entries.set(task.id, {
+            task_id: task.id, name: task.name,
+            estimate_min: DEFAULT_ESTIMATE, difficulty: 'medium',
+          });
+          markPlanChanged();
+          scheduleAutoSave();
+          render();
+        } catch {
+          showToast('Could not add the task — is the backend running?', { danger: true });
+        }
+      });
+    } else if (key === 'size') {
+      el('plan-body').querySelectorAll('input[data-est]').forEach(r => {
+        r.addEventListener('input', () => {
+          const id = parseInt(r.dataset.est, 10);
+          const entry = state.entries.get(id);
+          if (!entry) return;
+          entry.estimate_min = parseInt(r.value, 10);
+          el(`estval-${id}`).textContent = fmtMins(entry.estimate_min);
+          markPlanChanged();
+          refreshBudget();
+          scheduleAutoSave();
+        });
+      });
+      const avail = el('avail');
+      if (avail) avail.addEventListener('input', () => {
+        state.availableMin = parseInt(avail.value, 10);
+        el('availval').textContent = fmtMins(state.availableMin);
+        markPlanChanged();
+        refreshBudget();
+        scheduleAutoSave();
+      });
+      el('plan-body').querySelectorAll('.seg[data-diff]').forEach(group => {
+        const id = parseInt(group.dataset.diff, 10);
+        group.querySelectorAll('.seg-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const entry = state.entries.get(id);
+            if (!entry) return;
+            entry.difficulty = btn.dataset.d;
+            markPlanChanged();
+            group.querySelectorAll('.seg-btn').forEach(b =>
+              b.setAttribute('aria-pressed', String(b === btn)));
+            scheduleAutoSave();
+          });
+        });
+      });
+    } else if (key === 'schedule') {
+      paintCalendar();
+      const adviceBtn = el('plan-advice-btn');
+      if (adviceBtn) adviceBtn.addEventListener('click', generateAdvice);
+      const rescheduleBtn = el('plan-reschedule-btn');
+      if (rescheduleBtn) rescheduleBtn.addEventListener('click', generateReschedule);
+    } else if (key === 'confirm') {
+      const clear = el('plan-clear');
+      if (clear) clear.addEventListener('click', clearPlan);
+    }
+  }
+
+  // Re-render only the budget meter in place (the slider keeps focus while dragging).
+  function refreshBudget() {
+    const holder = el('plan-body').querySelector('.budget-meter');
+    if (holder && holder.parentElement) holder.parentElement.innerHTML = budgetMeterHtml();
+  }
+
+  function setSaveStatus(text) {
+    state.saveStatus = text;
+    const node = el('plan-save-status');
+    if (node) node.textContent = text;
+  }
+
+  let autoSaveTimer = null;
+  function scheduleAutoSave() {
+    if (state.finished || !state.entries.size) return;
+    setSaveStatus('Saving...');
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(autoSavePlan, 650);
+  }
+
+  async function autoSavePlan() {
+    const entries = [...state.entries.values()];
+    if (!entries.length || state.finished) return;
+    const payload = {
+      period_key: periodKey,
+      available_min: state.availableMin,
+      plan_json: JSON.stringify(entries.map(entryForSave)),
+    };
+    if (state.planDirty && state.hadSavedAdvice && state.adviceStale) {
+      payload.advice_json = "";
+    }
+    try {
+      await savePlan(payload);
+      state.existingPlan = true;
+      state.planDirty = false;
+      if (payload.advice_json === "") state.hadSavedAdvice = false;
+      setSaveStatus('Saved');
+    } catch {
+      setSaveStatus('Save failed');
+      showToast('Could not auto-save your plan — is the backend running?', { danger: true });
+    }
+  }
+
+  function applySchedulePatch(taskId, patch) {
+    const e = state.entries.get(taskId);
+    if (!e || !patch) return;
+    const touchesTime = Object.prototype.hasOwnProperty.call(patch, 'scheduled_min');
+    const touchesEstimate = Object.prototype.hasOwnProperty.call(patch, 'estimate_min');
+    const snap = Number.isFinite(patch._snap) ? patch._snap : undefined;
+    if (touchesTime) {
+      if (patch.scheduled_min === null) delete e.scheduled_min;
+      else e.scheduled_min = normalizeScheduledMin(e, Number(patch.scheduled_min), snap);
+    }
+    if (touchesEstimate) {
+      const clampEstimate = window.PlanCalendar && window.PlanCalendar._clampEstimate
+        ? window.PlanCalendar._clampEstimate
+        : (v => Math.max(10, Math.min(120, Math.round(Number(v) || 10))));
+      e.estimate_min = clampEstimate(patch.estimate_min);
+      if (Number.isFinite(e.scheduled_min)) {
+        e.scheduled_min = normalizeScheduledMin(e, e.scheduled_min, 5);
+      }
+    }
+    markPlanChanged({ adviceStale: !touchesTime || touchesEstimate });
+    paintCalendar();
+    refreshBudget();
+    scheduleAutoSave();
+  }
+
+  // Render the schedule-step calendar + tray (via plan-calendar.js) and re-render on a
+  // placement change. Placement updates plan_json on save; it does NOT mark advice stale.
+  function paintCalendar() {
+    const root = el('plan-cal-root');
+    if (!root || !window.PlanCalendar) return;
+    const suggestion = state.reschedule || (hasCurrentAdvice() ? state.advice : null);
+    const isReschedule = !!state.reschedule;
+    window.PlanCalendar.render(root, {
+      entries: [...state.entries.values()],
+      hourly: state.hourly,
+      aiSuggest: suggestion,
+      suggestLabel: isReschedule ? 'Revised' : 'AI',
+      suggestUseLabel: isReschedule ? 'Use time' : 'Use AI',
+      suggestAllLabel: isReschedule ? 'Apply all revised times' : 'Apply all AI times',
+      dismissedAi: state.dismissedAdviceIds,
+      onDismissAi: (taskId) => {
+        state.dismissedAdviceIds.add(taskId);
+        paintCalendar();
+      },
+      onUpdate: applySchedulePatch,
+      onChange: (taskId, scheduledMin) => {
+        applySchedulePatch(taskId, { scheduled_min: scheduledMin });
+      },
+    });
+  }
+
+  el('plan-next').addEventListener('click', () => {
+    if (state.loadError || state.entries.size === 0 || state.adviceLoading) return;
+    if (state.step === STEP_KEYS.length - 1) { savePlanNow(); return; }
+    state.step += 1;
+    render();
+  });
+  el('plan-back').addEventListener('click', () => {
+    if (state.step > 0) { state.step -= 1; render(); }
+  });
+
+  let adviceReqId = 0;
+  async function generateAdvice() {
+    const myReq = ++adviceReqId;
+    state.adviceLoading = true;
+    render();
+    let result = null, failed = false;
+    try {
+      result = await getPlanAdvice({
+        period_key: periodKey,
+        available_min: state.availableMin,
+        entries: [...state.entries.values()],
+      });
+    } catch {
+      failed = true;
+    }
+    // Ignore a stale completion: superseded by a newer Generate, or the plan was already
+    // saved (don't clobber the success screen).
+    if (myReq !== adviceReqId || state.finished) return;
+    state.adviceLoading = false;
+    if (failed) {
+      showToast('Could not generate advice — the AI may be busy. Try again in a moment.', { danger: true });
+    } else {
+      state.advice = result;
+      state.adviceStale = false;
+      state.reschedule = null;
+      state.adviceGeneratedThisVisit = true;
+      state.dismissedAdviceIds.clear();
+      setSaveStatus('Saving...');
+      try {
+        await persistAdviceNow();
+      } catch {
+        setSaveStatus('Save failed');
+        showToast('AI suggestions were generated, but could not be saved yet.', { danger: true });
+      }
+    }
+    render();
+  }
+
+  async function generateReschedule() {
+    if (state.rescheduleLoading || !state.entries.size) return;
+    state.rescheduleLoading = true;
+    render();
+    try {
+      const [sessions, tasks] = await Promise.all([getSessions(), getTasks()]);
+      const todayKey = window.PlanningInsights ? PlanningInsights.localDayKey() : periodKey;
+      const actualByTask = {};
+      (sessions || []).forEach(s => {
+        const started = new Date(s.started_at);
+        const key = window.PlanningInsights ? PlanningInsights.localDayKey(started) : localDateKey(started);
+        if (key !== todayKey) return;
+        const totalMin = Math.round(((s.seconds_focused || 0) + (s.seconds_distracted || 0) + (s.seconds_uncertain || 0) + (s.seconds_away || 0)) / 60);
+        actualByTask[s.task_id] = (actualByTask[s.task_id] || 0) + totalMin;
+      });
+      const completedTaskIds = (tasks || []).filter(t => t.completed).map(t => t.id);
+      const now = new Date();
+      state.reschedule = await getPlanReschedule({
+        period_key: periodKey,
+        entries: [...state.entries.values()].map(entryForSave),
+        current_min: now.getHours() * 60 + now.getMinutes(),
+        day_end_min: 23 * 60,
+        actual_by_task: actualByTask,
+        completed_task_ids: completedTaskIds,
+      });
+      state.dismissedAdviceIds.clear();
+    } catch {
+      showToast('Could not refit the remaining day — is the backend running?', { danger: true });
+    } finally {
+      state.rescheduleLoading = false;
+      render();
+    }
+  }
+
+  async function persistAdviceNow() {
+    if (!state.advice || state.adviceStale) return;
+    const entries = [...state.entries.values()];
+    if (!entries.length || state.finished) return;
+    const payload = {
+      period_key: periodKey,
+      available_min: state.availableMin,
+      plan_json: JSON.stringify(entries.map(entryForSave)),
+      advice_json: JSON.stringify(state.advice),
+    };
+    await savePlan(payload);
+    state.planDirty = false;
+    state.existingPlan = true;
+    state.hadSavedAdvice = true;
+    state.adviceGeneratedThisVisit = false;
+    setSaveStatus('Saved');
+  }
+
+  async function savePlanNow() {
+    const entries = [...state.entries.values()];
+    if (state.loadError || !entries.length) return;
+    const entriesForSave = entries.map(entryForSave);
+    const payload = {
+      period_key: periodKey,
+      available_min: state.availableMin,
+      plan_json: JSON.stringify(entriesForSave),
+    };
+    if (state.adviceGeneratedThisVisit && state.advice && !state.adviceStale) {
+      payload.advice_json = JSON.stringify(state.advice);
+    } else if (state.planDirty && state.hadSavedAdvice && state.adviceStale) {
+      payload.advice_json = "";
+    }
+    try {
+      await savePlan(payload);
+      state.planDirty = false;
+      state.existingPlan = true;
+      if (payload.advice_json === "") state.hadSavedAdvice = false;
+      else if (payload.advice_json) {
+        state.hadSavedAdvice = true;
+        state.adviceGeneratedThisVisit = false;
+      }
+      showSuccess();
+    } catch {
+      showToast('Could not save your plan — is the backend running?', { danger: true });
+    }
+  }
+
+  async function clearPlan() {
+    const ok = await confirmDialog('Clear today’s plan? This removes the saved plan for today.',
+      { danger: true, confirmText: 'Clear plan' });
+    if (!ok) return;
+    try {
+      await deletePlan(periodKey);
+      showToast('Today’s plan cleared.');
+      location.href = 'index.html';
+    } catch {
+      showToast('Could not clear the plan — is the backend running?', { danger: true });
+    }
+  }
+
+  function showSuccess() {
+    state.finished = true;   // stops any late advice completion from clobbering this screen
+    el('plan-footer').style.display = 'none';
+    el('plan-dots').innerHTML = '';
+    el('plan-body').innerHTML = `
+      <div class="flex flex-col items-center text-center gap-3 py-6">
+        <div style="width:42px;height:42px;border-radius:99px;background:var(--sage-soft);display:flex;align-items:center;justify-content:center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <p class="serif" style="font-size:1.05rem;font-weight:600;color:var(--text);margin:0">Plan saved for today</p>
+        <p class="text-sm" style="color:var(--text-muted);margin:0">${[...state.entries.values()].length} task${state.entries.size === 1 ? '' : 's'} · ${fmtMins(totalEstimate())} planned. Start whenever you’re ready — nothing’s forced.</p>
+        <a href="index.html" class="btn-primary mt-2">Go to Today
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>`;
+  }
+
+  async function init() {
+    let tasks = [], plan = null, hourly = [];
+    try {
+      [tasks, plan] = await Promise.all([
+        getTasks(),
+        getPlan(periodKey),
+      ]);
+    } catch {
+      state.loadError = true;
+      render();
+      return;
+    }
+    try {
+      hourly = await getHourlyFocus();
+    } catch { hourly = []; }
+    try {
+      state.calibration = await getPlanCalibration(14);
+    } catch { state.calibration = null; }
+    state.tasks = (tasks || []).filter(t => !t.completed);
+    (hourly || []).forEach(h => state.hourly.set(h.hour, { focus_pct: h.focus_pct, sessions: h.sessions }));
+    if (plan && plan.plan_json) {
+      try {
+        JSON.parse(plan.plan_json).forEach(e => {
+          if (e && typeof e.task_id === 'number') {
+            const entry = {
+              task_id: e.task_id,
+              name: e.name || '',
+              estimate_min: Number.isFinite(e.estimate_min) ? e.estimate_min : DEFAULT_ESTIMATE,
+              difficulty: DIFFICULTIES.includes(e.difficulty) ? e.difficulty : 'medium',
+            };
+            if (Number.isInteger(e.scheduled_min) && e.scheduled_min >= 0 && e.scheduled_min <= 1439) {
+              entry.scheduled_min = normalizeScheduledMin(entry, e.scheduled_min, 5);
+            }
+            state.entries.set(e.task_id, entry);
+          }
+        });
+        state.existingPlan = state.entries.size > 0;
+      } catch { /* ignore a malformed saved plan */ }
+      if (Number.isFinite(plan.available_min) && plan.available_min > 0) {
+        state.availableMin = plan.available_min;
+      }
+      if (plan.advice_json) {
+        state.hadSavedAdvice = true;
+        try { state.advice = JSON.parse(plan.advice_json); } catch { /* ignore malformed advice */ }
+      }
+    }
+    render();
+  }
+
+  init();
+</script>
+</body>
+</html>

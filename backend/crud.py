@@ -63,6 +63,8 @@ def start_session(db: Session, task: models.Task) -> models.FocusSession:
         seconds_uncertain=0,
         seconds_away=0,
         timeline_json="[]",
+        journal_json="[]",
+        intention="",
     )
     db.add(db_session)
     db.commit()
@@ -77,6 +79,7 @@ def create_session(
 ) -> models.FocusSession:
     data = session.model_dump()
     data["task_name"] = task.name
+    data["intention"] = (data.get("intention") or "").strip()[:240]
     db_session = models.FocusSession(**data)
     db.add(db_session)
     db.commit()
@@ -98,6 +101,8 @@ def update_session(
     db_session.seconds_away = update.seconds_away
     db_session.timeline_json = update.timeline_json
     db_session.journal_json = update.journal_json
+    if update.intention is not None:
+        db_session.intention = update.intention.strip()[:240]
     db.commit()
     db.refresh(db_session)
     return db_session
@@ -105,6 +110,15 @@ def update_session(
 
 def get_sessions(db: Session) -> list[models.FocusSession]:
     return db.query(models.FocusSession).order_by(models.FocusSession.ended_at.desc()).all()
+
+
+def get_sessions_between(db: Session, start, end) -> list[models.FocusSession]:
+    return (
+        db.query(models.FocusSession)
+        .filter(models.FocusSession.started_at >= start, models.FocusSession.started_at < end)
+        .order_by(models.FocusSession.started_at.asc(), models.FocusSession.id.asc())
+        .all()
+    )
 
 
 def upsert_work_period(db: Session, data: schemas.WorkPeriodCreate) -> models.WorkPeriod:
@@ -128,6 +142,8 @@ def upsert_work_period(db: Session, data: schemas.WorkPeriodCreate) -> models.Wo
         existing.reflection = data.reflection
     if data.ai_recap is not None:
         existing.ai_recap = data.ai_recap
+    if data.plan_reality_json is not None:
+        existing.plan_reality_json = data.plan_reality_json
     db.commit()
     db.refresh(existing)
     return existing
@@ -135,6 +151,56 @@ def upsert_work_period(db: Session, data: schemas.WorkPeriodCreate) -> models.Wo
 
 def get_work_periods(db: Session) -> list[models.WorkPeriod]:
     return db.query(models.WorkPeriod).order_by(models.WorkPeriod.ended_at.desc()).all()
+
+
+def get_recent_plan_reality_periods(db: Session, limit: int = 14) -> list[models.WorkPeriod]:
+    return (
+        db.query(models.WorkPeriod)
+        .filter(
+            models.WorkPeriod.kind == "day",
+            models.WorkPeriod.plan_reality_json.isnot(None),
+            models.WorkPeriod.plan_reality_json != "",
+        )
+        .order_by(models.WorkPeriod.period_key.desc())
+        .limit(max(1, min(int(limit or 14), 60)))
+        .all()
+    )
+
+
+# --- Daily plan ("Today's Plan") --------------------------------------------
+
+def get_plan(db: Session, period_key: str) -> models.DailyPlan | None:
+    return db.query(models.DailyPlan).filter(models.DailyPlan.period_key == period_key).first()
+
+
+def upsert_plan(db: Session, data: schemas.DailyPlanUpsert) -> models.DailyPlan:
+    from datetime import datetime, timezone
+
+    existing = get_plan(db, data.period_key)
+    if existing is None:
+        existing = models.DailyPlan(period_key=data.period_key)
+        db.add(existing)
+    # None means "leave as-is" so a plan-only save and an advice-only save don't clobber
+    # each other (same idiom as upsert_work_period).
+    if data.available_min is not None:
+        existing.available_min = data.available_min
+    if data.plan_json is not None:
+        existing.plan_json = data.plan_json
+    if data.advice_json is not None:
+        existing.advice_json = data.advice_json
+    existing.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(existing)
+    return existing
+
+
+def delete_plan(db: Session, period_key: str) -> bool:
+    existing = get_plan(db, period_key)
+    if existing is None:
+        return False
+    db.delete(existing)
+    db.commit()
+    return True
 
 
 def get_profile(db: Session) -> models.UserProfile:

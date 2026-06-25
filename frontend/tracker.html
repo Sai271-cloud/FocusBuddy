@@ -89,6 +89,15 @@
         </div>
       </div>
 
+      <div id="plan-handoff" class="card plan-handoff" style="display:none"></div>
+
+      <div class="card intention-card">
+        <label for="session-intention" class="section-label" style="margin-bottom:6px;display:block">Done looks like</label>
+        <input id="session-intention" class="input" type="text" maxlength="240"
+               placeholder="One clear finish line for this session."
+               autocomplete="off" aria-label="What does done look like for this session?" />
+      </div>
+
       <div class="card">
         <div class="flex items-center justify-between mb-2.5">
           <span class="text-sm" style="color:var(--text-muted)">Focus this session</span>
@@ -193,7 +202,9 @@
 
 <script src="js/api.js"></script>
 <script src="js/notify.js"></script>
+<script src="js/session-replay.js"></script>
 <script src="js/settings-menu.js"></script>
+<script src="js/planning-insights.js"></script>
 <script src="js/face-metrics.js"></script>
 <script src="js/focus-engine.js"></script>
 <script src="js/focus-detector.js"></script>
@@ -201,6 +212,10 @@
   const params = new URLSearchParams(location.search);
   const taskId = Number.parseInt(params.get('taskId'), 10);
   if (!Number.isInteger(taskId) || taskId <= 0) location.href = 'index.html';
+  const planDateParam = params.get('planDate') || '';
+  const recommendedParam = params.get('recommended') === '1';
+  const plannedStartParam = Number.parseInt(params.get('plannedStart'), 10);
+  const plannedEstimateParam = Number.parseInt(params.get('plannedEstimate'), 10);
 
   const totals = { focused: 0, distracted: 0, uncertain: 0, away: 0 };
   const validStates = new Set(['focused', 'distracted', 'uncertain', 'away']);
@@ -209,11 +224,14 @@
   let sessionId = null;
   let taskName = 'Loading task...';
   let taskDescription = '';
+  let sessionIntention = '';
+  let planContext = null;
   let elapsedSeconds = 0;
   let timerInterval = null;
   let autosaveInterval = null;
   let trackingHeartbeat = null;   // keeps the extension's "is tracking?" gate fresh
   let pendingSave = Promise.resolve();
+  let lastSavedPayload = null;
   let isPaused = false;
   let timeline = [];
   let journal = [];          // timestamped events: state changes, site switches, activity notes
@@ -240,6 +258,62 @@
     focused: '#5e8a65', distracted: '#b35c3a',
     uncertain: '#b08a38', away: '#8a7a6c',
   };
+
+  function fmtPlanClock(min) {
+    if (!Number.isFinite(min)) return '';
+    min = ((min % 1440) + 1440) % 1440;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    const ap = h < 12 ? 'am' : 'pm';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')}${ap}`;
+  }
+
+  async function loadPlanContext(task) {
+    if (planDateParam || Number.isFinite(plannedStartParam) || Number.isFinite(plannedEstimateParam)) {
+      return {
+        date: planDateParam,
+        planned_start: Number.isFinite(plannedStartParam) ? plannedStartParam : null,
+        planned_estimate: Number.isFinite(plannedEstimateParam) ? plannedEstimateParam : null,
+        recommended: recommendedParam,
+      };
+    }
+    if (!window.PlanningInsights || !window.getPlan) return null;
+    try {
+      const key = PlanningInsights.localDayKey();
+      const plan = await getPlan(key);
+      const entry = PlanningInsights.parsePlanEntries(plan).find(e => e.task_id === task.id);
+      if (!entry) return null;
+      return {
+        date: key,
+        planned_start: Number.isInteger(entry.scheduled_min) ? entry.scheduled_min : null,
+        planned_estimate: entry.estimate_min || null,
+        recommended: false,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function renderPlanContext() {
+    const node = document.getElementById('plan-handoff');
+    if (!node || !planContext) {
+      if (node) node.style.display = 'none';
+      return;
+    }
+    const bits = [];
+    if (Number.isFinite(planContext.planned_start)) bits.push(`Planned ${fmtPlanClock(planContext.planned_start)}`);
+    if (Number.isFinite(planContext.planned_estimate)) bits.push(`${planContext.planned_estimate}m estimate`);
+    const meta = bits.length
+      ? bits.map(bit => `<span>${escapeHtml(bit)}</span>`).join('')
+      : '<span>Plan guide</span>';
+    node.innerHTML = `
+      <div class="plan-handoff-top">
+        <p class="section-label" style="margin:0">${planContext.recommended ? 'Today plan suggestion' : 'From today plan'}</p>
+        ${planContext.recommended ? '<span class="plan-handoff-chip suggested">Next up</span>' : ''}
+      </div>
+      <div class="plan-handoff-meta">${meta}</div>`;
+    node.style.display = 'block';
+  }
 
   function formatSeconds(s) {
     const m = Math.floor(s / 60);
@@ -396,7 +470,7 @@
 
   function fireNudge() {
     const msg = `Drifting from "${taskName}" — come back?`;   // showToast escapes internally
-    if (window.showToast) showToast(msg, { icon: '🌱' });
+    if (window.showToast) showToast(msg);
     if (window.playChime) playChime();
     if (window.notifyUser) notifyUser('Focus Buddy', msg);
   }
@@ -462,12 +536,25 @@
       seconds_away: Math.round(totals.away),
       timeline_json: JSON.stringify(timeline),
       journal_json: JSON.stringify(journal),
+      intention: sessionIntention,
     };
+  }
+
+  const intentionInput = document.getElementById('session-intention');
+  if (intentionInput) {
+    intentionInput.addEventListener('input', () => {
+      sessionIntention = intentionInput.value.trim().slice(0, 240);
+    });
+    intentionInput.addEventListener('blur', () => {
+      sessionIntention = intentionInput.value.trim().slice(0, 240);
+      if (sessionId) enqueueSessionSave(false);
+    });
   }
 
   function enqueueSessionSave(finish = false) {
     if (!sessionId) return Promise.resolve();
     const payload = sessionPayload();
+    lastSavedPayload = payload;
     pendingSave = pendingSave
       .catch(() => {})
       .then(() => finish ? finishSession(sessionId, payload) : updateSession(sessionId, payload));
@@ -497,6 +584,9 @@
         descEl.textContent = taskDescription;
         descEl.classList.remove('hidden');
       }
+
+      planContext = await loadPlanContext(task);
+      renderPlanContext();
 
       const session = await startSession(taskId);
       sessionId = session.id;
@@ -562,13 +652,41 @@
 
   // --- AI debrief modal (shown after a successful save) ---
   const debriefOverlay = document.getElementById('debrief-overlay');
+  let debriefReplayHtml = '';
   function goHome() { location.href = 'index.html'; }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
-  function openDebriefLoading() {
+  function replaySessionFromPayload(payload) {
+    return {
+      id: sessionId,
+      task_id: taskId,
+      task_name: taskName,
+      started_at: sessionStart instanceof Date && !isNaN(sessionStart) ? sessionStart.toISOString() : new Date().toISOString(),
+      ...payload,
+    };
+  }
+  function renderReplayFromSavedPayload() {
+    if (!window.FocusSessionReplay) return '';
+    return FocusSessionReplay.render(replaySessionFromPayload(lastSavedPayload || sessionPayload()));
+  }
+  function debriefBodyPrefix() {
+    const intention = sessionIntention
+      ? `<div class="intention-echo"><span>Done looked like</span><p>${escapeHtml(sessionIntention)}</p></div>`
+      : '';
+    const replay = debriefReplayHtml
+      ? debriefReplayHtml
+      : '';
+    return (intention || replay)
+      ? intention + replay + '<div style="height:1px;background:var(--border);margin:16px 0"></div>'
+      : '';
+  }
+  function openDebriefLoading(replayHtml = '') {
+    debriefReplayHtml = replayHtml;
     document.getElementById('debrief-body').innerHTML =
-      '<p class="text-sm" style="color:var(--text-muted);animation:pulse 1.4s ease-in-out infinite">Analyzing your session…</p>';
+      debriefBodyPrefix() +
+      '<p class="section-label" style="margin:0 0 6px">AI debrief</p>' +
+      '<p class="text-sm" style="color:var(--text-muted);animation:pulse 1.4s ease-in-out infinite">Analyzing your session...</p>';
     debriefOverlay.style.display = 'flex';
     document.getElementById('debrief-done').focus();
   }
@@ -578,16 +696,20 @@
       : '';
     let html = '';
     if (d.summary) html += '<p class="text-sm" style="color:var(--text);line-height:1.55;margin:0 0 12px">' + escapeHtml(d.summary) + '</p>';
-    if (d.win) html += '<p class="text-sm" style="color:var(--text);line-height:1.45;margin:0 0 14px;background:rgba(94,138,101,0.12);border-radius:8px;padding:8px 10px">🌱 <strong>Win:</strong> ' + escapeHtml(d.win) + '</p>';
+    if (d.win) html += '<p class="text-sm" style="color:var(--text);line-height:1.45;margin:0 0 14px;background:rgba(94,138,101,0.12);border-radius:8px;padding:8px 10px"><strong>Win:</strong> ' + escapeHtml(d.win) + '</p>';
     if (d.patterns && d.patterns.length) html += '<p class="section-label" style="margin:0 0 2px">What happened</p>' + list(d.patterns);
     if (d.suggestions && d.suggestions.length) html += '<p class="section-label" style="margin:14px 0 2px">Try next time</p>' + list(d.suggestions);
     if (d.next_action) html += '<p class="text-sm" style="color:var(--text);line-height:1.45;margin:14px 0 0;border-left:3px solid var(--sage);padding-left:10px"><strong>Your one next step:</strong> ' + escapeHtml(d.next_action) + '</p>';
-    document.getElementById('debrief-body').innerHTML = html ||
-      '<p class="text-sm" style="color:var(--text-muted)">Your session is saved.</p>';
+    const debriefHtml = html
+      ? '<p class="section-label" style="margin:0 0 6px">AI debrief</p>' + html
+      : '<p class="text-sm" style="color:var(--text-muted)">Your session is saved.</p>';
+    document.getElementById('debrief-body').innerHTML = debriefBodyPrefix() + debriefHtml;
   }
   function renderDebriefError() {
     document.getElementById('debrief-body').innerHTML =
-      '<p class="text-sm" style="color:var(--text-muted);line-height:1.55">Couldn’t generate your debrief right now — but your session is saved. Head back to your tasks whenever you’re ready.</p>';
+      debriefBodyPrefix() +
+      '<p class="section-label" style="margin:0 0 6px">AI debrief</p>' +
+      '<p class="text-sm" style="color:var(--text-muted);line-height:1.55">Could not generate your debrief right now, but your session is saved. Head back to your tasks whenever you are ready.</p>';
   }
   // There is ALWAYS a way out of the modal, even if the debrief fails or hangs.
   document.getElementById('debrief-done').addEventListener('click', goHome);
@@ -622,6 +744,9 @@
     const tracked = totals.focused + totals.distracted + totals.uncertain + totals.away;
     if (tracked < 1 || !sessionId) { goHome(); return; }
 
+    // Replay is local: it uses only the saved timeline_json + journal_json.
+    openDebriefLoading(renderReplayFromSavedPayload());
+
     // 2.5) Background: update the hourly focus profile + the AI Pattern Memory from
     // this session. We send the LOCAL start/end clock hours so the backend can fold
     // this session's focus % into the right hours (it stores UTC, does no tz math).
@@ -633,7 +758,6 @@
     } catch (e) {}
 
     // 3) Best-effort debrief. Failure/timeout shows an error state; Done always exits.
-    openDebriefLoading();
     try {
       renderDebrief(await getDebrief(sessionId));
     } catch (err) {
