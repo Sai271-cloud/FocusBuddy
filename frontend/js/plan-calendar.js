@@ -1,12 +1,9 @@
 // Plan calendar — renders the Schedule step's task tray + day calendar.
 //
 // API: PlanCalendar.render(rootEl, {
-//   entries, hourly, aiSuggest, onUpdate, onChange
+//   entries, onUpdate, onChange
 // })
 //   entries  : [{ task_id, name, estimate_min, difficulty, scheduled_min? }]
-//   hourly   : Map(hour -> { focus_pct, sessions }) for hour shading
-//   aiSuggest: optional PlanAdviceResponse with scheduled[] ghost blocks
-//   suggestLabel: optional label for ghost suggestions (default "AI")
 //   onUpdate : (taskId, patch) => void, e.g. { scheduled_min: 540 }
 //   onChange : legacy fallback, (taskId, scheduledMin | null) => void
 (function () {
@@ -17,7 +14,6 @@
   const DEFAULT_PLACE = 9 * 60;
   const MIN_ESTIMATE = 10;
   const MAX_ESTIMATE = 120;
-  const AI_MAGNET_MIN = 10;
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -34,11 +30,8 @@
   function snapDown(m, snap) { return Math.floor(m / snap) * snap; }
   function clamp(min, lo, hi) { return Math.max(lo, Math.min(hi, min)); }
   function latestSnappedStart(e, snap = STEP) { return snapDown(latestStart(e), snap); }
-  function clampStart(e, m, snap = STEP, magnets = []) {
+  function clampStart(e, m, snap = STEP) {
     let next = clamp(snapTo(m, snap), 0, latestSnappedStart(e, snap));
-    for (const magnet of magnets) {
-      if (Math.abs(next - magnet) <= AI_MAGNET_MIN) return clamp(magnet, 0, latestStart(e));
-    }
     return next;
   }
   function clampEstimate(mins) {
@@ -79,22 +72,6 @@
       if (slotOpen(entries, entry, start)) return start;
     }
     return clampStart(entry, from);
-  }
-
-  function suggestionMap(aiSuggest) {
-    const out = new Map();
-    const scheduled = aiSuggest && Array.isArray(aiSuggest.scheduled) ? aiSuggest.scheduled : [];
-    scheduled.forEach(b => {
-      if (!b || !Number.isFinite(Number(b.task_id))) return;
-      const start = (Number(b.start_hour) || 0) * 60 + (Number(b.start_min) || 0);
-      out.set(Number(b.task_id), {
-        task_id: Number(b.task_id),
-        start_minute: clampStart({ estimate_min: Number(b.length_min) || 5 }, start, DRAG_SNAP),
-        length_min: Number(b.length_min) || 0,
-        reason: typeof b.reason === 'string' ? b.reason.trim() : '',
-      });
-    });
-    return out;
   }
 
   function layoutPlaced(entries) {
@@ -140,22 +117,12 @@
 
   function render(root, opts) {
     const entries = (opts && opts.entries) || [];
-    const hourly = (opts && opts.hourly) || new Map();
-    const aiSuggest = (opts && opts.aiSuggest) || null;
-    const suggestLabel = (opts && opts.suggestLabel) || 'AI';
-    const suggestUseLabel = (opts && opts.suggestUseLabel) || `Use ${suggestLabel}`;
-    const suggestAllLabel = (opts && opts.suggestAllLabel) || `Apply all ${suggestLabel} times`;
     const onUpdate = (opts && opts.onUpdate) || null;
-    const onDismissAi = (opts && opts.onDismissAi) || null;
     const legacyChange = (opts && opts.onChange) || function () {};
     const applyPatch = (taskId, patch) => {
       if (onUpdate) onUpdate(taskId, patch);
       else legacyChange(taskId, Object.prototype.hasOwnProperty.call(patch, 'scheduled_min') ? patch.scheduled_min : null);
     };
-    const suggestions = suggestionMap(aiSuggest);
-    const dismissedAi = new Set((opts && opts.dismissedAi) || []);
-    dismissedAi.forEach(id => suggestions.delete(Number(id)));
-    const aiMagnets = [...suggestions.values()].map(s => s.start_minute);
     const prevScroller = root.querySelector('#plan-cal-scroll');
     const prevScrollTop = prevScroller ? prevScroller.scrollTop : null;
     const active = document.activeElement && root.contains(document.activeElement) ? document.activeElement : null;
@@ -166,25 +133,16 @@
           kind: active.classList.contains('plan-cal-block') ? 'block'
             : active.classList.contains('plan-tray-chip') ? 'tray'
             : active.classList.contains('plan-place') ? 'place'
-              : active.classList.contains('plan-ai-use') ? 'ai'
-                : active.classList.contains('plan-ai-dismiss') ? 'ai-dismiss'
-                  : active.classList.contains('plan-step') ? 'step'
-                    : '',
+              : active.classList.contains('plan-step') ? 'step'
+                : '',
         }
       : null;
 
     const controls = entries.map(e => {
-      const suggestion = suggestions.get(e.task_id);
       const start = isPlaced(e) ? clampStart(e, e.scheduled_min, DRAG_SNAP) : null;
       const atStart = start === 0;
       const atEnd = start !== null && start >= latestSnappedStart(e);
       const difficulty = e.difficulty || 'medium';
-      const aiControls = suggestion
-        ? `<div class="plan-ai-controls">
-             <button type="button" class="plan-ai-use" data-act="ai-one" data-id="${e.task_id}" title="${esc(suggestion.reason || suggestUseLabel)}">${esc(suggestUseLabel)}</button>
-             <button type="button" class="plan-ai-dismiss" data-act="ai-dismiss" data-id="${e.task_id}" title="Hide this suggestion">Skip</button>
-           </div>`
-        : '';
       const timeControls = isPlaced(e)
         ? `<div class="plan-time-controls">
              <span class="plan-list-time">${fmtClock(start)}</span>
@@ -200,33 +158,16 @@
               <span class="plan-list-name" title="${esc(e.name)}">${esc(e.name)}</span>
               <span class="plan-list-est">${e.estimate_min || 0}m · ${esc(difficulty)}</span>
             </button>
-            ${suggestion && suggestion.reason ? `<p class="plan-ai-reason">${esc(suggestion.reason)}</p>` : ''}
           </div>
-          <div class="plan-list-ctrls">${timeControls}${aiControls}</div>
+          <div class="plan-list-ctrls">${timeControls}</div>
         </div>`;
     }).join('');
 
     let hourRows = '';
     for (let h = 0; h < 24; h++) {
-      const hf = hourly.get(h);
-      const has = hf && hf.sessions > 0;
-      const pct = has ? Math.round(hf.focus_pct) : null;
-      const tint = has ? `background:color-mix(in srgb, var(--sage-soft) ${pct}%, transparent);` : '';
       const workClass = h >= 7 && h < 22 ? 'is-work-hour' : 'is-off-hour';
-      hourRows += `<div class="plan-cal-row ${workClass}" style="top:${h * HOUR_HEIGHT}px;${tint}" data-hour="${h}"><span class="cal-hour-label">${hourLabel(h)}</span></div>`;
+      hourRows += `<div class="plan-cal-row ${workClass}" style="top:${h * HOUR_HEIGHT}px;" data-hour="${h}"><span class="cal-hour-label">${hourLabel(h)}</span></div>`;
     }
-
-    const ghostBlocks = [...suggestions.values()].map(s => {
-      const entry = entries.find(e => e.task_id === s.task_id);
-      if (!entry) return '';
-      const top = s.start_minute / 60 * HOUR_HEIGHT;
-      const height = Math.max(24, durationOf(entry) / 60 * HOUR_HEIGHT);
-      return `
-        <div class="plan-cal-ghost" style="top:${top}px;height:${height}px" title="${esc(entry.name)} AI suggestion · ${fmtClock(s.start_minute)}${s.reason ? ' · ' + esc(s.reason) : ''}">
-          <span>${esc(suggestLabel)} · ${esc(entry.name)}</span>
-          <span>${fmtClock(s.start_minute)}</span>
-        </div>`;
-    }).join('');
 
     const placed = layoutPlaced(entries);
     const blocks = placed.map(b => {
@@ -254,18 +195,14 @@
     const overlapHint = placed.some(b => b.laneCount > 1)
       ? `<p class="plan-overlap-hint">Overlaps shown side by side. Saving is allowed.</p>`
       : '';
-    const aiActions = suggestions.size
-      ? `<div class="plan-ai-actions"><button type="button" class="btn-ghost text-xs" data-act="ai-all">${esc(suggestAllLabel)}</button></div>`
-      : '';
 
     root.innerHTML = `
       <div class="plan-sched">
-        <div class="plan-list">${controls}${aiActions}${trayNote}</div>
+        <div class="plan-list">${controls}${trayNote}</div>
         <div class="plan-cal" id="plan-cal-scroll">
           ${overlapHint}
           <div class="plan-cal-grid" style="height:${24 * HOUR_HEIGHT}px">
             ${hourRows}
-            ${ghostBlocks}
             <div class="plan-cal-now" style="top:${nowTop}px" aria-hidden="true"></div>
             <div class="plan-drop-preview" aria-hidden="true"></div>
             ${blocks}
@@ -286,12 +223,8 @@
         ? `.plan-cal-block[data-id="${activeRef.id}"]`
         : activeRef.kind === 'tray'
           ? `.plan-tray-chip[data-id="${activeRef.id}"]`
-          : activeRef.kind === 'place'
-            ? `.plan-place[data-id="${activeRef.id}"]`
-            : activeRef.kind === 'ai'
-              ? `.plan-ai-use[data-id="${activeRef.id}"]`
-              : activeRef.kind === 'ai-dismiss'
-                ? `.plan-ai-dismiss[data-id="${activeRef.id}"]`
+            : activeRef.kind === 'place'
+              ? `.plan-place[data-id="${activeRef.id}"]`
                 : activeRef.kind === 'step'
                   ? `.plan-step[data-id="${activeRef.id}"][data-act="${activeRef.act}"]`
                   : '';
@@ -302,7 +235,6 @@
     }
 
     const find = id => entries.find(x => x.task_id === id);
-    const magnetsFor = id => aiMagnets.concat((opts && opts.magnets && opts.magnets[id]) || []);
     const grid = root.querySelector('.plan-cal-grid');
     const preview = root.querySelector('.plan-drop-preview');
 
@@ -310,7 +242,7 @@
       if (!grid) return 0;
       const rect = grid.getBoundingClientRect();
       const raw = (evt.clientY - rect.top) / HOUR_HEIGHT * 60;
-      return clampStart(entry, raw, snap, magnetsFor(entry.task_id));
+      return clampStart(entry, raw, snap);
     }
     function resizeLengthFromPointer(evt, start) {
       if (!grid) return MIN_ESTIMATE;
@@ -324,15 +256,55 @@
       preview.style.top = `${topMin / 60 * HOUR_HEIGHT}px`;
       preview.style.height = `${Math.max(24, lengthMin / 60 * HOUR_HEIGHT)}px`;
     }
-    function hidePreview() {
+    function hideDropPreview() {
       if (preview) preview.style.display = 'none';
+    }
+    function clearDragState() {
+      hideDropPreview();
       root.querySelectorAll('.is-dragging').forEach(n => n.classList.remove('is-dragging'));
+    }
+    function pointerOverCalendar(evt) {
+      const calRect = scroller ? scroller.getBoundingClientRect() : null;
+      return !!(calRect &&
+        evt.clientX >= calRect.left &&
+        evt.clientX <= calRect.right &&
+        evt.clientY >= calRect.top &&
+        evt.clientY <= calRect.bottom);
     }
     function autoScroll(evt) {
       if (!scroller) return;
       const rect = scroller.getBoundingClientRect();
       if (evt.clientY < rect.top + 36) scroller.scrollTop = Math.max(0, scroller.scrollTop - 18);
       if (evt.clientY > rect.bottom - 36) scroller.scrollTop += 18;
+    }
+    function createDragFloat(entry, sourceRect) {
+      const diff = ['easy', 'medium', 'hard'].includes(entry.difficulty) ? entry.difficulty : 'medium';
+      const width = Math.min(260, Math.max(180, sourceRect ? sourceRect.width : 210));
+      const height = Math.max(32, durationOf(entry) / 60 * HOUR_HEIGHT);
+      const node = document.createElement('div');
+      node.className = `plan-drag-float ${diff}`;
+      node.style.width = `${width}px`;
+      node.style.height = `${height}px`;
+      node.innerHTML = `
+        <span class="plan-drag-float-name">${esc(entry.name)}</span>
+        <span class="plan-drag-float-time">${durationOf(entry)}m</span>`;
+      document.body.appendChild(node);
+      return node;
+    }
+    function moveDragFloat(node, evt) {
+      if (!node) return;
+      node.style.transform = `translate3d(${evt.clientX + 14}px, ${evt.clientY + 12}px, 0)`;
+    }
+    function setDragFloatTime(node, entry, startMin) {
+      if (!node) return;
+      const time = node.querySelector('.plan-drag-float-time');
+      if (!time) return;
+      time.textContent = Number.isFinite(startMin)
+        ? `${fmtClock(startMin)} · ${durationOf(entry)}m`
+        : `${durationOf(entry)}m`;
+    }
+    function removeDragFloat(node) {
+      if (node && node.parentNode) node.parentNode.removeChild(node);
     }
 
     function startDrag(evt, entry, mode, startMin) {
@@ -348,6 +320,7 @@
         ? startMin
         : (Number.isFinite(original.scheduled_min) ? original.scheduled_min : DEFAULT_PLACE);
       const dragState = { mode, entry, latestMin: initialMin, latestLength: entry.estimate_min };
+      const floatNode = mode === 'move' ? createDragFloat(entry, target.getBoundingClientRect()) : null;
       const move = moveEvt => {
         autoScroll(moveEvt);
         if (dragState.mode === 'resize') {
@@ -355,16 +328,21 @@
           dragState.latestLength = resizeLengthFromPointer(moveEvt, start);
           showPreview(start, dragState.latestLength);
         } else {
-          dragState.latestMin = minuteFromPointer(moveEvt, entry);
-          showPreview(dragState.latestMin, durationOf(entry));
+          const overCalendar = pointerOverCalendar(moveEvt);
+          dragState.latestMin = overCalendar ? minuteFromPointer(moveEvt, entry) : dragState.latestMin;
+          setDragFloatTime(floatNode, entry, overCalendar ? dragState.latestMin : null);
+          moveDragFloat(floatNode, moveEvt);
+          if (overCalendar) showPreview(dragState.latestMin, durationOf(entry));
+          else hideDropPreview();
         }
       };
       const up = upEvt => {
         document.removeEventListener('pointermove', move);
         document.removeEventListener('pointerup', up);
-        hidePreview();
-        const calRect = scroller ? scroller.getBoundingClientRect() : null;
-        const overCalendar = calRect && upEvt.clientX >= calRect.left && upEvt.clientX <= calRect.right && upEvt.clientY >= calRect.top && upEvt.clientY <= calRect.bottom;
+        document.removeEventListener('pointercancel', cancel);
+        clearDragState();
+        removeDragFloat(floatNode);
+        const overCalendar = pointerOverCalendar(upEvt);
         if (dragState.mode === 'resize') {
           applyPatch(entry.task_id, { estimate_min: dragState.latestLength });
           return;
@@ -373,34 +351,29 @@
           applyPatch(entry.task_id, { scheduled_min: null, _snap: DRAG_SNAP });
           return;
         }
-        if (overCalendar) applyPatch(entry.task_id, { scheduled_min: dragState.latestMin, _snap: DRAG_SNAP });
+        if (overCalendar) applyPatch(entry.task_id, { scheduled_min: minuteFromPointer(upEvt, entry), _snap: DRAG_SNAP });
+      };
+      const cancel = () => {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        document.removeEventListener('pointercancel', cancel);
+        clearDragState();
+        removeDragFloat(floatNode);
       };
       document.addEventListener('pointermove', move);
       document.addEventListener('pointerup', up);
+      document.addEventListener('pointercancel', cancel);
       move(evt);
     }
 
-    root.querySelectorAll('.plan-step, .plan-block-unschedule, .plan-ai-use, .plan-ai-dismiss, [data-act="ai-all"]').forEach(btn => {
+    root.querySelectorAll('.plan-step, .plan-block-unschedule').forEach(btn => {
       btn.addEventListener('click', evt => {
         evt.stopPropagation();
         const act = btn.dataset.act;
-        if (act === 'ai-all') {
-          suggestions.forEach(s => applyPatch(s.task_id, { scheduled_min: s.start_minute, _snap: DRAG_SNAP }));
-          return;
-        }
         const id = parseInt(btn.dataset.id, 10);
         const e = find(id);
         if (!e) return;
         if (act === 'off') { applyPatch(id, { scheduled_min: null }); return; }
-        if (act === 'ai-one') {
-          const s = suggestions.get(id);
-          if (s) applyPatch(id, { scheduled_min: s.start_minute, _snap: DRAG_SNAP });
-          return;
-        }
-        if (act === 'ai-dismiss') {
-          if (onDismissAi) onDismissAi(id);
-          return;
-        }
         const delta = act === 'plus' ? STEP : -STEP;
         const next = clampStart(e, (e.scheduled_min || 0) + delta, STEP);
         if (next === clampStart(e, e.scheduled_min || 0, STEP)) return;
@@ -444,7 +417,7 @@
         if (evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
           evt.preventDefault();
           const delta = evt.key === 'ArrowDown' ? DRAG_SNAP : -DRAG_SNAP;
-          applyPatch(e.task_id, { scheduled_min: clampStart(e, (e.scheduled_min || 0) + delta, DRAG_SNAP, magnetsFor(e.task_id)), _snap: DRAG_SNAP });
+          applyPatch(e.task_id, { scheduled_min: clampStart(e, (e.scheduled_min || 0) + delta, DRAG_SNAP), _snap: DRAG_SNAP });
         } else if (evt.key === 'Delete' || evt.key === 'Backspace') {
           evt.preventDefault();
           applyPatch(e.task_id, { scheduled_min: null, _snap: DRAG_SNAP });
@@ -462,7 +435,7 @@
 
     if (grid) {
       grid.addEventListener('click', evt => {
-        if (evt.target.closest && evt.target.closest('.plan-cal-block, .plan-cal-ghost, button')) return;
+        if (evt.target.closest && evt.target.closest('.plan-cal-block, button')) return;
         const first = entries.find(e => !isPlaced(e));
         if (!first) return;
         applyPatch(first.task_id, { scheduled_min: minuteFromPointer(evt, first, STEP) });

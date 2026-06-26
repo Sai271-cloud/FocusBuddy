@@ -28,6 +28,11 @@ playwright-*.png
 skills-lock.json
 promptlab/
 tools/
+!tools/
+tools/*
+!tools/serve.ps1
+!tools/stop-serve.ps1
+tools/.serve/
 docs/
 .agents/
 .codex/

@@ -61,19 +61,6 @@
             <span class="switch"><input type="checkbox" id="pomo-toggle" /><span class="slider"></span></span>
           </label>
 
-          <!-- Goal selector (shown when Pomodoro is off) -->
-          <div id="goal-row" class="flex items-center gap-2" style="margin-top:10px">
-            <span class="section-label" style="color:var(--hero-label);margin:0">Goal</span>
-            <select id="goal-select" aria-label="Session goal"
-                    style="background:rgba(255,255,255,0.08);color:var(--hero-on);border:1px solid rgba(255,255,255,0.18);border-radius:var(--radius-sm);padding:0.25rem 0.5rem;font-family:var(--font-sans);font-size:0.8rem;cursor:pointer">
-              <option value="0">None</option>
-              <option value="25">25 min</option>
-              <option value="50">50 min</option>
-              <option value="90">90 min</option>
-            </select>
-            <span id="goal-status" class="text-xs" style="color:var(--hero-label)"></span>
-          </div>
-
           <!-- Pomodoro config + live phase (shown when Pomodoro is on) -->
           <div id="pomo-row" class="hidden" style="margin-top:10px">
             <div class="flex items-center gap-3" style="flex-wrap:wrap;color:var(--hero-label);font-size:0.8rem">
@@ -87,15 +74,6 @@
             <div id="pomo-phase" class="flex items-center gap-2" style="margin-top:10px"></div>
           </div>
         </div>
-      </div>
-
-      <div id="plan-handoff" class="card plan-handoff" style="display:none"></div>
-
-      <div class="card intention-card">
-        <label for="session-intention" class="section-label" style="margin-bottom:6px;display:block">Done looks like</label>
-        <input id="session-intention" class="input" type="text" maxlength="240"
-               placeholder="One clear finish line for this session."
-               autocomplete="off" aria-label="What does done look like for this session?" />
       </div>
 
       <div class="card focus-summary-card">
@@ -210,7 +188,6 @@
 <script src="js/notify.js"></script>
 <script src="js/session-replay.js"></script>
 <script src="js/settings-menu.js"></script>
-<script src="js/planning-insights.js"></script>
 <script src="js/face-metrics.js"></script>
 <script src="js/focus-engine.js"></script>
 <script src="js/focus-detector.js"></script>
@@ -218,10 +195,6 @@
   const params = new URLSearchParams(location.search);
   const taskId = Number.parseInt(params.get('taskId'), 10);
   if (!Number.isInteger(taskId) || taskId <= 0) location.href = 'index.html';
-  const planDateParam = params.get('planDate') || '';
-  const recommendedParam = params.get('recommended') === '1';
-  const plannedStartParam = Number.parseInt(params.get('plannedStart'), 10);
-  const plannedEstimateParam = Number.parseInt(params.get('plannedEstimate'), 10);
 
   const totals = { focused: 0, distracted: 0, uncertain: 0, away: 0 };
   const validStates = new Set(['focused', 'distracted', 'uncertain', 'away']);
@@ -230,8 +203,6 @@
   let sessionId = null;
   let taskName = 'Loading task...';
   let taskDescription = '';
-  let sessionIntention = '';
-  let planContext = null;
   let elapsedSeconds = 0;
   let timerInterval = null;
   let autosaveInterval = null;
@@ -247,8 +218,6 @@
   let lastTickMs = null;
   let pausedMs = 0;
   let pauseStartedAt = null;
-  let goalMinutes = 0;
-  let goalNotified = false;
   let driftMs = 0;
   let driftNotified = false;
   // Pomodoro (opt-in cyclic timer)
@@ -264,62 +233,6 @@
     focused: '#5e8a65', distracted: '#b35c3a',
     uncertain: '#b08a38', away: '#8a7a6c',
   };
-
-  function fmtPlanClock(min) {
-    if (!Number.isFinite(min)) return '';
-    min = ((min % 1440) + 1440) % 1440;
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    const ap = h < 12 ? 'am' : 'pm';
-    return `${h % 12 || 12}:${String(m).padStart(2, '0')}${ap}`;
-  }
-
-  async function loadPlanContext(task) {
-    if (planDateParam || Number.isFinite(plannedStartParam) || Number.isFinite(plannedEstimateParam)) {
-      return {
-        date: planDateParam,
-        planned_start: Number.isFinite(plannedStartParam) ? plannedStartParam : null,
-        planned_estimate: Number.isFinite(plannedEstimateParam) ? plannedEstimateParam : null,
-        recommended: recommendedParam,
-      };
-    }
-    if (!window.PlanningInsights || !window.getPlan) return null;
-    try {
-      const key = PlanningInsights.localDayKey();
-      const plan = await getPlan(key);
-      const entry = PlanningInsights.parsePlanEntries(plan).find(e => e.task_id === task.id);
-      if (!entry) return null;
-      return {
-        date: key,
-        planned_start: Number.isInteger(entry.scheduled_min) ? entry.scheduled_min : null,
-        planned_estimate: entry.estimate_min || null,
-        recommended: false,
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  function renderPlanContext() {
-    const node = document.getElementById('plan-handoff');
-    if (!node || !planContext) {
-      if (node) node.style.display = 'none';
-      return;
-    }
-    const bits = [];
-    if (Number.isFinite(planContext.planned_start)) bits.push(`Planned ${fmtPlanClock(planContext.planned_start)}`);
-    if (Number.isFinite(planContext.planned_estimate)) bits.push(`${planContext.planned_estimate}m estimate`);
-    const meta = bits.length
-      ? bits.map(bit => `<span>${escapeHtml(bit)}</span>`).join('')
-      : '<span>Plan guide</span>';
-    node.innerHTML = `
-      <div class="plan-handoff-top">
-        <p class="section-label" style="margin:0">${planContext.recommended ? 'Today plan suggestion' : 'From today plan'}</p>
-        ${planContext.recommended ? '<span class="plan-handoff-chip suggested">Next up</span>' : ''}
-      </div>
-      <div class="plan-handoff-meta">${meta}</div>`;
-    node.style.display = 'block';
-  }
 
   function formatSeconds(s) {
     const m = Math.floor(s / 60);
@@ -418,12 +331,6 @@
 
     elapsedSeconds = Math.max(0, Math.floor((now - sessionStart.getTime() - pausedMs) / 1000));
 
-    // Session goal reached → one-time celebration (only when Pomodoro is off).
-    if (!pomoEnabled && goalMinutes > 0 && !goalNotified && elapsedSeconds >= goalMinutes * 60) {
-      goalNotified = true;
-      fireGoal();
-    }
-
     const minute = Math.floor(elapsedSeconds / 60);
     if (minute > lastRecordedMinute) {
       lastRecordedMinute = minute;
@@ -472,21 +379,11 @@
     }
   }
 
-  function formatGoal(min) { return min % 60 === 0 ? (min / 60) + 'h' : min + 'm'; }
-
   function fireNudge() {
     const msg = `Drifting from "${taskName}" — come back?`;   // showToast escapes internally
     if (window.showToast) showToast(msg);
     if (window.playChime) playChime();
     if (window.notifyUser) notifyUser('Focus Buddy', msg);
-  }
-
-  function fireGoal() {
-    if (window.showToast) showToast(`Goal reached — ${formatGoal(goalMinutes)} of focus 🎉`, { icon: '🎉' });
-    if (window.playChime) playChime();
-    if (window.notifyUser) notifyUser('Focus Buddy', 'Goal reached — nice work!');
-    const gs = document.getElementById('goal-status');
-    if (gs) gs.textContent = '✓ reached';
   }
 
   // ---- Pomodoro cycle ----
@@ -542,19 +439,7 @@
       seconds_away: Math.round(totals.away),
       timeline_json: JSON.stringify(timeline),
       journal_json: JSON.stringify(journal),
-      intention: sessionIntention,
     };
-  }
-
-  const intentionInput = document.getElementById('session-intention');
-  if (intentionInput) {
-    intentionInput.addEventListener('input', () => {
-      sessionIntention = intentionInput.value.trim().slice(0, 240);
-    });
-    intentionInput.addEventListener('blur', () => {
-      sessionIntention = intentionInput.value.trim().slice(0, 240);
-      if (sessionId) enqueueSessionSave(false);
-    });
   }
 
   function enqueueSessionSave(finish = false) {
@@ -608,9 +493,6 @@
         descEl.textContent = taskDescription;
         descEl.classList.remove('hidden');
       }
-
-      planContext = await loadPlanContext(task);
-      renderPlanContext();
 
       const session = await startSession(taskId);
       sessionId = session.id;
@@ -704,14 +586,11 @@
     return FocusSessionReplay.render(replaySessionFromPayload(lastSavedPayload || sessionPayload()));
   }
   function debriefBodyPrefix() {
-    const intention = sessionIntention
-      ? `<div class="intention-echo"><span>Done looked like</span><p>${escapeHtml(sessionIntention)}</p></div>`
-      : '';
     const replay = debriefReplayHtml
       ? debriefReplayHtml
       : '';
-    return (intention || replay)
-      ? intention + replay + '<div style="height:1px;background:var(--border);margin:16px 0"></div>'
+    return replay
+      ? replay + '<div style="height:1px;background:var(--border);margin:16px 0"></div>'
       : '';
   }
   function openDebriefLoading(replayHtml = '') {
@@ -803,22 +682,10 @@
 
   document.getElementById('confirm-end').addEventListener('click', endAndSaveSession);
 
-  // Session goal selector (remembered per device)
-  const goalSelect = document.getElementById('goal-select');
-  goalMinutes = parseInt(localStorage.getItem('fb-session-goal'), 10) || 0;
-  goalSelect.value = String(goalMinutes);
-  goalSelect.addEventListener('change', () => {
-    goalMinutes = parseInt(goalSelect.value, 10) || 0;
-    try { localStorage.setItem('fb-session-goal', String(goalMinutes)); } catch (e) {}
-    goalNotified = false;
-    document.getElementById('goal-status').textContent = '';
-  });
-
   // Pomodoro: opt-in cyclic timer (remembered per device)
   const pomoToggle = document.getElementById('pomo-toggle');
   const pomoFocusInput = document.getElementById('pomo-focus');
   const pomoBreakInput = document.getElementById('pomo-break');
-  const goalRow = document.getElementById('goal-row');
   const pomoRow = document.getElementById('pomo-row');
 
   function clampInt(v, lo, hi, dflt) {
@@ -827,7 +694,6 @@
     return Math.min(hi, Math.max(lo, n));
   }
   function applyPomoVisibility() {
-    goalRow.classList.toggle('hidden', pomoEnabled);
     pomoRow.classList.toggle('hidden', !pomoEnabled);
   }
 

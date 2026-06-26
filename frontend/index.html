@@ -83,7 +83,6 @@
     </section>
 
     <section class="today-rail">
-      <div id="focus-goal-card" class="card focus-goal-card mb-4"></div>
       <div class="flex items-center justify-between mb-2">
         <p class="section-label" style="margin:0">Today</p>
         <p id="cal-date" class="text-xs" style="color:var(--text-faint)"></p>
@@ -225,55 +224,6 @@
 
   let _tasks = [];
   let editId = null;
-
-  function renderFocusGoal(sessions = _allSessions) {
-    const box = document.getElementById('focus-goal-card');
-    if (!box || !window.PlanningInsights) return;
-    const goal = PlanningInsights.focusGoalMin();
-    const todayKey = PlanningInsights.localDayKey();
-    const progress = PlanningInsights.focusGoalProgress(sessions, todayKey, goal);
-    const streak = PlanningInsights.focusStreak(sessions, goal, todayKey);
-    const options = [
-      [0, 'Off'],
-      [30, '30m'],
-      [60, '60m'],
-      [90, '90m'],
-      [120, '120m'],
-    ].map(([value, label]) => `<option value="${value}" ${goal === value ? 'selected' : ''}>${label}</option>`).join('');
-    const line = goal <= 0
-      ? 'Daily focus goal is off.'
-      : progress.met
-        ? 'Goal met today.'
-        : `${Math.max(0, goal - progress.focused_min)}m left for today's focus goal.`;
-    const streakLine = goal <= 0
-      ? 'Turn it on when a daily target would help.'
-      : streak.count
-        ? `${streak.count}-day rhythm${streak.includes_today ? ' including today' : ' through yesterday'}.`
-        : 'Fresh start today.';
-    const goalAria = goal > 0
-      ? `${progress.focused_min} of ${goal} focused minutes`
-      : 'Daily focus goal off';
-    box.innerHTML = `
-      <div class="focus-goal-head">
-        <div>
-          <p class="section-label" style="margin:0 0 2px">Focus goal</p>
-          <p class="text-xs" style="color:var(--text-muted);margin:0">${escapeHtml(line)}</p>
-        </div>
-        <select id="focus-goal-select" class="input focus-goal-select" aria-label="Daily focus goal">${options}</select>
-      </div>
-      <div class="focus-goal-meter" role="progressbar" aria-valuemin="0" aria-valuemax="${Math.max(1, goal)}"
-           aria-valuenow="${goal > 0 ? progress.focused_min : 0}" aria-label="${escapeHtml(goalAria)}">
-        <span style="width:${goal > 0 ? progress.pct : 0}%"></span>
-      </div>
-      <p class="text-xs" style="color:var(--text-faint);margin:8px 0 0">
-        ${goal > 0 ? `${progress.focused_min}/${goal} focused minutes - ` : ''}${escapeHtml(streakLine)}
-      </p>`;
-    const select = document.getElementById('focus-goal-select');
-    if (select) select.addEventListener('change', () => {
-      PlanningInsights.setFocusGoalMin(parseInt(select.value, 10));
-      renderFocusGoal(sessions);
-    });
-  }
 
   async function toggleComplete(id, currentlyCompleted) {
     try {
@@ -432,7 +382,6 @@
     try {
       const sessions = await getSessions();
       _allSessions = sessions || [];
-      renderFocusGoal(_allSessions);
       sessions.forEach(s => {
         const start = new Date(s.started_at);
         if (!isToday(start)) return;
@@ -538,7 +487,6 @@
   });
 
   loadTasks();
-  renderFocusGoal([]);
   loadCalendar();
   setInterval(() => {
     const grid = document.getElementById('cal-grid');

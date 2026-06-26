@@ -1,12 +1,28 @@
 import json
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 from backend import schemas
 
 
 class ChunkDPlanningTests(unittest.TestCase):
+    def test_planner_step_three_keeps_ai_advice_out_of_calendar_controls(self):
+        root = Path(__file__).resolve().parents[1]
+        plan_html = (root / "frontend" / "plan.html").read_text(encoding="utf-8")
+        calendar_js = (root / "frontend" / "js" / "plan-calendar.js").read_text(encoding="utf-8")
+
+        self.assertIn("renderAdvicePanel", plan_html)
+        self.assertIn("plan-advice-panel", plan_html)
+        self.assertNotIn("hourly: state.hourly", plan_html)
+        self.assertNotIn("aiSuggest", plan_html)
+        self.assertNotIn("plan-cal-ghost", calendar_js)
+        self.assertNotIn("plan-ai-use", calendar_js)
+        self.assertNotIn("plan-ai-dismiss", calendar_js)
+        self.assertNotIn('data-act="ai-all"', calendar_js)
+        self.assertNotIn("hourly.get", calendar_js)
+
     def test_plan_reality_matches_by_task_id_and_reports_unplanned_work(self):
         from backend.main import _build_plan_reality_report
 

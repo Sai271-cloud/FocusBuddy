@@ -37,7 +37,7 @@ GEMINI_MODEL = "gemini-3.1-flash-lite"
 # model reliably available on the free-tier key (pro has no free quota; 3.5-flash 429/503s
 # under load). Set COACHING_MODEL=gemini-3.1-pro-preview in .env once billing is enabled
 # to upgrade all three coaching calls with no code change.
-COACHING_MODEL = os.getenv("COACHING_MODEL", "gemini-3.1-flash-lite")
+COACHING_MODEL = os.getenv("COACHING_MODEL", "gemini-3.5-flash")
 
 VALID_STATES = ["focused", "distracted", "uncertain", "away"]
 _VALID_SET = set(VALID_STATES)

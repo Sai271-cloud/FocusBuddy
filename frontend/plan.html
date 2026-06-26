@@ -34,7 +34,7 @@
   </div>
 </header>
 
-<main class="app-main plan-main max-w-2xl mx-auto px-6 py-8">
+<main class="app-main plan-main max-w-6xl mx-auto px-6 py-8">
   <div class="card plan-wizard" style="position:relative">
     <!-- Always-available exit: leaves to Today, nothing saved. -->
     <button id="plan-exit" class="btn-ghost" aria-label="Exit planning" title="Exit (Esc)"
@@ -146,12 +146,10 @@
     advice: null,              // AI scheduling advice; may be stale after edits until regenerated
     adviceStale: false,
     adviceGeneratedThisVisit: false,
-    dismissedAdviceIds: new Set(),
     adviceLoading: false,
     calibration: null,
     saveStatus: '',
     finished: false,           // set once the plan is saved/dashboard-only
-    hourly: new Map(),         // hour -> { focus_pct, sessions } for timeline shading
   };
 
   el('plan-date').textContent =
@@ -204,7 +202,6 @@
     const staleAdvice = opts.adviceStale !== false;
     if (staleAdvice && (state.advice || state.hadSavedAdvice)) {
       state.adviceStale = true;
-      state.dismissedAdviceIds.clear();
     }
   }
 
@@ -288,14 +285,22 @@
         </div>`;
     }
     const list = pickList();
-    const rows = list.map(t => `
-      <label class="flex items-center gap-3" style="padding:0.5rem 0.1rem;cursor:pointer">
-        <input type="checkbox" data-task="${t.id}" ${state.entries.has(t.id) ? 'checked' : ''}
-               style="width:17px;height:17px;accent-color:var(--sage)" />
-        <span class="serif" style="font-size:0.95rem;color:var(--text)">${escapeHtml(t.name)}</span>
-      </label>`).join('');
-    const empty = list.length ? '' :
-      `<p class="text-sm" style="color:var(--text-faint);padding:0.4rem 0">No tasks yet. Add one to start planning.</p>`;
+    const available = list.filter(t => !state.entries.has(t.id));
+    const planned = [...state.entries.values()];
+    const taskBlock = (task, side) => `
+      <button type="button" class="plan-pick-block plan-tray-chip" draggable="true"
+              data-task="${task.id}" data-side="${side}"
+              aria-label="${side === 'planned' ? 'Remove' : 'Add'} ${escapeHtml(task.name)} ${side === 'planned' ? 'from' : 'to'} today's plan">
+        <span class="plan-list-name">${escapeHtml(task.name)}</span>
+        <span class="plan-pick-hint">${side === 'planned' ? 'Click to move back' : 'Click or drag into plan'}</span>
+        ${side === 'planned' ? `<span class="plan-pick-remove" data-remove="${task.id}" aria-hidden="true">&times;</span>` : ''}
+      </button>`;
+    const availableRows = available.length
+      ? available.map(t => taskBlock(t, 'available')).join('')
+      : `<p class="plan-pick-empty">${list.length ? "All available tasks are in today's plan." : 'No tasks yet. Add one to start planning.'}</p>`;
+    const plannedRows = planned.length
+      ? planned.map(e => taskBlock({ id: e.task_id, name: e.name }, 'planned')).join('')
+      : `<div class="plan-pick-empty"><strong>Build today's plan</strong><span>Drop tasks here or click a task from Available.</span></div>`;
     const helper = state.entries.size ? '' :
       `<p class="text-xs mt-3" style="color:var(--text-faint)">Pick or add at least one task to continue.</p>`;
     return `
@@ -305,7 +310,22 @@
         </p>
         <button id="open-add-task" class="btn-ghost" type="button">Add task</button>
       </div>
-      <div id="pick-list" class="flex flex-col">${rows}${empty}</div>
+      <div class="plan-pick-board" aria-label="Pick tasks for today's plan">
+        <section class="plan-pick-zone" id="pick-available" data-drop="available" aria-labelledby="pick-available-title">
+          <div class="plan-pick-zone-head">
+            <p id="pick-available-title" class="section-label" style="margin:0">Available</p>
+            <span>${available.length}</span>
+          </div>
+          <div class="plan-pick-stack">${availableRows}</div>
+        </section>
+        <section class="plan-pick-zone plan-pick-zone-planned" id="pick-plan" data-drop="planned" aria-labelledby="pick-plan-title">
+          <div class="plan-pick-zone-head">
+            <p id="pick-plan-title" class="section-label" style="margin:0">Today's Plan</p>
+            <span>${planned.length}</span>
+          </div>
+          <div class="plan-pick-stack">${plannedRows}</div>
+        </section>
+      </div>
       ${helper}`;
   }
 
@@ -354,8 +374,103 @@
     return `${hr}:${String(m).padStart(2, '0')}${ap}`;
   }
 
-  // Schedule step (Chunk C): the calendar + tray render into #plan-cal-root via
-  // plan-calendar.js (wired in bindStep). The AI-suggestions overlay arrives in Step 3.
+  function adviceStartMin(block) {
+    if (!block) return null;
+    const hour = Number(block.start_hour);
+    const min = Number(block.start_min);
+    if (!Number.isFinite(hour) || !Number.isFinite(min)) return null;
+    return Math.max(0, Math.min(1439, hour * 60 + min));
+  }
+
+  function adviceWindow(block) {
+    const start = adviceStartMin(block);
+    const length = Math.max(0, Number(block && block.length_min) || 0);
+    if (start === null) return 'Suggested time';
+    return `${fmtClock(start)} - ${fmtClock(start + length)}`;
+  }
+
+  function renderAdvicePanel() {
+    const stale = state.adviceStale && (state.advice || state.hadSavedAdvice);
+    let body = '';
+    if (state.adviceLoading) {
+      body = `
+        <div class="plan-advice-empty">
+          <p>Getting suggestions...</p>
+          <span>Checking your tasks, estimates, and focus patterns.</span>
+        </div>`;
+    } else if (hasCurrentAdvice()) {
+      const advice = state.advice || {};
+      const entryById = new Map([...state.entries.values()].map(e => [e.task_id, e]));
+      const scheduled = Array.isArray(advice.scheduled)
+        ? advice.scheduled
+            .filter(block => entryById.has(Number(block && block.task_id)))
+            .sort((a, b) => (adviceStartMin(a) ?? 1440) - (adviceStartMin(b) ?? 1440))
+        : [];
+      const summary = advice.summary
+        ? `<p class="plan-advice-summary">${escapeHtml(advice.summary)}</p>`
+        : '';
+      const order = scheduled.length
+        ? `<ol class="plan-advice-list">
+            ${scheduled.map((block, index) => {
+              const entry = entryById.get(Number(block.task_id));
+              const reason = typeof block.reason === 'string' && block.reason.trim()
+                ? block.reason.trim()
+                : 'Recommended based on the plan details.';
+              return `
+                <li>
+                  <span class="plan-advice-rank">${index + 1}</span>
+                  <div>
+                    <div class="plan-advice-row-top">
+                      <strong>${escapeHtml(entry.name)}</strong>
+                      <span>${escapeHtml(adviceWindow(block))}</span>
+                    </div>
+                    <p>${escapeHtml(reason)}</p>
+                  </div>
+                </li>`;
+            }).join('')}
+          </ol>`
+        : `<p class="plan-advice-muted">No task-specific timing suggestions came back.</p>`;
+      const over = advice.over_plan_note
+        ? `<p class="plan-advice-alert">${escapeHtml(advice.over_plan_note)}</p>`
+        : '';
+      const tips = Array.isArray(advice.general_advice)
+        ? advice.general_advice.filter(item => typeof item === 'string' && item.trim()).slice(0, 2)
+        : [];
+      const general = tips.length
+        ? `<div class="plan-advice-tips">
+            <p class="section-label">Notes</p>
+            ${tips.map(tip => `<p>${escapeHtml(tip)}</p>`).join('')}
+          </div>`
+        : '';
+      const cold = advice.cold_start
+        ? `<p class="plan-advice-muted">This uses a sensible order while your hour-by-hour history grows.</p>`
+        : '';
+      body = `${summary}${over}<p class="section-label">Suggested order</p>${order}${general}${cold}`;
+    } else if (stale) {
+      body = `
+        <div class="plan-advice-empty">
+          <p>Suggestions need a refresh.</p>
+          <span>Your task details changed since the last AI pass.</span>
+        </div>`;
+    } else {
+      body = `
+        <div class="plan-advice-empty">
+          <p>No suggestions yet.</p>
+          <span>Generate them when you want a second opinion on order and timing.</span>
+        </div>`;
+    }
+    return `
+      <aside class="plan-advice-panel" aria-live="polite">
+        <div class="plan-advice-head">
+          <p class="section-label">AI suggestions</p>
+          <span>${hasCurrentAdvice() ? 'Ready' : state.adviceLoading ? 'Thinking' : 'Optional'}</span>
+        </div>
+        ${body}
+      </aside>`;
+  }
+
+  // Schedule step (Chunk C): plan-calendar.js owns only the manual task tray + day calendar.
+  // AI suggestions stay in the side panel so saved times come only from the user's placement.
   function scheduleBody() {
     const entries = [...state.entries.values()];
     if (!entries.length) {
@@ -369,9 +484,9 @@
       ? 'Getting fresh suggestions.'
       : hasCurrentAdvice()
         ? 'AI suggestions are ready.'
-        : state.adviceStale
-          ? 'AI suggestions need regeneration after your edits.'
-          : 'Optional timing help.';
+      : state.adviceStale
+        ? 'AI suggestions need regeneration after your edits.'
+        : 'Optional timing help appears beside the calendar.';
     const saveStatus = state.saveStatus
       ? `<span id="plan-save-status" class="plan-save-status">${escapeHtml(state.saveStatus)}</span>`
       : `<span id="plan-save-status" class="plan-save-status" aria-live="polite"></span>`;
@@ -387,8 +502,14 @@
           ${saveStatus}
         </div>
       </div>
-      <div id="plan-cal-root"></div>
-      <div class="mt-3">${budgetMeterHtml()}</div>`;
+      <div class="plan-schedule-layout">
+        <div class="plan-schedule-board">
+          <div id="plan-cal-root"></div>
+          <div class="mt-3">${budgetMeterHtml()}</div>
+        </div>
+        ${renderAdvicePanel()}
+      </div>
+      `;
   }
 
   function confirmBody() {
@@ -535,22 +656,60 @@
     const key = STEP_KEYS[state.step];
     if (key === 'pick') {
       if (state.loadError) return;
-      const listEl = el('pick-list');
+      const body = el('plan-body');
       const addBtn = el('open-add-task');
-      if (!listEl) return;
       if (addBtn) addBtn.addEventListener('click', () => openAddTaskModal(addBtn));
-      listEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
-        cb.addEventListener('change', () => {
-          const id = parseInt(cb.dataset.task, 10);
-          if (cb.checked) {
-            const t = pickList().find(x => x.id === id);
-            selectTaskForPlan(t);
-          } else {
-            state.entries.delete(id);
-          }
-          markPlanChanged();
-          scheduleAutoSave();
-          render();
+      if (!body) return;
+
+      function moveTask(id, target) {
+        if (!Number.isInteger(id)) return;
+        if (target === 'planned') {
+          if (state.entries.has(id)) return;
+          selectTaskForPlan(pickList().find(t => t.id === id));
+        } else {
+          if (!state.entries.has(id)) return;
+          state.entries.delete(id);
+        }
+        markPlanChanged();
+        scheduleAutoSave();
+        render();
+      }
+
+      body.querySelectorAll('.plan-pick-block').forEach(block => {
+        block.addEventListener('dragstart', (evt) => {
+          block.classList.add('is-dragging');
+          evt.dataTransfer.effectAllowed = 'move';
+          evt.dataTransfer.setData('text/plain', block.dataset.task || '');
+        });
+        block.addEventListener('dragend', () => {
+          block.classList.remove('is-dragging');
+          body.querySelectorAll('.is-drop-target').forEach(zone => zone.classList.remove('is-drop-target'));
+        });
+        block.addEventListener('click', (evt) => {
+          const remove = evt.target.closest('[data-remove]');
+          const id = parseInt(remove ? remove.dataset.remove : block.dataset.task, 10);
+          const side = block.dataset.side === 'planned' ? 'available' : 'planned';
+          moveTask(id, remove ? 'available' : side);
+        });
+      });
+
+      body.querySelectorAll('[data-drop]').forEach(zone => {
+        zone.addEventListener('dragover', (evt) => {
+          evt.preventDefault();
+          evt.dataTransfer.dropEffect = 'move';
+          zone.classList.add('is-drop-target');
+        });
+        zone.addEventListener('dragenter', (evt) => {
+          evt.preventDefault();
+          zone.classList.add('is-drop-target');
+        });
+        zone.addEventListener('dragleave', (evt) => {
+          if (!zone.contains(evt.relatedTarget)) zone.classList.remove('is-drop-target');
+        });
+        zone.addEventListener('drop', (evt) => {
+          evt.preventDefault();
+          zone.classList.remove('is-drop-target');
+          moveTask(parseInt(evt.dataTransfer.getData('text/plain'), 10), zone.dataset.drop);
         });
       });
     } else if (key === 'size') {
@@ -671,19 +830,8 @@
   function paintCalendar() {
     const root = el('plan-cal-root');
     if (!root || !window.PlanCalendar) return;
-    const suggestion = hasCurrentAdvice() ? state.advice : null;
     window.PlanCalendar.render(root, {
       entries: [...state.entries.values()],
-      hourly: state.hourly,
-      aiSuggest: suggestion,
-      suggestLabel: 'AI',
-      suggestUseLabel: 'Use AI',
-      suggestAllLabel: 'Apply all AI times',
-      dismissedAi: state.dismissedAdviceIds,
-      onDismissAi: (taskId) => {
-        state.dismissedAdviceIds.add(taskId);
-        paintCalendar();
-      },
       onUpdate: applySchedulePatch,
       onChange: (taskId, scheduledMin) => {
         applySchedulePatch(taskId, { scheduled_min: scheduledMin });
@@ -722,9 +870,6 @@
     try {
       const task = await createTask(name, description);
       state.tasks.unshift(task);
-      selectTaskForPlan(task);
-      markPlanChanged();
-      scheduleAutoSave();
       closeAddTaskModal({ restoreFocus: false });
       render();
       setTimeout(() => el('open-add-task')?.focus(), 0);
@@ -760,7 +905,6 @@
       state.advice = result;
       state.adviceStale = false;
       state.adviceGeneratedThisVisit = true;
-      state.dismissedAdviceIds.clear();
       setSaveStatus('Saving...');
       try {
         await persistAdviceNow();
@@ -839,7 +983,7 @@
   }
 
   async function init() {
-    let tasks = [], plan = null, hourly = [];
+    let tasks = [], plan = null;
     try {
       [tasks, plan] = await Promise.all([
         getTasks(),
@@ -851,13 +995,9 @@
       return;
     }
     try {
-      hourly = await getHourlyFocus();
-    } catch { hourly = []; }
-    try {
       state.calibration = await getPlanCalibration(14);
     } catch { state.calibration = null; }
     state.tasks = (tasks || []).filter(t => !t.completed);
-    (hourly || []).forEach(h => state.hourly.set(h.hour, { focus_pct: h.focus_pct, sessions: h.sessions }));
     if (plan && plan.plan_json) {
       try {
         JSON.parse(plan.plan_json).forEach(e => {

@@ -137,6 +137,8 @@ focus-buddy/
     session-handoff-2026-06-26-planner-modal-current-plan.md  # latest handoff for planner modal/current-plan work
   tools/
     check.ps1                # manual project sanity check for agents and local setup
+    serve.ps1                # starts backend + frontend for human-run browser smoke tests
+    stop-serve.ps1           # stops only the helper-owned server PIDs
     agent-hooks/             # shared PowerShell hook scripts used by Claude Code + Codex
   tests/
     test_chunk_d_planning.py # backend unit coverage for plan-vs-reality, calibration, reschedule
@@ -195,6 +197,24 @@ Then open `http://localhost:5500`. (Port number is a suggestion — any free por
 the backend's CORS settings allow it.) This requires a working Python. If this machine says there is
 no working Python, fix/recreate `.venv` or use another static file server, but still serve the
 frontend over HTTP rather than opening the HTML as `file://`.
+
+**Agent / smoke-test workflow**
+- Default verification should be in-process, with no live server needed:
+
+```
+python -m unittest discover -s tests
+```
+
+  For ad-hoc API checks, prefer FastAPI `TestClient` in-process instead of opening a port, e.g.
+  `python -c "from fastapi.testclient import TestClient; from backend.main import app; print(TestClient(app).get('/docs').status_code)"`.
+- For a real browser smoke test, Sai runs `tools\serve.ps1` in his own terminal (or `! tools\serve.ps1`
+  if the shell output should land in the session). The agent then confirms `http://127.0.0.1:8000/docs`
+  is up and runs Playwright against `http://localhost:5500`. Sai runs `tools\stop-serve.ps1` afterward.
+- Do not improvise `Start-Process` or background long-lived servers from inside the agent shell for
+  browser smoke tests. Agent-launched server children can be reaped or blocked; use the helper run by
+  a human instead.
+- Leave unrelated dirty worktree changes untouched (for example, a pre-existing `backend/main.py`
+  edit). Mention them and move on; that observation is not an error.
 
 ## Where I want to take it (direction)
 A multi-feature tool, built in **phases where each phase is a working demo on its own**:
@@ -264,6 +284,17 @@ Format for each entry:
 - **Lesson:** <the rule, as an instruction>
   **Why it matters:** <what broke, or what it prevents>
   **Where it applies:** <file or area, e.g. focus-detector.js>
+
+- **Lesson:** For local verification, agents should default to in-process checks (`python -m unittest
+  discover -s tests` or FastAPI `TestClient`) and only use live servers for browser-level smoke tests;
+  when live servers are needed, Sai runs `tools\serve.ps1` from his own terminal and later stops
+  helper-owned PIDs with `tools\stop-serve.ps1`. Agents must not improvise `Start-Process`
+  background servers for smoke tests.
+  **Why it matters:** background servers launched from an agent shell can be reaped, blocked, or
+  broken by quoting/environment differences, which causes repeated false blockers before Playwright
+  can verify the UI.
+  **Where it applies:** `tools/{serve,stop-serve}.ps1`, `AGENTS.md`, `CLAUDE.md`, browser smoke tests,
+  PowerShell verification.
 
 - **Lesson:** Keep environment cleanup facts concrete: `.venv.broken-*` folders are old broken
   virtualenv backups and can be deleted after the active `.venv` is verified; the current intended
