@@ -8,13 +8,19 @@
     return String(n).padStart(2, '0');
   }
 
-  function localDayKey(date = new Date()) {
+  function currentDate() {
+    return window.FocusBuddyDemo && window.FocusBuddyDemo.now
+      ? window.FocusBuddyDemo.now()
+      : new Date();
+  }
+
+  function localDayKey(date = currentDate()) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   }
 
   function dateFromKey(key) {
     const parts = String(key || '').split('-').map(Number);
-    if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return new Date();
+    if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return currentDate();
     return new Date(parts[0], parts[1] - 1, parts[2]);
   }
 
@@ -160,6 +166,7 @@
 
   window.PlanningInsights = {
     localDayKey,
+    currentDate,
     dateFromKey,
     isoWithLocalOffset,
     dayBounds,

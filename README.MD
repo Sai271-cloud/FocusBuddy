@@ -7,8 +7,10 @@ sessions feed analytics, daily/weekly unwind flows, and pattern memory.
 ## Current Shape
 
 - `frontend/` is the real app UI: plain HTML, CSS, and JavaScript served over HTTP.
-- `backend/` is the FastAPI API: SQLite storage, task/session endpoints, analytics helpers, and
-  Gemini proxy endpoints.
+- `backend/` is the FastAPI API: SQLite storage locally, Postgres storage when hosted,
+  task/session endpoints, analytics helpers, and Gemini proxy endpoints.
+- `render.yaml` and `frontend/vercel.json` prepare the public judge demo deployment: Render runs
+  the FastAPI API, and Vercel serves the static frontend.
 - `extension/` is an unpacked Chrome/Edge MV3 extension that can report the current tab title and a
   stripped URL to the local backend while tracking is active.
 - `promptlab/` is a prompt experimentation harness. It is useful for testing candidate coaching
@@ -25,7 +27,11 @@ sessions feed analytics, daily/weekly unwind flows, and pattern memory.
 - Website awareness is opt-in. The extension reports the page title and a stripped URL to the
   backend, which keeps the latest activity in memory with a short TTL.
 - SQLite stores tasks, sessions, work-period reflections/recaps, profile text, hourly focus rows,
-  and qualitative pattern-memory observations.
+  and qualitative pattern-memory observations during local development. The hosted judge demo stores
+  the same app data in Render Postgres, split by demo workspace.
+- Seeded judge demos use readable links (`/demo/early-morning`, `/demo/doomscroller`,
+  `/demo/overplanner`, `/demo/night-owl`, `/demo/self-improver`) with sample data frozen around
+  June 28, 2026. `/demo/new` is a blank per-browser sandbox.
 
 ## Run Locally
 
@@ -57,6 +63,49 @@ GEMINI_API_KEY=...
 ```
 
 Do not commit `.env`.
+
+For the hosted backend, Render provides `DATABASE_URL` from Postgres. Set these environment
+variables in Render:
+
+```text
+GEMINI_API_KEY=...
+FOCUS_BUDDY_CORS_ORIGINS=https://<your-vercel-project>.vercel.app
+COACHING_MODEL=gemini-3.5-flash
+```
+
+After Render gives you the backend URL, update `frontend/js/config.js` if the service is not named
+`focus-buddy-api`.
+
+## Public Judge Demo
+
+Once deployed, send judges named links like:
+
+```text
+https://<your-vercel-project>.vercel.app/demo/early-morning
+https://<your-vercel-project>.vercel.app/demo/doomscroller
+https://<your-vercel-project>.vercel.app/demo/overplanner
+https://<your-vercel-project>.vercel.app/demo/night-owl
+https://<your-vercel-project>.vercel.app/demo/self-improver
+https://<your-vercel-project>.vercel.app/demo/new
+```
+
+The five named links auto-seed different personas with the week of June 22-27, 2026 already filled
+with tasks, sessions, analytics, plans, daily unwinds, hourly focus, and pattern memory. The app's
+demo clock is fixed to the morning of June 28, 2026 so judges can run a fresh session and daily
+unwind. The Judge Demo panel includes a reset button for seeded personas and a clear-data button for
+the blank sandbox.
+
+## Hosting
+
+The intended demo setup is:
+
+- **Render** hosts the FastAPI backend and Postgres database from `render.yaml`.
+- **Vercel** hosts the static frontend from `frontend/` and rewrites `/demo/:slug` to the app.
+- The Gemini API key stays only in Render environment variables.
+
+Deploy Render first, copy its backend URL, then deploy Vercel. If the backend URL differs from
+`https://focus-buddy-api.onrender.com`, update `frontend/js/config.js` and redeploy Vercel. Finally,
+set Render's `FOCUS_BUDDY_CORS_ORIGINS` to the exact Vercel origin.
 
 ## Browser Extension
 

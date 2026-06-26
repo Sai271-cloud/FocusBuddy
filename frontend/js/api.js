@@ -1,8 +1,33 @@
 const API = window.FOCUS_BUDDY_API || 'http://127.0.0.1:8000';
 
+function demoHeaders() {
+  // Demo mode returns either X-Demo-Slug or X-Demo-Anonymous-Id.
+  return window.FocusBuddyDemo && window.FocusBuddyDemo.headers
+    ? window.FocusBuddyDemo.headers()
+    : {};
+}
+
+function withHeaders(options = {}, extra = {}) {
+  return {
+    ...options,
+    headers: {
+      ...demoHeaders(),
+      ...(options.headers || {}),
+      ...extra,
+    },
+  };
+}
+
 async function requestJson(url, options = {}) {
-  const r = await fetch(url, options);
-  if (!r.ok) throw new Error(`${options.method || 'GET'} ${url} failed: ${r.status}`);
+  const r = await fetch(url, withHeaders(options));
+  if (!r.ok) {
+    let detail = '';
+    try {
+      const body = await r.json();
+      detail = body && body.detail ? `: ${body.detail}` : '';
+    } catch {}
+    throw new Error(`${options.method || 'GET'} ${url} failed: ${r.status}${detail}`);
+  }
   return r.json();
 }
 
@@ -38,11 +63,13 @@ async function deleteSession(sessionId) {
   return requestJson(`${API}/sessions/${sessionId}`, { method: 'DELETE' });
 }
 
-async function startSession(taskId) {
+async function startSession(taskId, startedAt = null) {
+  const payload = { task_id: taskId };
+  if (startedAt) payload.started_at = startedAt;
   return requestJson(`${API}/sessions/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task_id: taskId }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -87,6 +114,22 @@ async function createWorkPeriod(data) {
 
 async function getWorkPeriods() {
   return requestJson(`${API}/work-periods`);
+}
+
+async function getDemoWorkspace(slug) {
+  return requestJson(`${API}/demo/${encodeURIComponent(slug)}`);
+}
+
+async function getDemoDailyUnwinds(slug) {
+  return requestJson(`${API}/demo/${encodeURIComponent(slug)}/daily-unwinds`);
+}
+
+async function resetDemoWorkspace(slug) {
+  return requestJson(`${API}/demo/${encodeURIComponent(slug)}/reset`, { method: 'POST' });
+}
+
+async function clearNewDemoWorkspace() {
+  return requestJson(`${API}/demo/new/clear`, { method: 'POST' });
 }
 
 async function getDebrief(sessionId) {
@@ -209,7 +252,7 @@ async function getPlanAdvice(payload) {
 }
 
 async function analyzeFocus(frameBase64, taskName, description = '', activity = null, explain = false, sensors = null) {
-  const r = await fetch(`${API}/focus/analyze`, {
+  const r = await fetch(`${API}/focus/analyze`, withHeaders({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -221,7 +264,14 @@ async function analyzeFocus(frameBase64, taskName, description = '', activity = 
       explain: !!explain,
       sensors: sensors || null,
     }),
-  });
-  if (!r.ok) throw new Error(`analyzeFocus failed: ${r.status}`);
+  }));
+  if (!r.ok) {
+    let detail = '';
+    try {
+      const body = await r.json();
+      detail = body && body.detail ? `: ${body.detail}` : '';
+    } catch {}
+    throw new Error(`analyzeFocus failed: ${r.status}${detail}`);
+  }
   return r.json();
 }

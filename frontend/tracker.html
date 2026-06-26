@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
   <title>Focus Buddy — Session</title>
   <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -194,12 +197,15 @@
 <script>
   const params = new URLSearchParams(location.search);
   const taskId = Number.parseInt(params.get('taskId'), 10);
-  if (!Number.isInteger(taskId) || taskId <= 0) location.href = 'index.html';
+  if (!Number.isInteger(taskId) || taskId <= 0) {
+    location.href = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html';
+  }
 
   const totals = { focused: 0, distracted: 0, uncertain: 0, away: 0 };
   const validStates = new Set(['focused', 'distracted', 'uncertain', 'away']);
   let currentState = 'uncertain';
   let sessionStart = null;
+  let sessionRecordStart = null;
   let sessionId = null;
   let taskName = 'Loading task...';
   let taskDescription = '';
@@ -432,7 +438,9 @@
 
   function sessionPayload() {
     return {
-      ended_at: new Date().toISOString(),
+      ended_at: window.FocusBuddyDemo && FocusBuddyDemo.active
+        ? FocusBuddyDemo.sessionEndIso(sessionRecordStart ? sessionRecordStart.toISOString() : null, elapsedSeconds)
+        : new Date().toISOString(),
       seconds_focused: Math.round(totals.focused),
       seconds_distracted: Math.round(totals.distracted),
       seconds_uncertain: Math.round(totals.uncertain),
@@ -494,9 +502,11 @@
         descEl.classList.remove('hidden');
       }
 
-      const session = await startSession(taskId);
+      const demoStart = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.sessionStartIso() : null;
+      const session = await startSession(taskId, demoStart);
       sessionId = session.id;
-      sessionStart = new Date(session.started_at);
+      sessionRecordStart = new Date(session.started_at);
+      sessionStart = window.FocusBuddyDemo && FocusBuddyDemo.active ? new Date() : sessionRecordStart;
       timerInterval = setInterval(tick, 1000);
       autosaveInterval = setInterval(() => enqueueSessionSave(false), 5000);
 
@@ -568,7 +578,7 @@
   // --- AI debrief modal (shown after a successful save) ---
   const debriefOverlay = document.getElementById('debrief-overlay');
   let debriefReplayHtml = '';
-  function goHome() { location.href = 'index.html'; }
+  function goHome() { location.href = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html'; }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
@@ -577,7 +587,7 @@
       id: sessionId,
       task_id: taskId,
       task_name: taskName,
-      started_at: sessionStart instanceof Date && !isNaN(sessionStart) ? sessionStart.toISOString() : new Date().toISOString(),
+      started_at: sessionRecordStart instanceof Date && !isNaN(sessionRecordStart) ? sessionRecordStart.toISOString() : new Date().toISOString(),
       ...payload,
     };
   }
@@ -666,8 +676,10 @@
     // this session's focus % into the right hours (it stores UTC, does no tz math).
     // Fire-and-forget — must never block or break the debrief/save path.
     try {
-      const startH = (sessionStart instanceof Date && !isNaN(sessionStart)) ? sessionStart.getHours() : new Date().getHours();
-      const endH = new Date().getHours();
+      const payload = lastSavedPayload || sessionPayload();
+      const endDate = new Date(payload.ended_at);
+      const startH = (sessionRecordStart instanceof Date && !isNaN(sessionRecordStart)) ? sessionRecordStart.getHours() : endDate.getHours();
+      const endH = endDate.getHours();
       learnFromSession(sessionId, startH, endH).catch(() => {});
     } catch (e) {}
 

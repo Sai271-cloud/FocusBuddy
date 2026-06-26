@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
   <title>Focus Buddy — Today</title>
   <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -145,6 +148,12 @@
   let _recommendedEntry = null;
   let _allSessions = [];
 
+  function currentDate() {
+    return window.PlanningInsights && PlanningInsights.currentDate
+      ? PlanningInsights.currentDate()
+      : new Date();
+  }
+
   function planEntryForTask(taskId) {
     return (window.PlanningInsights ? PlanningInsights.parsePlanEntries(_todayPlan) : [])
       .find(e => e.task_id === Number(taskId)) || null;
@@ -158,6 +167,11 @@
       params.set('plannedEstimate', String(entry.estimate_min || 0));
       if (Number.isInteger(entry.scheduled_min)) params.set('plannedStart', String(entry.scheduled_min));
       if (_recommendedEntry && _recommendedEntry.task_id === entry.task_id) params.set('recommended', '1');
+    }
+    if (window.FocusBuddyDemo && FocusBuddyDemo.active) {
+      const obj = {};
+      params.forEach((value, key) => { obj[key] = value; });
+      return FocusBuddyDemo.href('tracker.html', obj);
     }
     return `tracker.html?${params.toString()}`;
   }
@@ -334,7 +348,7 @@
   }
 
   function isToday(d) {
-    const n = new Date();
+    const n = currentDate();
     return d.getFullYear() === n.getFullYear()
         && d.getMonth() === n.getMonth()
         && d.getDate() === n.getDate();
@@ -359,7 +373,7 @@
       line.className = 'cal-now-line';
       grid.appendChild(line);
     }
-    const now = new Date();
+    const now = currentDate();
     line.style.top = ((now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT) + 'px';
     return parseFloat(line.style.top);
   }
@@ -403,7 +417,11 @@
         block.style.height = height + 'px';
         block.title = `${s.task_name} · ${pct}% focused · ${formatSeconds(total)}`;
         block.innerHTML = `<span class="font-medium">${escapeHtml(s.task_name)}</span> <span class="cal-block-pct">${pct}%</span>`;
-        block.addEventListener('click', () => { location.href = 'analytics.html'; });
+        block.addEventListener('click', () => {
+          location.href = window.FocusBuddyDemo && FocusBuddyDemo.active
+            ? FocusBuddyDemo.href('analytics.html')
+            : 'analytics.html';
+        });
         grid.appendChild(block);
         count++;
       });
@@ -426,7 +444,7 @@
   }
 
   document.getElementById('cal-date').textContent =
-    new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
   const addBtn   = document.getElementById('add-btn');
   const nameInput = document.getElementById('task-input');

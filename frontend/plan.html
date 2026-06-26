@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
   <title>Focus Buddy — Plan</title>
   <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -106,7 +109,10 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
   // Local day key (YYYY-MM-DD) — same local-date convention analytics uses, never UTC.
-  function localDateKey(d = new Date()) {
+  function currentDate() {
+    return window.FocusBuddyDemo && FocusBuddyDemo.now ? FocusBuddyDemo.now() : new Date();
+  }
+  function localDateKey(d = currentDate()) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -152,12 +158,18 @@
     finished: false,           // set once the plan is saved/dashboard-only
   };
 
+  function todayHref() {
+    return window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html';
+  }
+
   el('plan-date').textContent =
-    new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
   // Easy exit: the close button and Escape both return to Today with nothing saved. If a modal
   // is open, its own Escape handler gets first chance instead of leaving Plan.
-  el('plan-exit').addEventListener('click', () => { location.href = 'index.html'; });
+  el('plan-exit').addEventListener('click', () => {
+    location.href = todayHref();
+  });
   function visibleDialogOpen() {
     return [...document.querySelectorAll('.modal-overlay, [role="dialog"]')].some(node => {
       const box = node.classList && node.classList.contains('modal-overlay') ? node : node.closest('.modal-overlay') || node;
@@ -172,7 +184,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (visibleDialogOpen() || typingTarget(e.target)) return;
-    location.href = 'index.html';
+    location.href = todayHref();
   });
 
   let addTaskReturnFocus = null;
@@ -970,7 +982,7 @@
     try {
       await deletePlan(periodKey);
       showToast('Today’s plan cleared.');
-      location.href = 'index.html';
+      location.href = todayHref();
     } catch {
       showToast('Could not clear the plan — is the backend running?', { danger: true });
     }

@@ -74,8 +74,8 @@ AI calls).
 - **uvicorn** — the server that runs the FastAPI app: `uvicorn backend.main:app --reload`.
 - **SQLAlchemy** — lets the code talk to the database from Python instead of raw SQL; it defines the
   data models (Task, FocusSession).
-- **SQLite** — the database itself: a single file, zero setup. Right for the MVP; only consider
-  Postgres later if hosted multi-user is ever needed.
+- **SQLite / Postgres** — SQLite is the local zero-setup database. The hosted public judge demo uses
+  Render Postgres through `DATABASE_URL`, with the same SQLAlchemy models and workspace-scoped demo data.
 - **Pydantic** — validates request/response data and powers the clean `/docs` (ships with FastAPI).
 
 **Frontend (browser)**
@@ -118,6 +118,7 @@ focus-buddy/
   AGENTS.md                  # Codex project memory; keep synced with CLAUDE.md
   CLAUDE.md                  # Claude Code project memory; keep synced with AGENTS.md
   README.MD                  # what it is, how to run, how it works
+  render.yaml                # Render backend + Postgres blueprint for the public demo
   requirements.txt           # Python dependencies for backend/local checks
   .agents/skills/            # Codex task-specific skills
   .codex/
@@ -132,7 +133,6 @@ focus-buddy/
       privacy-guard/data-flow.md  # honest "what data goes where" reference (for demo Q&A)
   docs/
     agent-subagents.md       # when to use the project review agents in Claude and Codex
-    project-lessons.md       # shared long-term lesson log for Codex + Claude Code
     session-handoff-2026-06-25-debug-fixes.md  # prior handoff for debug/UI fix work
     session-handoff-2026-06-26-planner-modal-current-plan.md  # latest handoff for planner modal/current-plan work
   tools/
@@ -142,16 +142,18 @@ focus-buddy/
     agent-hooks/             # shared PowerShell hook scripts used by Claude Code + Codex
   tests/
     test_chunk_d_planning.py # backend unit coverage for plan-vs-reality, calibration, reschedule
+    test_demo_workspaces.py  # judge demo workspace seeding/isolation/static checks
   promptlab/                 # prompt testing harness; out/ is generated and ignored
   v0-export/                 # archived/reference generated UI export; ignored by default
   backend/
     main.py                  # ✓ FastAPI app + routes (thin handlers)
     schemas.py               # ✓ Pydantic request/response models
     crud.py                  # ✓ SQLAlchemy query helpers (one job each)
-    models.py                # SQLAlchemy models: Task, FocusSession, UserProfile, Observation, HourlyFocus
-    database.py              # DB connection/session setup (+ seeds the Observation starters)
+    models.py                # SQLAlchemy models: DemoWorkspace, Task, FocusSession, profile/pattern/plan tables
+    database.py              # SQLite/Postgres DB setup (+ local SQLite repair helpers)
     focus_buddy.db           # the SQLite file (created on first run)
   frontend/
+    vercel.json              # Vercel rewrite for readable /demo/:slug links
     index.html               # homepage — task list + add a task
     tracker.html             # live session: timer, webcam, chart, totals
     analytics.html           # saved-session analytics
@@ -160,6 +162,8 @@ focus-buddy/
       styles.css             # ✓ only genuinely custom styles (Tailwind via CDN otherwise)
     js/
       api.js                 # ✓ all fetch() calls to the backend live here
+      config.js              # hosted frontend API base URL
+      demo-context.js        # judge demo routing, headers, fixed demo clock, reset panel
       plan-calendar.js       # Today's Plan schedule calendar: placement, drag/resize, AI ghosts
       planning-insights.js   # shared plan helpers: local day bounds, plan parsing, focus goal/streak math
       session-replay.js      # builds replay UI from saved timeline_json + journal_json
@@ -215,6 +219,14 @@ python -m unittest discover -s tests
   a human instead.
 - Leave unrelated dirty worktree changes untouched (for example, a pre-existing `backend/main.py`
   edit). Mention them and move on; that observation is not an error.
+
+**Hosted judge demo workflow**
+- The public demo is split between Render (FastAPI + Postgres from `render.yaml`) and Vercel
+  (static frontend from `frontend/`).
+- Named demo links are `/demo/early-morning`, `/demo/doomscroller`, `/demo/overplanner`,
+  `/demo/night-owl`, and `/demo/self-improver`; `/demo/new` is the blank per-browser sandbox.
+- In demo mode, `frontend/js/demo-context.js` freezes "today" to the morning of June 28, 2026 and
+  sends `X-Demo-Slug` or `X-Demo-Anonymous-Id` so backend data stays isolated by workspace.
 
 ## Where I want to take it (direction)
 A multi-feature tool, built in **phases where each phase is a working demo on its own**:
@@ -284,6 +296,17 @@ Format for each entry:
 - **Lesson:** <the rule, as an instruction>
   **Why it matters:** <what broke, or what it prevents>
   **Where it applies:** <file or area, e.g. focus-detector.js>
+
+- **Lesson:** Keep the public judge demo workspace-scoped end to end: seeded links use
+  `X-Demo-Slug`, the blank sandbox uses `X-Demo-Anonymous-Id`, hosted data lives in Render Postgres
+  via `DATABASE_URL`, and demo-mode dates stay frozen to the morning of June 28, 2026 until the demo
+  plan intentionally changes.
+  **Why it matters:** judges need independent readable links with reliable sample history, reset
+  controls, and a blank experiment link without creating real accounts or letting one judge's edits
+  leak into another workspace.
+  **Where it applies:** `backend/{models,crud,database,main}.py`,
+  `frontend/js/{config,demo-context,api,planning-insights}.js`, `frontend/{index,tracker,analytics,plan}.html`,
+  `render.yaml`, `frontend/vercel.json`.
 
 - **Lesson:** For local verification, agents should default to in-process checks (`python -m unittest
   discover -s tests` or FastAPI `TestClient`) and only use live servers for browser-level smoke tests;

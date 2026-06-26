@@ -6,7 +6,7 @@ import base64
 import logging
 from typing import Optional
 from datetime import datetime, timezone
-from fastapi import FastAPI, Depends, HTTPException, Body
+from fastapi import FastAPI, Depends, HTTPException, Body, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
@@ -49,7 +49,7 @@ MAX_FRAME_BYTES = 1_000_000
 # stale after ACTIVITY_TTL seconds so an old URL isn't reused once the extension
 # stops reporting (browser closed, tab not switched, etc.).
 ACTIVITY_TTL = 30.0
-_latest_activity = {"url": None, "title": None, "ts": 0.0}
+_latest_activity = {}
 
 # Whether a tracker session is ACTIVELY tracking with website awareness on. The
 # tracker page heartbeats this (active = session live, not paused/on-break, and the
@@ -61,16 +61,32 @@ _latest_activity = {"url": None, "title": None, "ts": 0.0}
 # The extension checks GET /tracking-state before reporting, and POST /activity is
 # ignored unless the gate is open, so the toggle is honored authoritatively.
 TRACKING_TTL = 90.0
-_tracking_state = {"active": False, "ts": 0.0}
+_tracking_state = {}
 
 
-def _tracking_active() -> bool:
-    return _tracking_state["active"] and (time.time() - _tracking_state["ts"]) <= TRACKING_TTL
+def _activity_slot(workspace_id: int):
+    return _latest_activity.setdefault(workspace_id, {"url": None, "title": None, "ts": 0.0})
+
+
+def _tracking_slot(workspace_id: int):
+    return _tracking_state.setdefault(workspace_id, {"active": False, "ts": 0.0})
+
+
+def _tracking_active(workspace_id: int) -> bool:
+    state = _tracking_slot(workspace_id)
+    return state["active"] and (time.time() - state["ts"]) <= TRACKING_TTL
 
 app = FastAPI(title="Focus Buddy API")
 
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("FOCUS_BUDDY_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=_cors_origins,
     allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1):\d+|chrome-extension://[a-p]{32})$",
     allow_credentials=True,
     allow_methods=["*"],
@@ -78,58 +94,177 @@ app.add_middleware(
 )
 
 
+def get_workspace(
+    x_demo_slug: Optional[str] = Header(None, alias="X-Demo-Slug"),
+    x_demo_anonymous_id: Optional[str] = Header(None, alias="X-Demo-Anonymous-Id"),
+    db: Session = Depends(get_db),
+):
+    workspace = crud.resolve_demo_workspace(db, x_demo_slug, x_demo_anonymous_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Demo workspace not found")
+    return workspace
+
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
+@app.get("/demo/{slug}", response_model=schemas.DemoWorkspaceOut)
+def get_demo_workspace(slug: str, db: Session = Depends(get_db)):
+    if slug == "new":
+        return {
+            "slug": "new",
+            "display_name": "Blank Demo",
+            "archetype": "Blank judge experiment",
+            "workspace_type": "anonymous",
+            "seed_version": 0,
+            "demo_today_key": crud.DEMO_TODAY_KEY,
+        }
+    workspace = crud.ensure_seeded_workspace(db, slug)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Demo workspace not found")
+    return {
+        "slug": workspace.slug,
+        "display_name": workspace.display_name,
+        "archetype": workspace.archetype,
+        "workspace_type": workspace.workspace_type,
+        "seed_version": workspace.seed_version,
+        "demo_today_key": crud.DEMO_TODAY_KEY,
+    }
+
+
+@app.post("/demo/{slug}/reset", response_model=schemas.DemoWorkspaceOut)
+def reset_demo_workspace(slug: str, db: Session = Depends(get_db)):
+    workspace = crud.reset_seeded_workspace(db, slug)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Demo workspace not found")
+    return {
+        "slug": workspace.slug,
+        "display_name": workspace.display_name,
+        "archetype": workspace.archetype,
+        "workspace_type": workspace.workspace_type,
+        "seed_version": workspace.seed_version,
+        "demo_today_key": crud.DEMO_TODAY_KEY,
+    }
+
+
+@app.post("/demo/new/clear")
+def clear_new_demo(
+    x_demo_anonymous_id: Optional[str] = Header(None, alias="X-Demo-Anonymous-Id"),
+    db: Session = Depends(get_db),
+):
+    if not x_demo_anonymous_id:
+        raise HTTPException(status_code=400, detail="Blank demo workspace ID is required")
+    crud.clear_anonymous_workspace(db, x_demo_anonymous_id)
+    return {"ok": True}
+
+
+@app.get("/demo/{slug}/daily-unwinds", response_model=list[schemas.DemoDailyUnwindOut])
+def get_demo_daily_unwinds(slug: str, db: Session = Depends(get_db)):
+    rows = crud.seeded_daily_unwinds(db, slug)
+    if rows is None:
+        raise HTTPException(status_code=404, detail="Demo workspace not found")
+    return rows
+
+
 @app.post("/tasks", response_model=schemas.TaskOut)
-def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
+def create_task(
+    task: schemas.TaskCreate,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     if not task.name.strip():
         raise HTTPException(status_code=400, detail="Task name cannot be empty")
-    return crud.create_task(db, task)
+    return crud.create_task(db, task, workspace)
 
 
 @app.get("/tasks", response_model=list[schemas.TaskOut])
-def get_tasks(db: Session = Depends(get_db)):
-    return crud.get_tasks(db)
+def get_tasks(
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return crud.get_tasks(db, workspace)
 
 
 @app.get("/tasks/{task_id}", response_model=schemas.TaskOut)
-def get_task(task_id: int, db: Session = Depends(get_db)):
-    task = crud.get_task(db, task_id)
+def get_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    task = crud.get_task(db, task_id, workspace)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 
 @app.patch("/tasks/{task_id}", response_model=schemas.TaskOut)
-def update_task(task_id: int, update: schemas.TaskUpdate, db: Session = Depends(get_db)):
-    task = _get_task_or_404(db, task_id)
+def update_task(
+    task_id: int,
+    update: schemas.TaskUpdate,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    task = _get_task_or_404(db, task_id, workspace)
     if update.name is not None and not update.name.strip():
         raise HTTPException(status_code=400, detail="Task name cannot be empty")
-    return crud.update_task(db, task, update)
+    completed_at = None
+    if update.completed and workspace.workspace_type in {"seeded", "anonymous"}:
+        completed_at = datetime(2026, 6, 28, 9, 0, tzinfo=timezone.utc)
+    return crud.update_task(db, task, update, completed_at=completed_at)
 
 
 @app.delete("/tasks/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db)):
-    task = _get_task_or_404(db, task_id)
+def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    task = _get_task_or_404(db, task_id, workspace)
     crud.delete_task(db, task)
     return {"ok": True}
 
 
-def _get_task_or_404(db: Session, task_id: int):
-    task = crud.get_task(db, task_id)
+def _get_task_or_404(db: Session, task_id: int, workspace):
+    task = crud.get_task(db, task_id, workspace)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 
+def _get_session_or_404(db: Session, session_id: int, workspace):
+    session = (
+        db.query(models.FocusSession)
+        .filter(
+            models.FocusSession.id == session_id,
+            models.FocusSession.workspace_id == workspace.id,
+        )
+        .first()
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
 @app.post("/sessions", response_model=schemas.SessionOut)
-def create_session(session: schemas.SessionCreate, db: Session = Depends(get_db)):
-    task = _get_task_or_404(db, session.task_id)
-    return crud.create_session(db, session, task)
+def create_session(
+    session: schemas.SessionCreate,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    task = _get_task_or_404(db, session.task_id, workspace)
+    return crud.create_session(db, session, task, workspace)
 
 
 @app.post("/sessions/start", response_model=schemas.SessionOut)
-def start_session(session: schemas.SessionStart, db: Session = Depends(get_db)):
-    task = _get_task_or_404(db, session.task_id)
-    return crud.start_session(db, task)
+def start_session(
+    session: schemas.SessionStart,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    task = _get_task_or_404(db, session.task_id, workspace)
+    return crud.start_session(db, task, workspace, started_at=session.started_at)
 
 
 @app.patch("/sessions/{session_id}", response_model=schemas.SessionOut)
@@ -137,10 +272,9 @@ def update_session(
     session_id: int,
     update: schemas.SessionUpdate,
     db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    session = db.get(models.FocusSession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_session_or_404(db, session_id, workspace)
     return crud.update_session(db, session, update)
 
 
@@ -149,23 +283,27 @@ def finish_session(
     session_id: int,
     update: schemas.SessionUpdate,
     db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    session = db.get(models.FocusSession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_session_or_404(db, session_id, workspace)
     return crud.update_session(db, session, update)
 
 
 @app.get("/sessions", response_model=list[schemas.SessionOut])
-def get_sessions(db: Session = Depends(get_db)):
-    return crud.get_sessions(db)
+def get_sessions(
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return crud.get_sessions(db, workspace)
 
 
 @app.delete("/sessions/{session_id}")
-def delete_session(session_id: int, db: Session = Depends(get_db)):
-    session = db.get(models.FocusSession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+def delete_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    session = _get_session_or_404(db, session_id, workspace)
     crud.delete_session(db, session)
     return {"ok": True}
 
@@ -876,10 +1014,12 @@ def _session_summary(session: models.FocusSession) -> tuple[str, int]:
 
 
 @app.post("/sessions/{session_id}/debrief", response_model=schemas.DebriefResponse)
-def debrief_session(session_id: int, db: Session = Depends(get_db)):
-    session = db.get(models.FocusSession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+def debrief_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    session = _get_session_or_404(db, session_id, workspace)
     if _client is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set in .env")
 
@@ -894,7 +1034,7 @@ def debrief_session(session_id: int, db: Session = Depends(get_db)):
         "uncertain": session.seconds_uncertain or 0,
         "away": session.seconds_away or 0,
     }
-    about = _about_block(db)
+    about = _about_block(db, workspace)
     prompt = f"""You are a warm, perceptive focus coach giving a short debrief right after ONE work session. Talk
 like a thoughtful friend. Reinforce what genuinely worked, then offer one evidence-based thing to try next. THOUROUGLY READ THROUGH EVERY SINGLE POINT MADE TO GIVE THE BEST ADVICE. The session's data is below, including the task name, total tracked time, focused/distracted/uncertain/away breakdown, timeline of state changes, and a timestamped journal of what they were doing and which sites they opened.
 
@@ -985,13 +1125,20 @@ Reply with ONLY valid JSON, no markdown, exactly:
 
 
 @app.post("/work-periods", response_model=schemas.WorkPeriodOut)
-def upsert_work_period(period: schemas.WorkPeriodCreate, db: Session = Depends(get_db)):
-    return crud.upsert_work_period(db, period)
+def upsert_work_period(
+    period: schemas.WorkPeriodCreate,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return crud.upsert_work_period(db, period, workspace)
 
 
 @app.get("/work-periods", response_model=list[schemas.WorkPeriodOut])
-def get_work_periods(db: Session = Depends(get_db)):
-    return crud.get_work_periods(db)
+def get_work_periods(
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return crud.get_work_periods(db, workspace)
 
 
 def _sessions_in_range(sessions: list, day_start: datetime, day_end: datetime) -> list:
@@ -1001,9 +1148,13 @@ def _sessions_in_range(sessions: list, day_start: datetime, day_end: datetime) -
 
 
 @app.get("/plan/calibration", response_model=schemas.PlanCalibrationResponse)
-def plan_calibration(limit: int = 14, db: Session = Depends(get_db)):
+def plan_calibration(
+    limit: int = 14,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     scorecards = []
-    for period in crud.get_recent_plan_reality_periods(db, limit):
+    for period in crud.get_recent_plan_reality_periods(db, limit, workspace):
         try:
             card = json.loads(period.plan_reality_json or "{}")
         except Exception:
@@ -1014,10 +1165,14 @@ def plan_calibration(limit: int = 14, db: Session = Depends(get_db)):
 
 
 @app.get("/plan/{period_key}", response_model=Optional[schemas.DailyPlanOut])
-def get_plan(period_key: str, db: Session = Depends(get_db)):
+def get_plan(
+    period_key: str,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     # Returns null (200) when the day isn't planned — never 404 — so the frontend's
     # throw-on-non-200 fetch helper treats "no plan yet" as a normal empty result.
-    return crud.get_plan(db, period_key)
+    return crud.get_plan(db, period_key, workspace)
 
 
 @app.get("/plan/{period_key}/reality", response_model=schemas.PlanRealityReport)
@@ -1026,17 +1181,22 @@ def plan_reality(
     day_start: datetime,
     day_end: datetime,
     db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
     if _aware_utc(day_end) <= _aware_utc(day_start):
         raise HTTPException(status_code=422, detail="day_end must be after day_start")
-    plan = crud.get_plan(db, period_key)
-    sessions = _sessions_in_range(crud.get_sessions(db), day_start, day_end)
+    plan = crud.get_plan(db, period_key, workspace)
+    sessions = _sessions_in_range(crud.get_sessions(db, workspace), day_start, day_end)
     return _build_plan_reality_report(period_key, plan, sessions, day_start.tzinfo)
 
 
 @app.post("/plan", response_model=schemas.DailyPlanOut)
-def upsert_plan(plan: schemas.DailyPlanUpsert, db: Session = Depends(get_db)):
-    return crud.upsert_plan(db, plan)
+def upsert_plan(
+    plan: schemas.DailyPlanUpsert,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return crud.upsert_plan(db, plan, workspace)
 
 
 @app.post("/plan/reschedule", response_model=schemas.PlanRescheduleResponse)
@@ -1047,24 +1207,35 @@ def plan_reschedule(req: schemas.PlanRescheduleRequest):
 
 
 @app.delete("/plan/{period_key}")
-def delete_plan(period_key: str, db: Session = Depends(get_db)):
-    crud.delete_plan(db, period_key)
+def delete_plan(
+    period_key: str,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    crud.delete_plan(db, period_key, workspace)
     return {"ok": True}
 
 
 @app.get("/profile", response_model=schemas.ProfileOut)
-def read_profile(db: Session = Depends(get_db)):
-    return crud.get_profile(db)
+def read_profile(
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return crud.get_profile(db, workspace)
 
 
 @app.put("/profile", response_model=schemas.ProfileOut)
-def write_profile(profile: schemas.ProfileIn, db: Session = Depends(get_db)):
-    return crud.update_profile(db, profile.about)
+def write_profile(
+    profile: schemas.ProfileIn,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return crud.update_profile(db, profile.about, workspace)
 
 
-def _about_block(db: Session) -> str:
+def _about_block(db: Session, workspace=None) -> str:
     """The user's 'About me' context, formatted for a prompt. '' if empty."""
-    about = crud.get_profile(db).about.strip()
+    about = crud.get_profile(db, workspace).about.strip()
     if not about:
         return ''
     return (
@@ -1109,54 +1280,68 @@ def _parse_focus(reply_text: str):
 
 
 @app.post("/tracking-state")
-def set_tracking_state(state: schemas.TrackingState):
+def set_tracking_state(
+    state: schemas.TrackingState,
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     """The tracker page reports whether it's actively tracking with website awareness
     on. The extension checks this (GET) before reporting, so it only reports while a
     session is live and the toggle is honored."""
-    _tracking_state["active"] = bool(state.active)
-    _tracking_state["ts"] = time.time()
-    if not _tracking_state["active"]:
+    tracking = _tracking_slot(workspace.id)
+    tracking["active"] = bool(state.active)
+    tracking["ts"] = time.time()
+    if not tracking["active"]:
         # Gate just closed — drop any lingering active-tab URL right away so it can't
         # be read during the brief window before it would have expired on its own.
-        _latest_activity["url"] = None
-        _latest_activity["title"] = None
-        _latest_activity["ts"] = 0.0
+        latest = _activity_slot(workspace.id)
+        latest["url"] = None
+        latest["title"] = None
+        latest["ts"] = 0.0
     return {"ok": True}
 
 
 @app.get("/tracking-state")
-def get_tracking_state():
+def get_tracking_state(workspace: models.DemoWorkspace = Depends(get_workspace)):
     """The extension calls this before reporting — true only while the tracker is
     actively tracking (heartbeating) with website awareness on."""
-    return {"active": _tracking_active()}
+    return {"active": _tracking_active(workspace.id)}
 
 
 @app.post("/activity")
-def set_activity(activity: schemas.ActivityIn):
+def set_activity(
+    activity: schemas.ActivityIn,
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     """Browser extension reports the active tab's URL + title here. Stored in memory
     only. Ignored unless a tracker session is actively tracking (gate) — this is what
     makes the extension honor pause/stop and the website-awareness toggle."""
-    if not _tracking_active():
+    if not _tracking_active(workspace.id):
         return {"ok": False, "ignored": True}
-    _latest_activity["url"] = activity.url
-    _latest_activity["title"] = activity.title
-    _latest_activity["ts"] = time.time()
+    latest = _activity_slot(workspace.id)
+    latest["url"] = activity.url
+    latest["title"] = activity.title
+    latest["ts"] = time.time()
     return {"ok": True}
 
 
 @app.get("/activity", response_model=schemas.ActivityOut)
-def get_activity():
+def get_activity(workspace: models.DemoWorkspace = Depends(get_workspace)):
     """Latest reported URL + title, or null if none/stale/gate-closed. The tracker
     reads this each sample."""
-    if not _tracking_active():
+    if not _tracking_active(workspace.id):
         return schemas.ActivityOut(url=None, title=None)
-    if _latest_activity["url"] and (time.time() - _latest_activity["ts"]) <= ACTIVITY_TTL:
-        return schemas.ActivityOut(url=_latest_activity["url"], title=_latest_activity["title"])
+    latest = _activity_slot(workspace.id)
+    if latest["url"] and (time.time() - latest["ts"]) <= ACTIVITY_TTL:
+        return schemas.ActivityOut(url=latest["url"], title=latest["title"])
     return schemas.ActivityOut(url=None, title=None)
 
 
 @app.post("/focus/analyze", response_model=schemas.FocusAnalyzeResponse)
-def analyze_focus(request: schemas.FocusAnalyzeRequest, db: Session = Depends(get_db)):
+def analyze_focus(
+    request: schemas.FocusAnalyzeRequest,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     if _client is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set in .env")
 
@@ -1185,7 +1370,7 @@ def analyze_focus(request: schemas.FocusAnalyzeRequest, db: Session = Depends(ge
             "If the page's relevance is unclear, rely on the webcam image rather than assuming "
             "distraction."
         )
-    about = _about_block(db)
+    about = _about_block(db, workspace)
     sensors_block = (
         f"\n\nOn-device sensors (may be imperfect — trust the image if they conflict): "
         f"{request.sensors}."
@@ -1249,18 +1434,28 @@ def _observation_out(obs: models.Observation) -> schemas.ObservationOut:
 
 
 @app.get("/observations", response_model=list[schemas.ObservationOut])
-def get_observations(db: Session = Depends(get_db)):
-    return [_observation_out(o) for o in crud.list_observations(db)]
+def get_observations(
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return [_observation_out(o) for o in crud.list_observations(db, workspace=workspace)]
 
 
 @app.get("/hourly-focus", response_model=list[schemas.HourlyFocusOut])
-def get_hourly_focus(db: Session = Depends(get_db)):
-    return crud.get_hourly_focus(db)
+def get_hourly_focus(
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    return crud.get_hourly_focus(db, workspace)
 
 
 @app.delete("/observations/{obs_id}")
-def delete_observation(obs_id: int, db: Session = Depends(get_db)):
-    obs = crud.get_observation(db, obs_id)
+def delete_observation(
+    obs_id: int,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
+    obs = crud.get_observation(db, obs_id, workspace)
     if obs is None:
         raise HTTPException(status_code=404, detail="Observation not found")
     crud.delete_observation(db, obs)
@@ -1305,14 +1500,13 @@ def learn_from_session(
     session_id: int,
     payload: schemas.LearnRequest = Body(default=None),
     db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
     """Best-effort after a session. Two parts: (1) DETERMINISTIC — fold the session's
     focus % into the hourly profile (runs even if the AI is unavailable); (2) AI —
     ask the model to affirm/reject the qualitative patterns and propose new ones.
     Never raises on an AI/parse failure, and never touches the saved session."""
-    session = db.get(models.FocusSession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_session_or_404(db, session_id, workspace)
 
     summary_lines, total = _session_summary(session)
     if total <= 0:
@@ -1325,13 +1519,13 @@ def learn_from_session(
     end_h = payload.end_hour if payload else None
     if start_h is not None and end_h is not None:
         session_pct = 100.0 * (session.seconds_focused or 0) / total
-        hours_updated = crud.update_hourly_focus(db, start_h, end_h, session_pct)
+        hours_updated = crud.update_hourly_focus(db, start_h, end_h, session_pct, workspace)
 
     if _client is None:
         return schemas.LearnResult(updated=0, hours_updated=hours_updated)
 
     # (2) Qualitative patterns — the AI affirm/reject/add loop.
-    active = crud.list_observations(db, active_only=True)
+    active = crud.list_observations(db, active_only=True, workspace=workspace)
     if active:
         patterns_block = "\n".join(
             f"- id {o.id}: \"{o.text}\" (net {o.affirmations - o.rejections})" for o in active
@@ -1339,7 +1533,7 @@ def learn_from_session(
     else:
         patterns_block = "(none yet)"
 
-    about = _about_block(db)
+    about = _about_block(db, workspace)
 
     prompt = f"""You are a focus coach maintaining a long-term memory of how ONE person focuses. You
 are reviewing a single just-finished work session to update that memory. You are specifically hunting
@@ -1374,17 +1568,17 @@ Reply with ONLY valid JSON, no markdown, in exactly this shape:
 
         updated = 0
         for obs_id in affirm_ids:
-            obs = crud.get_observation(db, obs_id)
+            obs = crud.get_observation(db, obs_id, workspace)
             if obs is not None:
                 crud.affirm_observation(db, obs)
                 updated += 1
         for obs_id in reject_ids:
-            obs = crud.get_observation(db, obs_id)
+            obs = crud.get_observation(db, obs_id, workspace)
             if obs is not None:
                 crud.reject_observation(db, obs)
                 updated += 1
         for text in result["new"][:2]:  # cap new per session
-            if crud.create_observation(db, text) is not None:
+            if crud.create_observation(db, text, workspace) is not None:
                 updated += 1
 
         return schemas.LearnResult(updated=updated, hours_updated=hours_updated)
@@ -1479,14 +1673,26 @@ def _plan_echo(summary: Optional[str]) -> str:
 
 
 @app.post("/unwind/daily", response_model=schemas.DailyUnwindResponse)
-def daily_unwind(req: schemas.DailyUnwindRequest, db: Session = Depends(get_db)):
+def daily_unwind(
+    req: schemas.DailyUnwindRequest,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     """AI coaching for one day: reviews today's sessions and compares them against the
     user's learned patterns, recent daily average, and most-focused hours. Best-effort
     + defensive parse; the recap is saved by the frontend via the work-period upsert."""
     if _client is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set in .env")
 
-    sessions = [s for s in (db.get(models.FocusSession, i) for i in req.session_ids) if s is not None]
+    sessions = [
+        s for s in (
+            db.query(models.FocusSession)
+            .filter(models.FocusSession.id == i, models.FocusSession.workspace_id == workspace.id)
+            .first()
+            for i in req.session_ids
+        )
+        if s is not None
+    ]
     summary_lines, total = _day_summary(sessions)
     if total < 120:
         # Not enough tracked today — don't spend a call. Frontend shows a friendly note.
@@ -1513,7 +1719,7 @@ def daily_unwind(req: schemas.DailyUnwindRequest, db: Session = Depends(get_db))
         )
 
     ranked = sorted(
-        [h for h in crud.get_hourly_focus(db) if h.sessions > 0],
+        [h for h in crud.get_hourly_focus(db, workspace) if h.sessions > 0],
         key=lambda h: h.focus_pct, reverse=True,
     )[:3]
     hourly_block = ""
@@ -1521,12 +1727,12 @@ def daily_unwind(req: schemas.DailyUnwindRequest, db: Session = Depends(get_db))
         best = ", ".join(f"{_fmt_hour(h.hour)} ({round(h.focus_pct)}%)" for h in ranked)
         hourly_block = f"\nYour historically most-focused hours: {best}."
 
-    active = crud.list_observations(db, active_only=True)
+    active = crud.list_observations(db, active_only=True, workspace=workspace)
     patterns_block = "\n".join(
         f'- "{o.text}" ({crud.observation_status(o)})' for o in active
     ) if active else "(none yet)"
 
-    about = _about_block(db)
+    about = _about_block(db, workspace)
 
     prompt = f"""You are a warm, perceptive focus coach helping a person unwind from ONE day and close it out.
 Talk like a thoughtful friend.
@@ -1616,7 +1822,11 @@ Reply with ONLY valid JSON, no markdown, exactly:
 
 
 @app.post("/plan/advice", response_model=schemas.PlanAdviceResponse)
-def plan_advice(req: schemas.PlanAdviceRequest, db: Session = Depends(get_db)):
+def plan_advice(
+    req: schemas.PlanAdviceRequest,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     """AI scheduling advice for a day's plan: suggests WHEN to do each task (harder tasks
     matched to historically higher-focus hours) and gently flags over-planning. Reads the
     hourly focus profile + learned patterns + About me. Planning-specific — NOT gated on
@@ -1642,7 +1852,7 @@ def plan_advice(req: schemas.PlanAdviceRequest, db: Session = Depends(get_db)):
 
     # Peak hours from the hourly profile — only hours with real samples count. Without
     # enough history we must NOT invent peak times (the cold-start trap the review flagged).
-    sampled = [h for h in crud.get_hourly_focus(db) if h.sessions > 0]
+    sampled = [h for h in crud.get_hourly_focus(db, workspace) if h.sessions > 0]
     ranked = sorted(sampled, key=lambda h: h.focus_pct, reverse=True)[:3]
     cold_start = len(sampled) < 4
     if ranked and not cold_start:
@@ -1654,12 +1864,12 @@ def plan_advice(req: schemas.PlanAdviceRequest, db: Session = Depends(get_db)):
                         "specific peak times — schedule sensibly (often the hardest task first while fresh) "
                         "and note the timing is a starting guess they can adjust.")
 
-    active = crud.list_observations(db, active_only=True)
+    active = crud.list_observations(db, active_only=True, workspace=workspace)
     confirmed = [o for o in active if crud.observation_status(o) == "confirmed"]
     patterns_block = "\n".join(
         f'- "{o.text}" ({crud.observation_status(o)})' for o in active
     ) if active else "(none yet)"
-    about = _about_block(db)
+    about = _about_block(db, workspace)
 
     # Planner gating: with little profile AND no confirmed patterns AND no About-me, don't
     # generate "based on your patterns" advice — it would be generic filler.
@@ -1797,7 +2007,11 @@ def _parse_weekly_unwind(text: str) -> schemas.WeeklyUnwindResponse:
 
 
 @app.post("/unwind/weekly", response_model=schemas.WeeklyUnwindResponse)
-def weekly_unwind(req: schemas.WeeklyUnwindRequest, db: Session = Depends(get_db)):
+def weekly_unwind(
+    req: schemas.WeeklyUnwindRequest,
+    db: Session = Depends(get_db),
+    workspace: models.DemoWorkspace = Depends(get_workspace),
+):
     """AI coaching for a week: reasons over the week's days (using saved daily recaps
     where present), the learned patterns, best hours, and prior weeks (trend), and may
     recommend new Pomodoro timings. Best-effort + defensive parse."""
@@ -1809,7 +2023,7 @@ def weekly_unwind(req: schemas.WeeklyUnwindRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=422, detail="Not enough tracked time this week to analyze")
 
     ranked = sorted(
-        [h for h in crud.get_hourly_focus(db) if h.sessions > 0],
+        [h for h in crud.get_hourly_focus(db, workspace) if h.sessions > 0],
         key=lambda h: h.focus_pct, reverse=True,
     )[:3]
     hourly_block = ""
@@ -1817,12 +2031,12 @@ def weekly_unwind(req: schemas.WeeklyUnwindRequest, db: Session = Depends(get_db
         best = ", ".join(f"{_fmt_hour(h.hour)} ({round(h.focus_pct)}%)" for h in ranked)
         hourly_block = f"\nMost-focused hours historically: {best}."
 
-    active = crud.list_observations(db, active_only=True)
+    active = crud.list_observations(db, active_only=True, workspace=workspace)
     patterns_block = "\n".join(
         f'- "{o.text}" ({crud.observation_status(o)})' for o in active
     ) if active else "(none yet)"
 
-    prev_weeks = [w for w in crud.get_work_periods(db) if w.kind == "week" and w.period_key != req.week_key][:3]
+    prev_weeks = [w for w in crud.get_work_periods(db, workspace) if w.kind == "week" and w.period_key != req.week_key][:3]
     trend_block = ""
     if prev_weeks:
         rows = []
@@ -1849,7 +2063,7 @@ def weekly_unwind(req: schemas.WeeklyUnwindRequest, db: Session = Depends(get_db
         f"{req.pomo_break_min or 5}m (enabled={bool(req.pomo_enabled)}). Focus must stay "
         f"{POMO_FOCUS_MIN}-{POMO_FOCUS_MAX} min and break {POMO_BREAK_MIN}-{POMO_BREAK_MAX} min."
     )
-    about = _about_block(db)
+    about = _about_block(db, workspace)
 
     prompt = f"""You are a warm, perceptive focus coach reviewing ONE week for a person. Talk like a thoughtful friend.
 

@@ -805,6 +805,48 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   overflow-y: auto;
   animation: modalPop 0.2s ease both;
 }
+
+.judge-demo-modal {
+  max-width: 620px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.judge-unwind-list {
+  display: grid;
+  gap: 10px;
+}
+
+.judge-unwind-row {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 11px 12px;
+}
+
+.judge-demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.demo-recap-result {
+  border-left: 3px solid var(--sage);
+  background: rgba(94, 138, 101, 0.10);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.demo-recap-result p {
+  margin: 0 0 8px;
+}
+
+.demo-recap-result p:last-child {
+  margin-bottom: 0;
+}
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalPop {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }

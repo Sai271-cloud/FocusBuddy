@@ -55,6 +55,7 @@ class SessionCreate(BaseModel):
 
 class SessionStart(BaseModel):
     task_id: int
+    started_at: Optional[datetime] = None
 
 
 class SessionUpdate(BaseModel):
@@ -124,6 +125,26 @@ class WorkPeriodOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DemoWorkspaceOut(BaseModel):
+    slug: str
+    display_name: str
+    archetype: str = ''
+    workspace_type: str = 'seeded'
+    seed_version: int = 0
+    demo_today_key: str = '2026-06-28'
+
+    class Config:
+        from_attributes = True
+
+
+class DemoDailyUnwindOut(BaseModel):
+    period_key: str
+    summary: str = ''
+    win: str = ''
+    next_action: str = ''
+    ai_recap: str = ''
 
 
 class FocusAnalyzeRequest(BaseModel):

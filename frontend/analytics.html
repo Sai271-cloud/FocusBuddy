@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
   <title>Focus Buddy — Analytics</title>
   <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="css/styles.css" />
@@ -151,6 +154,14 @@
 
   function pad2(n) { return String(n).padStart(2, '0'); }
   function localDayKey(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+  function currentDate() {
+    return window.FocusBuddyDemo && FocusBuddyDemo.now ? FocusBuddyDemo.now() : new Date();
+  }
+  function endedAtIso() {
+    return window.FocusBuddyDemo && FocusBuddyDemo.active
+      ? FocusBuddyDemo.isoWithLocalOffset(currentDate())
+      : new Date().toISOString();
+  }
   function parseDayKey(key) { const [y, m, dd] = key.split('-').map(Number); return new Date(y, m - 1, dd); }
   function mondayOf(d) {
     const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -187,8 +198,8 @@
   const WK_LONG  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   function weekDays() {
-    const monday = mondayOf(new Date());
-    const todayKey = localDayKey(new Date());
+    const monday = mondayOf(currentDate());
+    const todayKey = localDayKey(currentDate());
     const days = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
@@ -215,11 +226,11 @@
   /* ---------- dashboard renderers ---------- */
   function computeStreak() {
     if (window.PlanningInsights) {
-      return PlanningInsights.focusStreak(allSessions, PlanningInsights.focusGoalMin(), localDayKey(new Date())).count;
+      return PlanningInsights.focusStreak(allSessions, PlanningInsights.focusGoalMin(), localDayKey(currentDate())).count;
     }
     const set = new Set(allSessions.map(s => localDayKey(new Date(s.started_at))));
     if (set.size === 0) return 0;
-    const t = new Date();
+    const t = currentDate();
     let cursor = new Date(t.getFullYear(), t.getMonth(), t.getDate());
     if (!set.has(localDayKey(cursor))) {          // today blank → streak can still run up to yesterday
       cursor.setDate(cursor.getDate() - 1);
@@ -239,10 +250,10 @@
   }
 
   function renderTiles() {
-    const todayKey = localDayKey(new Date());
+    const todayKey = localDayKey(currentDate());
     const today = allSessions.filter(s => localDayKey(new Date(s.started_at)) === todayKey);
     const tSum = sumStates(today);
-    const weekKey = weekKeyOf(new Date());
+    const weekKey = weekKeyOf(currentDate());
     const week = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey);
     const wSum = sumStates(week);
     const goal = window.PlanningInsights ? PlanningInsights.focusGoalMin() : 0;
@@ -272,12 +283,12 @@
 
   function renderToday() {
     const el = document.getElementById('today-card');
-    const todayKey = localDayKey(new Date());
+    const todayKey = localDayKey(currentDate());
     const today = allSessions.filter(s => localDayKey(new Date(s.started_at)) === todayKey);
     const sum = sumStates(today);
     const period = findPeriod('day', todayKey);
     const has = today.length > 0;
-    const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    const dateStr = currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     let savedReality = null;
     if (period && period.plan_reality_json) {
       try { savedReality = JSON.parse(period.plan_reality_json); } catch (e) { savedReality = null; }
@@ -304,7 +315,7 @@
 
   function renderWeek() {
     const el = document.getElementById('week-card');
-    const monday = mondayOf(new Date());
+    const monday = mondayOf(currentDate());
     const weekKey = localDayKey(monday);
     const days = weekDays();
     const week = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey);
@@ -418,8 +429,8 @@
   let unwind = { kind: null, step: 0, reflection: '', snapshot: null, finished: false };
 
   async function openUnwind(kind) {
-    const todayKey = localDayKey(new Date());
-    const weekKey  = weekKeyOf(new Date());
+    const todayKey = localDayKey(currentDate());
+    const weekKey  = weekKeyOf(currentDate());
     let sessions, periodKey;
     if (kind === 'day') { sessions = allSessions.filter(s => localDayKey(new Date(s.started_at)) === todayKey); periodKey = todayKey; }
     else                { sessions = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey); periodKey = weekKey; }
@@ -472,7 +483,7 @@
 
   // Average focus % over the last ~14 days, excluding today — the AI's "recent" baseline.
   function recentAvgFocusPct(excludeKey) {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 14);
+    const cutoff = currentDate(); cutoff.setDate(cutoff.getDate() - 14);
     const byDay = {};
     allSessions.forEach(s => {
       const d = new Date(s.started_at); if (d < cutoff) return;
@@ -599,7 +610,7 @@
 
   // ----- Weekly AI step -----
   function buildWeekDays() {
-    const monday = mondayOf(new Date());
+    const monday = mondayOf(currentDate());
     const out = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
@@ -678,7 +689,7 @@
       const sum = unwind.snapshot.sum;
       try {
         await createWorkPeriod({
-          kind: 'week', period_key: unwind.snapshot.periodKey, ended_at: new Date().toISOString(),
+          kind: 'week', period_key: unwind.snapshot.periodKey, ended_at: endedAtIso(),
           seconds_focused: sum.focused, seconds_distracted: sum.distracted,
           seconds_uncertain: sum.uncertain, seconds_away: sum.away,
           ai_recap: JSON.stringify(unwind.aiRecap),
@@ -772,7 +783,7 @@
       const sum = unwind.snapshot.sum;
       try {
         await createWorkPeriod({
-          kind: 'day', period_key: unwind.snapshot.periodKey, ended_at: new Date().toISOString(),
+          kind: 'day', period_key: unwind.snapshot.periodKey, ended_at: endedAtIso(),
           seconds_focused: sum.focused, seconds_distracted: sum.distracted,
           seconds_uncertain: sum.uncertain, seconds_away: sum.away,
           ai_recap: JSON.stringify(unwind.aiRecap),
@@ -832,7 +843,7 @@
         ${weekBarsHtml(days)}
         <p class="text-xs mt-3" style="color:var(--text-faint)">${focusPct(sum)}% of tracked time focused · ${formatHM(sum.total)} tracked</p>`;
     }
-    const monday = mondayOf(new Date());
+    const monday = mondayOf(currentDate());
     const list = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
@@ -859,9 +870,9 @@
     const { kind, step } = unwind;
     document.getElementById('unwind-title').textContent = kind === 'day' ? 'Daily Unwind' : 'Weekly Unwind';
     if (kind === 'day') {
-      document.getElementById('unwind-subtitle').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+      document.getElementById('unwind-subtitle').textContent = currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     } else {
-      const m = mondayOf(new Date());
+      const m = mondayOf(currentDate());
       const e = new Date(m.getFullYear(), m.getMonth(), m.getDate() + 6);
       document.getElementById('unwind-subtitle').textContent =
         `${m.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
@@ -889,7 +900,7 @@
     nextBtn.disabled = true; nextBtn.textContent = 'Saving…';
     try {
       await createWorkPeriod({
-        kind, period_key: snapshot.periodKey, ended_at: new Date().toISOString(),
+        kind, period_key: snapshot.periodKey, ended_at: endedAtIso(),
         seconds_focused: sum.focused, seconds_distracted: sum.distracted,
         seconds_uncertain: sum.uncertain, seconds_away: sum.away, reflection: reflection || '',
         plan_reality_json: kind === 'day' && snapshot.planReality ? JSON.stringify(snapshot.planReality) : null,
