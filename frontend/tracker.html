@@ -40,13 +40,13 @@
   </div>
 </header>
 
-<main class="max-w-4xl mx-auto px-6 py-8">
-  <div class="grid gap-5 md:grid-cols-[1.5fr_1fr] items-start">
+<main class="app-main app-main-wide tracker-main max-w-4xl mx-auto px-6 py-8">
+  <div class="tracker-grid grid gap-5 md:grid-cols-[1.5fr_1fr] items-start">
 
     <!-- LEFT — focal panel -->
-    <div class="flex flex-col gap-5">
+    <div class="tracker-workflow flex flex-col gap-5">
 
-      <div class="card" style="background:var(--hero-bg);border-color:transparent;box-shadow:var(--shadow-lg);position:relative;overflow:hidden">
+      <div class="card tracker-hero" style="background:var(--hero-bg);border-color:transparent;box-shadow:var(--shadow-lg);position:relative;overflow:hidden">
         <div id="state-tint" aria-hidden="true"></div>
         <div id="state-accent" aria-hidden="true"></div>
         <div style="position:relative;z-index:1">
@@ -98,7 +98,7 @@
                autocomplete="off" aria-label="What does done look like for this session?" />
       </div>
 
-      <div class="card">
+      <div class="card focus-summary-card">
         <div class="flex items-center justify-between mb-2.5">
           <span class="text-sm" style="color:var(--text-muted)">Focus this session</span>
           <span class="text-sm font-semibold" id="focus-pct" style="color:var(--sage);font-variant-numeric:tabular-nums">0%</span>
@@ -110,7 +110,7 @@
         </div>
       </div>
 
-      <div class="flex gap-3">
+      <div class="tracker-actions flex gap-3">
         <button id="pause-btn" class="btn-ghost flex-1" style="min-height:48px">
           <span id="pause-ico" style="display:inline-flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></span>
           <span id="pause-lbl">Pause</span>
@@ -119,6 +119,12 @@
           <span style="display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></span>
           <span id="stop-lbl">Stop &amp; Save</span>
         </button>
+      </div>
+
+      <div id="startup-error-card" class="card tracker-error-card hidden" role="alert">
+        <p class="section-label" style="margin-bottom:6px">Session unavailable</p>
+        <p id="startup-error-copy" class="text-sm" style="color:var(--text-muted);line-height:1.55;margin:0 0 12px"></p>
+        <a href="index.html" class="btn-primary">Back to Today</a>
       </div>
 
       <!-- Dev: AI reasoning for the latest sample (shown when "Show AI reasoning" is on) -->
@@ -131,7 +137,7 @@
     </div>
 
     <!-- RIGHT — webcam + breakdown rail -->
-    <div class="card flex flex-col gap-4">
+    <div class="card tracker-rail flex flex-col gap-4">
       <div>
         <p class="section-label" style="margin-bottom:8px">Camera</p>
         <div id="webcam-row">
@@ -561,11 +567,29 @@
     return pendingSave;
   }
 
+  function setSessionControlsDisabled(disabled) {
+    ['pause-btn', 'stop-btn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = disabled;
+    });
+    const actions = document.querySelector('.tracker-actions');
+    if (actions) actions.classList.toggle('hidden', disabled);
+  }
+
   function showStartupError(message) {
+    setSessionControlsDisabled(true);
     document.getElementById('webcam-row').classList.add('hidden');
     const errorEl = document.getElementById('webcam-error');
-    errorEl.innerHTML = `<strong>Session could not start.</strong> ${message}`;
+    errorEl.textContent = '';
+    const strong = document.createElement('strong');
+    strong.textContent = 'Session could not start.';
+    errorEl.append(strong, ' ' + message);
     errorEl.classList.remove('hidden');
+    const card = document.getElementById('startup-error-card');
+    document.getElementById('startup-error-copy').textContent = message;
+    card.classList.remove('hidden');
+    card.querySelector('a').focus();
+    if (window.showToast) showToast('Session could not start.', { danger: true });
   }
 
   async function init() {
@@ -642,10 +666,19 @@
 
   // Stop -> styled confirm modal (calmer than window.confirm)
   const confirmOverlay = document.getElementById('confirm-overlay');
+  const stopBtn = document.getElementById('stop-btn');
+  const stopLabel = document.getElementById('stop-lbl');
+  let retryFinalSave = false;
   function openConfirm() { confirmOverlay.style.display = 'flex'; document.getElementById('confirm-cancel').focus(); }
   function closeConfirm() { confirmOverlay.style.display = 'none'; }
 
-  document.getElementById('stop-btn').addEventListener('click', openConfirm);
+  stopBtn.addEventListener('click', () => {
+    if (retryFinalSave) {
+      endAndSaveSession();
+      return;
+    }
+    openConfirm();
+  });
   document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
   confirmOverlay.addEventListener('click', e => { if (e.target.id === 'confirm-overlay') closeConfirm(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && confirmOverlay.style.display === 'flex') closeConfirm(); });
@@ -716,7 +749,8 @@
   debriefOverlay.addEventListener('click', e => { if (e.target.id === 'debrief-overlay') goHome(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && debriefOverlay.style.display === 'flex') goHome(); });
 
-  document.getElementById('confirm-end').addEventListener('click', async () => {
+  async function endAndSaveSession() {
+    retryFinalSave = false;
     closeConfirm();
     clearInterval(timerInterval);
     clearInterval(autosaveInterval);
@@ -725,8 +759,7 @@
     // Session ending → close the extension's gate explicitly (sessionId still set here).
     try { if (window.setTrackingState) setTrackingState(false).catch(() => {}); } catch (e) {}
 
-    const stopBtn = document.getElementById('stop-btn');
-    document.getElementById('stop-lbl').textContent = 'Saving…';
+    stopLabel.textContent = 'Saving…';
     stopBtn.disabled = true;
 
     // 1) Save first — this must succeed independently; the debrief never risks it.
@@ -734,9 +767,11 @@
       await enqueueSessionSave(true);
     } catch (err) {
       console.error('Save failed:', err);
-      document.getElementById('stop-lbl').textContent = 'Save Failed — Retry';
+      retryFinalSave = true;
+      stopLabel.textContent = 'Retry Save';
       stopBtn.disabled = false;
-      // Stop button still opens the confirm modal, so a click retries End & Save.
+      stopBtn.focus();
+      if (window.showToast) showToast('Could not save this session. Check the backend, then retry.', { danger: true });
       return;
     }
 
@@ -764,7 +799,9 @@
       console.warn('Debrief failed:', err);
       renderDebriefError();
     }
-  });
+  }
+
+  document.getElementById('confirm-end').addEventListener('click', endAndSaveSession);
 
   // Session goal selector (remembered per device)
   const goalSelect = document.getElementById('goal-select');

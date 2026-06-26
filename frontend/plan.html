@@ -34,8 +34,8 @@
   </div>
 </header>
 
-<main class="max-w-2xl mx-auto px-6 py-8">
-  <div class="card" style="position:relative">
+<main class="app-main plan-main max-w-2xl mx-auto px-6 py-8">
+  <div class="card plan-wizard" style="position:relative">
     <!-- Always-available exit: leaves to Today, nothing saved. -->
     <button id="plan-exit" class="btn-ghost" aria-label="Exit planning" title="Exit (Esc)"
             style="position:absolute;top:13px;right:13px;width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1">
@@ -59,6 +59,32 @@
     </div>
   </div>
 </main>
+
+<div id="add-task-modal" class="modal-overlay plan-task-modal-overlay" hidden>
+  <form id="add-task-form" class="modal plan-task-modal" role="dialog" aria-modal="true" aria-labelledby="add-task-title">
+    <div class="plan-modal-head">
+      <div>
+        <p class="section-label">New task</p>
+        <h2 id="add-task-title" class="serif">Add a task to today</h2>
+      </div>
+      <button id="add-task-close" class="icon-btn" type="button" aria-label="Close add task">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <label class="plan-modal-field" for="add-task-name">
+      <span>Task name</span>
+      <input id="add-task-name" class="input" type="text" autocomplete="off" required />
+    </label>
+    <label class="plan-modal-field" for="add-task-description">
+      <span>Description</span>
+      <textarea id="add-task-description" class="input plan-task-description" rows="4" placeholder="Optional context for focus detection"></textarea>
+    </label>
+    <div class="plan-modal-actions">
+      <button id="add-task-cancel" class="btn-ghost" type="button">Cancel</button>
+      <button id="add-task-submit" class="btn-primary" type="submit">Add task</button>
+    </div>
+  </form>
+</div>
 
 <script src="js/api.js"></script>
 <script src="js/notify.js"></script>
@@ -108,6 +134,7 @@
 
   const periodKey = localDateKey();
   const state = {
+    view: 'wizard',            // 'wizard' while editing, 'current' for the saved-plan dashboard
     step: 0,
     tasks: [],                 // active tasks from the backend
     entries: new Map(),        // task_id -> { task_id, name, estimate_min, difficulty }
@@ -122,10 +149,8 @@
     dismissedAdviceIds: new Set(),
     adviceLoading: false,
     calibration: null,
-    reschedule: null,
-    rescheduleLoading: false,
     saveStatus: '',
-    finished: false,           // set once the plan is saved (success screen shown)
+    finished: false,           // set once the plan is saved/dashboard-only
     hourly: new Map(),         // hour -> { focus_pct, sessions } for timeline shading
   };
 
@@ -152,10 +177,31 @@
     location.href = 'index.html';
   });
 
+  let addTaskReturnFocus = null;
+
+  function addTaskModal() {
+    return el('add-task-modal');
+  }
+
+  function openAddTaskModal(trigger) {
+    addTaskReturnFocus = trigger || el('open-add-task');
+    const modal = addTaskModal();
+    modal.hidden = false;
+    el('add-task-form').reset();
+    setTimeout(() => el('add-task-name').focus(), 0);
+  }
+
+  function closeAddTaskModal({ restoreFocus = true } = {}) {
+    const modal = addTaskModal();
+    modal.hidden = true;
+    if (restoreFocus && addTaskReturnFocus && document.contains(addTaskReturnFocus)) {
+      addTaskReturnFocus.focus();
+    }
+  }
+
   function markPlanChanged(opts = {}) {
     state.planDirty = true;
     const staleAdvice = opts.adviceStale !== false;
-    if (staleAdvice) state.reschedule = null;
     if (staleAdvice && (state.advice || state.hadSavedAdvice)) {
       state.adviceStale = true;
       state.dismissedAdviceIds.clear();
@@ -214,6 +260,16 @@
     return [...state.tasks, ...ghosts];
   }
 
+  function selectTaskForPlan(task) {
+    if (!task || typeof task.id !== 'number') return;
+    state.entries.set(task.id, {
+      task_id: task.id,
+      name: task.name || '',
+      estimate_min: DEFAULT_ESTIMATE,
+      difficulty: 'medium',
+    });
+  }
+
   // ---------- Phase bodies ----------
   function stepBody() {
     const key = STEP_KEYS[state.step];
@@ -239,19 +295,17 @@
         <span class="serif" style="font-size:0.95rem;color:var(--text)">${escapeHtml(t.name)}</span>
       </label>`).join('');
     const empty = list.length ? '' :
-      `<p class="text-sm" style="color:var(--text-faint);padding:0.4rem 0">No tasks yet — add one below.</p>`;
+      `<p class="text-sm" style="color:var(--text-faint);padding:0.4rem 0">No tasks yet. Add one to start planning.</p>`;
     const helper = state.entries.size ? '' :
       `<p class="text-xs mt-3" style="color:var(--text-faint)">Pick or add at least one task to continue.</p>`;
     return `
-      <p class="text-sm mb-3" style="color:var(--text-muted)">
-        Choose the tasks you want to focus on today. Totally optional — you can leave anytime.
-      </p>
+      <div class="plan-pick-head">
+        <p class="text-sm" style="color:var(--text-muted);margin:0">
+          Choose the tasks you want to focus on today. Totally optional - you can leave anytime.
+        </p>
+        <button id="open-add-task" class="btn-ghost" type="button">Add task</button>
+      </div>
       <div id="pick-list" class="flex flex-col">${rows}${empty}</div>
-      <form id="inline-add" class="flex gap-2 mt-3">
-        <input id="inline-name" class="input" type="text" placeholder="Add a task…"
-               autocomplete="off" aria-label="New task name" style="flex:1" />
-        <button class="btn-ghost" type="submit">Add</button>
-      </form>
       ${helper}`;
   }
 
@@ -311,29 +365,28 @@
       ? 'Getting suggestions...'
       : (state.advice ? 'Regenerate AI suggestions' : 'Get AI suggestions');
     const adviceDisabled = state.adviceLoading ? 'disabled' : '';
-    const rescheduleDisabled = state.rescheduleLoading ? 'disabled' : '';
-    const rescheduleLabel = state.rescheduleLoading ? 'Refitting...' : 'Refit remaining day';
     const adviceNote = state.adviceLoading
-      ? 'Asking the AI for suggested times.'
-      : state.reschedule
-        ? 'Revised times show as faint blocks. Apply the ones you want.'
+      ? 'Getting fresh suggestions.'
       : hasCurrentAdvice()
-        ? 'AI suggestions show as faint blocks. You choose what to use.'
+        ? 'AI suggestions are ready.'
         : state.adviceStale
-          ? 'Your saved AI advice is stale after task or estimate changes. Regenerate when you want fresh suggestions.'
-          : 'Optional: ask the AI for suggested times after you place your own plan.';
+          ? 'AI suggestions need regeneration after your edits.'
+          : 'Optional timing help.';
     const saveStatus = state.saveStatus
       ? `<span id="plan-save-status" class="plan-save-status">${escapeHtml(state.saveStatus)}</span>`
       : `<span id="plan-save-status" class="plan-save-status" aria-live="polite"></span>`;
     return `
-      <p class="text-sm mb-3" style="color:var(--text-muted)">Place each task on your day. Optional — you can save without scheduling.</p>
-      <div class="plan-schedule-tools">
-        <button id="plan-advice-btn" type="button" class="btn-ghost text-xs" ${adviceDisabled}>${adviceLabel}</button>
-        <button id="plan-reschedule-btn" type="button" class="btn-ghost text-xs" ${rescheduleDisabled}>${rescheduleLabel}</button>
-        ${saveStatus}
+      <div class="plan-schedule-intro">
+        <div class="plan-schedule-copy">
+          <p class="section-label">Schedule</p>
+          <h3 class="serif">Arrange your day</h3>
+          <p class="plan-schedule-note">${adviceNote}</p>
+        </div>
+        <div class="plan-schedule-actions">
+          <button id="plan-advice-btn" type="button" class="btn-ghost text-xs" ${adviceDisabled}>${adviceLabel}</button>
+          ${saveStatus}
+        </div>
       </div>
-      <p class="text-xs mb-3" style="color:var(--text-faint)">${adviceNote}</p>
-      ${state.reschedule && state.reschedule.over_plan_note ? `<p class="plan-reschedule-note">${escapeHtml(state.reschedule.over_plan_note)}</p>` : ''}
       <div id="plan-cal-root"></div>
       <div class="mt-3">${budgetMeterHtml()}</div>`;
   }
@@ -368,8 +421,82 @@
       <div class="mt-4">${clear}</div>`;
   }
 
+  function currentPlanBody() {
+    const entries = [...state.entries.values()];
+    if (!entries.length) {
+      return `
+        <div class="plan-current-empty">
+          <p class="serif" style="font-size:1.05rem;font-weight:600;color:var(--text);margin:0">No saved plan yet</p>
+          <p class="text-sm" style="color:var(--text-muted);margin:4px 0 0">Pick a few tasks to build today's plan.</p>
+          <button id="current-edit-tasks" class="btn-primary mt-3" type="button">Start planning</button>
+        </div>`;
+    }
+    const scheduledCount = entries.filter(e => Number.isFinite(e.scheduled_min)).length;
+    const rows = entries.map(e => {
+      const scheduled = Number.isFinite(e.scheduled_min);
+      const start = scheduled ? normalizeScheduledMin(e, e.scheduled_min, 5) : null;
+      const when = scheduled
+        ? `${fmtClock(start)} - ${fmtClock(start + e.estimate_min)}`
+        : 'Unscheduled';
+      const status = scheduled ? 'Scheduled' : 'Unscheduled';
+      return `
+        <div class="plan-current-row">
+          <div class="plan-current-task">
+            <p>${escapeHtml(e.name)}</p>
+            <span>${escapeHtml(when)}</span>
+          </div>
+          <span class="plan-current-pill ${scheduled ? 'scheduled' : ''}">${status}</span>
+          <span class="plan-current-meta">${fmtMins(e.estimate_min)}</span>
+          <span class="plan-current-meta">${DIFF_LABEL[e.difficulty] || 'Medium'}</span>
+        </div>`;
+    }).join('');
+    const over = totalEstimate() > state.availableMin;
+    return `
+      <div class="plan-current">
+        <div class="plan-current-top">
+          <div>
+            <p class="section-label">Current plan</p>
+            <h2 class="serif">Today's saved plan</h2>
+            <p class="plan-current-note">Review the plan you saved, then jump back into only the part you want to change.</p>
+          </div>
+          <a href="index.html" class="btn-primary">Go to Today</a>
+        </div>
+        <div class="plan-current-stats">
+          <div>
+            <span>Total planned</span>
+            <strong>${fmtMins(totalEstimate())}</strong>
+          </div>
+          <div>
+            <span>Budget</span>
+            <strong class="${over ? 'over' : ''}">${fmtMins(state.availableMin)}</strong>
+          </div>
+          <div>
+            <span>Scheduled</span>
+            <strong>${scheduledCount}/${entries.length}</strong>
+          </div>
+        </div>
+        <div class="plan-current-budget">${budgetMeterHtml()}</div>
+        <div class="plan-current-list" aria-label="Saved planned tasks">${rows}</div>
+        <div class="plan-current-actions">
+          <button id="current-edit-tasks" class="btn-ghost" type="button">Edit tasks</button>
+          <button id="current-edit-estimates" class="btn-ghost" type="button">Edit estimates</button>
+          <button id="current-edit-schedule" class="btn-ghost" type="button">Edit schedule</button>
+          <button id="current-clear" class="btn-ghost" type="button">Clear plan</button>
+        </div>
+      </div>`;
+  }
+
   // ---------- Render + per-step wiring ----------
   function render() {
+    if (state.view === 'current') {
+      el('plan-dots').innerHTML = '';
+      el('plan-footer').style.display = 'none';
+      el('plan-body').innerHTML = currentPlanBody();
+      bindCurrentPlan();
+      return;
+    }
+
+    el('plan-footer').style.display = 'flex';
     el('plan-dots').innerHTML = STEP_KEYS.map((_, i) =>
       `<span class="step-dot ${i === state.step ? 'active' : ''}"></span>`).join('');
     el('plan-body').innerHTML = stepBody();
@@ -386,22 +513,38 @@
     bindStep();
   }
 
+  function editPlanStep(step) {
+    state.view = 'wizard';
+    state.finished = false;
+    state.step = step;
+    render();
+  }
+
+  function bindCurrentPlan() {
+    const editTasks = el('current-edit-tasks');
+    const editEstimates = el('current-edit-estimates');
+    const editSchedule = el('current-edit-schedule');
+    const clear = el('current-clear');
+    if (editTasks) editTasks.addEventListener('click', () => editPlanStep(0));
+    if (editEstimates) editEstimates.addEventListener('click', () => editPlanStep(1));
+    if (editSchedule) editSchedule.addEventListener('click', () => editPlanStep(2));
+    if (clear) clear.addEventListener('click', clearPlan);
+  }
+
   function bindStep() {
     const key = STEP_KEYS[state.step];
     if (key === 'pick') {
       if (state.loadError) return;
       const listEl = el('pick-list');
-      const addForm = el('inline-add');
-      if (!listEl || !addForm) return;
+      const addBtn = el('open-add-task');
+      if (!listEl) return;
+      if (addBtn) addBtn.addEventListener('click', () => openAddTaskModal(addBtn));
       listEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
         cb.addEventListener('change', () => {
           const id = parseInt(cb.dataset.task, 10);
           if (cb.checked) {
             const t = pickList().find(x => x.id === id);
-            state.entries.set(id, {
-              task_id: id, name: t ? t.name : '',
-              estimate_min: DEFAULT_ESTIMATE, difficulty: 'medium',
-            });
+            selectTaskForPlan(t);
           } else {
             state.entries.delete(id);
           }
@@ -409,25 +552,6 @@
           scheduleAutoSave();
           render();
         });
-      });
-      addForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const name = el('inline-name').value.trim();
-        if (!name) return;
-        try {
-          const task = await createTask(name);
-          state.tasks.unshift(task);
-          // auto-select the just-added task
-          state.entries.set(task.id, {
-            task_id: task.id, name: task.name,
-            estimate_min: DEFAULT_ESTIMATE, difficulty: 'medium',
-          });
-          markPlanChanged();
-          scheduleAutoSave();
-          render();
-        } catch {
-          showToast('Could not add the task — is the backend running?', { danger: true });
-        }
       });
     } else if (key === 'size') {
       el('plan-body').querySelectorAll('input[data-est]').forEach(r => {
@@ -468,8 +592,6 @@
       paintCalendar();
       const adviceBtn = el('plan-advice-btn');
       if (adviceBtn) adviceBtn.addEventListener('click', generateAdvice);
-      const rescheduleBtn = el('plan-reschedule-btn');
-      if (rescheduleBtn) rescheduleBtn.addEventListener('click', generateReschedule);
     } else if (key === 'confirm') {
       const clear = el('plan-clear');
       if (clear) clear.addEventListener('click', clearPlan);
@@ -549,15 +671,14 @@
   function paintCalendar() {
     const root = el('plan-cal-root');
     if (!root || !window.PlanCalendar) return;
-    const suggestion = state.reschedule || (hasCurrentAdvice() ? state.advice : null);
-    const isReschedule = !!state.reschedule;
+    const suggestion = hasCurrentAdvice() ? state.advice : null;
     window.PlanCalendar.render(root, {
       entries: [...state.entries.values()],
       hourly: state.hourly,
       aiSuggest: suggestion,
-      suggestLabel: isReschedule ? 'Revised' : 'AI',
-      suggestUseLabel: isReschedule ? 'Use time' : 'Use AI',
-      suggestAllLabel: isReschedule ? 'Apply all revised times' : 'Apply all AI times',
+      suggestLabel: 'AI',
+      suggestUseLabel: 'Use AI',
+      suggestAllLabel: 'Apply all AI times',
       dismissedAi: state.dismissedAdviceIds,
       onDismissAi: (taskId) => {
         state.dismissedAdviceIds.add(taskId);
@@ -578,6 +699,40 @@
   });
   el('plan-back').addEventListener('click', () => {
     if (state.step > 0) { state.step -= 1; render(); }
+  });
+
+  addTaskModal().addEventListener('click', (e) => {
+    if (e.target === addTaskModal()) closeAddTaskModal();
+  });
+  el('add-task-close').addEventListener('click', () => closeAddTaskModal());
+  el('add-task-cancel').addEventListener('click', () => closeAddTaskModal());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !addTaskModal().hidden) {
+      e.preventDefault();
+      closeAddTaskModal();
+    }
+  });
+  el('add-task-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = el('add-task-name').value.trim();
+    const description = el('add-task-description').value.trim();
+    if (!name) return;
+    const submit = el('add-task-submit');
+    submit.disabled = true;
+    try {
+      const task = await createTask(name, description);
+      state.tasks.unshift(task);
+      selectTaskForPlan(task);
+      markPlanChanged();
+      scheduleAutoSave();
+      closeAddTaskModal({ restoreFocus: false });
+      render();
+      setTimeout(() => el('open-add-task')?.focus(), 0);
+    } catch {
+      showToast('Could not add the task - is the backend running?', { danger: true });
+    } finally {
+      submit.disabled = false;
+    }
   });
 
   let adviceReqId = 0;
@@ -604,7 +759,6 @@
     } else {
       state.advice = result;
       state.adviceStale = false;
-      state.reschedule = null;
       state.adviceGeneratedThisVisit = true;
       state.dismissedAdviceIds.clear();
       setSaveStatus('Saving...');
@@ -616,40 +770,6 @@
       }
     }
     render();
-  }
-
-  async function generateReschedule() {
-    if (state.rescheduleLoading || !state.entries.size) return;
-    state.rescheduleLoading = true;
-    render();
-    try {
-      const [sessions, tasks] = await Promise.all([getSessions(), getTasks()]);
-      const todayKey = window.PlanningInsights ? PlanningInsights.localDayKey() : periodKey;
-      const actualByTask = {};
-      (sessions || []).forEach(s => {
-        const started = new Date(s.started_at);
-        const key = window.PlanningInsights ? PlanningInsights.localDayKey(started) : localDateKey(started);
-        if (key !== todayKey) return;
-        const totalMin = Math.round(((s.seconds_focused || 0) + (s.seconds_distracted || 0) + (s.seconds_uncertain || 0) + (s.seconds_away || 0)) / 60);
-        actualByTask[s.task_id] = (actualByTask[s.task_id] || 0) + totalMin;
-      });
-      const completedTaskIds = (tasks || []).filter(t => t.completed).map(t => t.id);
-      const now = new Date();
-      state.reschedule = await getPlanReschedule({
-        period_key: periodKey,
-        entries: [...state.entries.values()].map(entryForSave),
-        current_min: now.getHours() * 60 + now.getMinutes(),
-        day_end_min: 23 * 60,
-        actual_by_task: actualByTask,
-        completed_task_ids: completedTaskIds,
-      });
-      state.dismissedAdviceIds.clear();
-    } catch {
-      showToast('Could not refit the remaining day — is the backend running?', { danger: true });
-    } finally {
-      state.rescheduleLoading = false;
-      render();
-    }
   }
 
   async function persistAdviceNow() {
@@ -693,7 +813,7 @@
         state.hadSavedAdvice = true;
         state.adviceGeneratedThisVisit = false;
       }
-      showSuccess();
+      showCurrentPlan();
     } catch {
       showToast('Could not save your plan — is the backend running?', { danger: true });
     }
@@ -712,21 +832,10 @@
     }
   }
 
-  function showSuccess() {
-    state.finished = true;   // stops any late advice completion from clobbering this screen
-    el('plan-footer').style.display = 'none';
-    el('plan-dots').innerHTML = '';
-    el('plan-body').innerHTML = `
-      <div class="flex flex-col items-center text-center gap-3 py-6">
-        <div style="width:42px;height:42px;border-radius:99px;background:var(--sage-soft);display:flex;align-items:center;justify-content:center">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-        </div>
-        <p class="serif" style="font-size:1.05rem;font-weight:600;color:var(--text);margin:0">Plan saved for today</p>
-        <p class="text-sm" style="color:var(--text-muted);margin:0">${[...state.entries.values()].length} task${state.entries.size === 1 ? '' : 's'} · ${fmtMins(totalEstimate())} planned. Start whenever you’re ready — nothing’s forced.</p>
-        <a href="index.html" class="btn-primary mt-2">Go to Today
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </a>
-      </div>`;
+  function showCurrentPlan() {
+    state.view = 'current';
+    state.finished = true;   // stops any late advice completion from clobbering the saved dashboard
+    render();
   }
 
   async function init() {
@@ -774,6 +883,10 @@
         state.hadSavedAdvice = true;
         try { state.advice = JSON.parse(plan.advice_json); } catch { /* ignore malformed advice */ }
       }
+    }
+    if (state.existingPlan) {
+      state.view = 'current';
+      state.finished = true;
     }
     render();
   }

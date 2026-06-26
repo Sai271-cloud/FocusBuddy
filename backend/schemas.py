@@ -362,7 +362,7 @@ class PlanRealityReport(BaseModel):
     planned_total_min: int = 0
     actual_total_min: int = 0
     focused_total_min: int = 0
-    rows: list[PlanRealityRow] = []
+    rows: list[PlanRealityRow] = Field(default_factory=list)
     summary: str = ''
 
 
@@ -377,20 +377,20 @@ class PlanCalibrationItem(BaseModel):
 
 
 class PlanCalibrationResponse(BaseModel):
-    overall: PlanCalibrationItem = PlanCalibrationItem()
-    by_task: list[PlanCalibrationItem] = []
+    overall: PlanCalibrationItem = Field(default_factory=PlanCalibrationItem)
+    by_task: list[PlanCalibrationItem] = Field(default_factory=list)
 
 
 class PlanRescheduleRequest(BaseModel):
     period_key: Optional[str] = None
-    entries: list[PlanEntry] = []
+    entries: list[PlanEntry] = Field(default_factory=list)
     current_min: int = Field(..., ge=0, le=1439)
     day_end_min: int = Field(23 * 60, ge=1, le=1440)
-    actual_by_task: dict[int, int] = {}
-    completed_task_ids: list[int] = []
+    actual_by_task: dict[int, int] = Field(default_factory=dict)
+    completed_task_ids: list[int] = Field(default_factory=list)
 
 
 class PlanRescheduleResponse(BaseModel):
     summary: str = ''
-    scheduled: list[ScheduledBlock] = []
+    scheduled: list[ScheduledBlock] = Field(default_factory=list)
     over_plan_note: str = ''

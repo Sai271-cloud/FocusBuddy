@@ -25,8 +25,8 @@
   window.showToast = function (message, opts) {
     opts = opts || {};
     var t = document.createElement('div');
-    t.className = 'toast';
-    t.setAttribute('role', 'status');
+    t.className = 'toast' + (opts.danger ? ' toast-danger' : '');
+    t.setAttribute('role', opts.danger ? 'alert' : 'status');
     t.innerHTML = (opts.icon ? '<span style="font-size:1.1rem;line-height:1">' + opts.icon + '</span>' : '') +
       '<span>' + esc(message) + '</span>';
     toastWrap().appendChild(t);

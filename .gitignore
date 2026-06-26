@@ -24,6 +24,8 @@ promptlab/out/
 v0-export/
 .pnpm-store/
 .playwright-mcp/
+playwright-*.png
+skills-lock.json
 promptlab/
 tools/
 docs/

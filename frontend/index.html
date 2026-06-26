@@ -34,11 +34,11 @@
   </div>
 </header>
 
-<main class="max-w-5xl mx-auto px-6 py-8">
+<main class="app-main app-main-wide today-main max-w-5xl mx-auto px-6 py-8">
   <div class="today-grid">
 
-    <section class="flex flex-col gap-5">
-      <div class="card">
+    <section class="today-primary flex flex-col gap-5">
+      <div class="card task-composer">
         <p class="section-label">New task</p>
         <form id="add-form" class="flex flex-col gap-3">
           <div>
@@ -48,7 +48,7 @@
           </div>
           <div>
             <label for="task-desc" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
-              Description <span class="font-normal" style="color:var(--text-faint)"> — Add details about the task. This can can include the needed websites, tools, or any other context that might be helpful for focus analysis</span>
+              Description <span class="font-normal" style="color:var(--text-faint)"> — Add needed websites, tools, or context for focus analysis</span>
             </label>
             <textarea id="task-desc" class="input" rows="3"
                       placeholder="Please add context or details about this task."
@@ -66,7 +66,7 @@
         </form>
       </div>
 
-      <div>
+      <div class="task-stack">
         <p class="section-label">Tasks</p>
         <div id="task-list" class="flex flex-col gap-3"></div>
         <div id="active-empty" class="flex flex-col items-center gap-2 text-center py-10">
@@ -82,7 +82,7 @@
       </div>
     </section>
 
-    <section>
+    <section class="today-rail">
       <div id="focus-goal-card" class="card focus-goal-card mb-4"></div>
       <div class="flex items-center justify-between mb-2">
         <p class="section-label" style="margin:0">Today</p>
@@ -280,7 +280,7 @@
       await updateTask(id, { completed: !currentlyCompleted });
       await loadTasks();
     } catch {
-      alert('Could not update the task — is the backend running?');
+      showToast('Could not update the task — is the backend running?', { danger: true });
     }
   }
 
@@ -296,7 +296,7 @@
       await loadTasks();
       await loadCalendar();
     } catch {
-      alert('Could not delete the task — is the backend running?');
+      showToast('Could not delete the task — is the backend running?', { danger: true });
     }
   }
 
@@ -503,7 +503,7 @@
       document.getElementById('task-desc').value = '';
       await loadTasks();
     } catch {
-      alert('Failed to create task — make sure the backend is running.');
+      showToast('Failed to create task — make sure the backend is running.', { danger: true });
     } finally {
       addBtn.innerHTML = ADD_LABEL;
       setAddEnabled(nameInput.value.trim().length > 0);
@@ -525,7 +525,7 @@
       closeEdit();
       await loadTasks();
     } catch {
-      alert('Could not save the task — is the backend running?');
+      showToast('Could not save the task — is the backend running?', { danger: true });
     }
   });
 

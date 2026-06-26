@@ -112,7 +112,7 @@ class ChunkDPlanningTests(unittest.TestCase):
             period_key="2026-06-24",
             entries=entries,
             current_min=12 * 60 + 3,
-            day_end_min=13 * 60,
+            day_end_min=13 * 60 + 15,
             actual_by_task={1: 35, 2: 20},
             completed_task_ids=[1],
         )
@@ -123,7 +123,45 @@ class ChunkDPlanningTests(unittest.TestCase):
         self.assertNotIn(1, starts)
         self.assertEqual(starts[2], 12 * 60 + 15)
         self.assertEqual(starts[3], 12 * 60 + 45)
-        self.assertTrue(result.over_plan_note)
+        self.assertEqual(result.over_plan_note, "")
+
+    def test_reschedule_omits_blocks_that_do_not_fit_before_day_end(self):
+        from backend.main import _build_reschedule_response
+
+        entries = [
+            schemas.PlanEntry(task_id=1, name="Fit", estimate_min=20, difficulty="hard", scheduled_min=9 * 60),
+            schemas.PlanEntry(task_id=2, name="Too long", estimate_min=40, difficulty="medium", scheduled_min=10 * 60),
+        ]
+        req = schemas.PlanRescheduleRequest(
+            period_key="2026-06-24",
+            entries=entries,
+            current_min=12 * 60,
+            day_end_min=12 * 60 + 35,
+            actual_by_task={},
+            completed_task_ids=[],
+        )
+
+        result = _build_reschedule_response(req)
+        scheduled_ids = [block.task_id for block in result.scheduled]
+
+        self.assertEqual(scheduled_ids, [1])
+        self.assertLessEqual(
+            result.scheduled[0].start_hour * 60 + result.scheduled[0].start_min + result.scheduled[0].length_min,
+            req.day_end_min,
+        )
+        self.assertIn("1 task", result.over_plan_note)
+
+    def test_planner_schema_defaults_are_not_shared_between_instances(self):
+        self.assertIs(schemas.PlanRealityReport.model_fields["rows"].default_factory, list)
+        self.assertIs(schemas.PlanRescheduleRequest.model_fields["actual_by_task"].default_factory, dict)
+        self.assertIs(schemas.PlanRescheduleResponse.model_fields["scheduled"].default_factory, list)
+
+        first = schemas.PlanRescheduleResponse()
+        second = schemas.PlanRescheduleResponse()
+
+        first.scheduled.append(schemas.ScheduledBlock(task_id=1, start_hour=9, start_min=0, length_min=25))
+
+        self.assertEqual(second.scheduled, [])
 
 
 if __name__ == "__main__":

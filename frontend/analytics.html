@@ -35,11 +35,11 @@
   </div>
 </header>
 
-<main id="analytics-main" class="max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
-  <div id="tiles" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+<main id="analytics-main" class="app-main analytics-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
+  <div id="tiles" class="analytics-tiles grid grid-cols-2 md:grid-cols-4 gap-3"></div>
   <section id="today-card" class="card"></section>
   <section id="week-card" class="card"></section>
-  <div>
+  <div class="history-panel">
     <p class="section-label">Session history</p>
     <div id="history-list" class="flex flex-col gap-3"></div>
   </div>
@@ -911,7 +911,7 @@
       nextBtn.disabled = false; nextBtn.textContent = 'Done';
     } catch {
       nextBtn.disabled = false; nextBtn.textContent = 'Finish unwind';
-      alert('Could not save your unwind — is the backend running?');
+      showToast('Could not save your unwind — is the backend running?', { danger: true });
     }
   }
 
@@ -987,7 +987,7 @@
     const ok = await confirmDialog("Delete this session? This can't be undone.", { danger: true, confirmText: 'Delete' });
     if (!ok) return;
     try { await deleteSession(id); await loadAll(); }
-    catch { alert('Could not delete the session — is the backend running?'); }
+    catch { showToast('Could not delete the session — is the backend running?', { danger: true }); }
   });
 
   loadAll();

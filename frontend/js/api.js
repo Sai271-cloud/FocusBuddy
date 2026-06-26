@@ -208,15 +208,6 @@ async function getPlanAdvice(payload) {
   });
 }
 
-async function getPlanReschedule(payload) {
-  // Deterministic mid-day refit for remaining planned tasks. No AI call.
-  return requestJson(`${API}/plan/reschedule`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-}
-
 async function analyzeFocus(frameBase64, taskName, description = '', activity = null, explain = false, sensors = null) {
   const r = await fetch(`${API}/focus/analyze`, {
     method: 'POST',

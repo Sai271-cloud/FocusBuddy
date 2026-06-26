@@ -133,6 +133,8 @@ focus-buddy/
   docs/
     agent-subagents.md       # when to use the project review agents in Claude and Codex
     project-lessons.md       # shared long-term lesson log for Codex + Claude Code
+    session-handoff-2026-06-25-debug-fixes.md  # prior handoff for debug/UI fix work
+    session-handoff-2026-06-26-planner-modal-current-plan.md  # latest handoff for planner modal/current-plan work
   tools/
     check.ps1                # manual project sanity check for agents and local setup
     agent-hooks/             # shared PowerShell hook scripts used by Claude Code + Codex
@@ -262,6 +264,18 @@ Format for each entry:
 - **Lesson:** <the rule, as an instruction>
   **Why it matters:** <what broke, or what it prevents>
   **Where it applies:** <file or area, e.g. focus-detector.js>
+
+- **Lesson:** Keep environment cleanup facts concrete: `.venv.broken-*` folders are old broken
+  virtualenv backups and can be deleted after the active `.venv` is verified; the current intended
+  venv uses Python 3.13. When testing JavaScript snippets from PowerShell, avoid fragile inline
+  `node -e "..."` quoting for assertions; use PowerShell-native checks or a temporary script file
+  instead. Keep `.gitattributes` as the repo-level fix for recurring LF-to-CRLF warnings rather
+  than changing global Git config or renormalizing the whole repo casually.
+  **Why it matters:** future sessions can otherwise misread backup folders as active Python
+  problems, waste time on shell quoting failures that are not app bugs, or create noisy line-ending
+  diffs while trying to silence Git warnings.
+  **Where it applies:** `.venv*`, `.gitattributes`, PowerShell verification commands,
+  `AGENTS.md`, `CLAUDE.md`.
 
 - **Lesson:** Chunk D planning is one matched loop, not separate widgets: Today/tracker can highlight
   the recommended-first task as a suggestion, tracker sessions can carry a pre-session `intention`,

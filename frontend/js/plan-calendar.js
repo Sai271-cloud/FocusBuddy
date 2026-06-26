@@ -180,25 +180,30 @@
       const atEnd = start !== null && start >= latestSnappedStart(e);
       const difficulty = e.difficulty || 'medium';
       const aiControls = suggestion
-        ? `<button type="button" class="plan-ai-use" data-act="ai-one" data-id="${e.task_id}" title="${esc(suggestion.reason || suggestUseLabel)}">${esc(suggestUseLabel)}</button>
-           <button type="button" class="plan-ai-dismiss" data-act="ai-dismiss" data-id="${e.task_id}" title="Hide this suggestion">Skip</button>`
+        ? `<div class="plan-ai-controls">
+             <button type="button" class="plan-ai-use" data-act="ai-one" data-id="${e.task_id}" title="${esc(suggestion.reason || suggestUseLabel)}">${esc(suggestUseLabel)}</button>
+             <button type="button" class="plan-ai-dismiss" data-act="ai-dismiss" data-id="${e.task_id}" title="Hide this suggestion">Skip</button>
+           </div>`
         : '';
-      const ctrls = isPlaced(e)
-        ? `<span class="plan-list-time">${fmtClock(start)}</span>
-           <button type="button" class="plan-step ${atStart ? 'is-disabled' : ''}" data-act="minus" data-id="${e.task_id}" aria-disabled="${atStart}" ${atStart ? 'disabled' : ''} aria-label="Move ${esc(e.name)} 15 minutes earlier">−</button>
-           <button type="button" class="plan-step ${atEnd ? 'is-disabled' : ''}" data-act="plus" data-id="${e.task_id}" aria-disabled="${atEnd}" ${atEnd ? 'disabled' : ''} aria-label="Move ${esc(e.name)} 15 minutes later">+</button>
-           <button type="button" class="plan-step" data-act="off" data-id="${e.task_id}" aria-label="Unschedule ${esc(e.name)}">×</button>
-           ${aiControls}`
-        : `<button type="button" class="btn-ghost text-xs plan-place" data-id="${e.task_id}">Schedule</button>${aiControls}`;
+      const timeControls = isPlaced(e)
+        ? `<div class="plan-time-controls">
+             <span class="plan-list-time">${fmtClock(start)}</span>
+             <button type="button" class="plan-step ${atStart ? 'is-disabled' : ''}" data-act="minus" data-id="${e.task_id}" aria-disabled="${atStart}" ${atStart ? 'disabled' : ''} aria-label="Move ${esc(e.name)} 15 minutes earlier">−</button>
+             <button type="button" class="plan-step ${atEnd ? 'is-disabled' : ''}" data-act="plus" data-id="${e.task_id}" aria-disabled="${atEnd}" ${atEnd ? 'disabled' : ''} aria-label="Move ${esc(e.name)} 15 minutes later">+</button>
+             <button type="button" class="plan-step" data-act="off" data-id="${e.task_id}" aria-label="Unschedule ${esc(e.name)}">×</button>
+           </div>`
+        : `<div class="plan-time-controls"><button type="button" class="btn-ghost text-xs plan-place" data-id="${e.task_id}">Schedule</button></div>`;
       return `
         <div class="plan-list-row ${isPlaced(e) ? 'is-placed' : 'is-tray'}">
-          <button type="button" class="plan-tray-chip ${difficulty}" draggable="true" data-id="${e.task_id}" aria-label="${isPlaced(e) ? 'Drag or focus' : 'Drag'} ${esc(e.name)}">
-            <span class="plan-list-name" title="${esc(e.name)}">${esc(e.name)}</span>
-            <span class="plan-list-est">${e.estimate_min || 0}m · ${esc(difficulty)}</span>
-          </button>
-          <div class="plan-list-ctrls">${ctrls}</div>
-        </div>
-        ${suggestion && suggestion.reason ? `<p class="plan-ai-reason">${esc(e.name)}: ${esc(suggestion.reason)}</p>` : ''}`;
+          <div class="plan-list-main">
+            <button type="button" class="plan-tray-chip ${difficulty}" draggable="true" data-id="${e.task_id}" aria-label="${isPlaced(e) ? 'Drag or focus' : 'Drag'} ${esc(e.name)}">
+              <span class="plan-list-name" title="${esc(e.name)}">${esc(e.name)}</span>
+              <span class="plan-list-est">${e.estimate_min || 0}m · ${esc(difficulty)}</span>
+            </button>
+            ${suggestion && suggestion.reason ? `<p class="plan-ai-reason">${esc(suggestion.reason)}</p>` : ''}
+          </div>
+          <div class="plan-list-ctrls">${timeControls}${aiControls}</div>
+        </div>`;
     }).join('');
 
     let hourRows = '';

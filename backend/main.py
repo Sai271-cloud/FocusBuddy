@@ -676,7 +676,7 @@ def _build_reschedule_response(req: schemas.PlanRescheduleRequest) -> schemas.Pl
     completed = {int(x) for x in (req.completed_task_ids or [])}
     actual = {int(k): max(0, int(v or 0)) for k, v in (req.actual_by_task or {}).items()}
     start = _ceil_snap(min(req.current_min + 10, 1439), 5)
-    day_end = max(start, min(int(req.day_end_min or 1440), 1440))
+    day_end = min(int(req.day_end_min or 1440), 1440)
     remaining = []
     for idx, entry in enumerate(req.entries or []):
         if entry.task_id in completed:
@@ -689,9 +689,13 @@ def _build_reschedule_response(req: schemas.PlanRescheduleRequest) -> schemas.Pl
     remaining.sort(key=lambda item: (item[0], item[1], item[2]))
 
     scheduled = []
+    skipped = []
     cursor = start
     for _, _, _, entry, length in remaining:
         cursor = _ceil_snap(cursor, 5)
+        if cursor + length > day_end:
+            skipped.append(entry)
+            continue
         scheduled.append(schemas.ScheduledBlock(
             task_id=entry.task_id,
             start_hour=cursor // 60,
@@ -701,16 +705,19 @@ def _build_reschedule_response(req: schemas.PlanRescheduleRequest) -> schemas.Pl
         ))
         cursor += length
 
-    over = cursor > day_end
+    over = bool(skipped)
+    skipped_count = len(skipped)
     return schemas.PlanRescheduleResponse(
         summary=(
             "Remaining planned work was refit from the next open slot."
             if scheduled else
+            "No remaining planned work fits before your available day ends."
+            if over else
             "No remaining planned work needs rescheduling."
         ),
         scheduled=scheduled,
         over_plan_note=(
-            "The remaining estimates run past your available day; move or trim one block."
+            f"{skipped_count} {'task does' if skipped_count == 1 else 'tasks do'} not fit before your available day ends; move or trim one block."
             if over else ""
         ),
     )
