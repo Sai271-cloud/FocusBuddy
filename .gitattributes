@@ -1,0 +1,17 @@
+# Keep LF in repo + working tree for source files
+* text=auto eol=lf
+
+# Windows-only scripts stay CRLF
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binary - never convert
+*.db   binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
