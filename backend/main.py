@@ -32,13 +32,11 @@ if _gemini_key:
         http_options=types.HttpOptions(timeout=15_000),
     )
 
-GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 # The three end-of-session/day/week COACHING calls (debrief, daily, weekly) use this
 # model. It is kept SEPARATE from GEMINI_MODEL: the per-sample /focus/analyze hot path
-# and the /learn pattern call stay on flash-lite. Defaults to flash-lite — the only
-# model reliably available on the free-tier key (pro has no free quota; 3.5-flash 429/503s
-# under load). Set COACHING_MODEL=gemini-3.1-pro-preview in .env once billing is enabled
-# to upgrade all three coaching calls with no code change.
+# and the /learn pattern call stay on GEMINI_MODEL. Set COACHING_MODEL in the host
+# environment to switch the debrief/daily/weekly model without touching code.
 COACHING_MODEL = os.getenv("COACHING_MODEL", "gemini-3.5-flash")
 
 VALID_STATES = ["focused", "distracted", "uncertain", "away"]
@@ -172,6 +170,16 @@ def deployment_check():
         "ok": True,
         "frontend_root_route": True,
         "deployment": "vercel-neon-static-frontend-v2",
+    }
+
+
+@app.get("/ai/status")
+def ai_status():
+    return {
+        "gemini_key_configured": bool(_gemini_key),
+        "client_ready": _client is not None,
+        "focus_model": GEMINI_MODEL,
+        "coaching_model": COACHING_MODEL,
     }
 
 

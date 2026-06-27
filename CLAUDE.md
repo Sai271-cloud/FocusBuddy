@@ -87,7 +87,8 @@ AI calls).
 **Computer vision**
 - **Gemini (vision)** — the focus state itself comes from a Gemini call: the backend sends the
   sampled webcam frame + task (+ opt-in URL/title) and Gemini returns one of the four states. This
-  is the core AI signal.
+  is the core AI signal. Hosted deploys can set `GEMINI_MODEL` for focus detection and
+  `COACHING_MODEL` for debrief/unwind/plan advice.
 - **MediaPipe Tasks for Web** — Google's CV library running locally in the browser. Face Landmarker
   currently turns landmarks into semantic labels (eyes open/closed, head facing/away/down, face
   present). Pose Landmarker for the posture coach is planned for Phase 2. This part is genuinely
@@ -316,6 +317,13 @@ Format for each entry:
   `frontend/js/{config,demo-context,api,planning-insights}.js`, `frontend/{index,tracker,analytics,plan}.html`,
   `pyproject.toml`, `vercel_build.py`, `backend/main.py`.
 
+- **Lesson:** For hosted Gemini failures, first check `/ai/status` on the deployed site, then inspect
+  Vercel logs for `/focus/analyze` or coaching endpoint errors before changing prompts or frontend
+  code. Keep `GEMINI_MODEL` and `COACHING_MODEL` configurable through environment variables.
+  **Why it matters:** deployed AI can fail because the host did not load `GEMINI_API_KEY`, the model
+  name is wrong for the account, or the account hit quota; prompt/UI edits will not fix those.
+  **Where it applies:** `backend/main.py`, Vercel environment variables, Gemini endpoints.
+
 - **Lesson:** For local verification, agents should default to in-process checks (`python -m unittest
   discover -s tests` or FastAPI `TestClient`) and only use live servers for browser-level smoke tests;
   when live servers are needed, Sai runs `tools\serve.ps1` from his own terminal and later stops
@@ -448,12 +456,12 @@ Format for each entry:
   "do NOT quote" them; the scrub removes echoes). Each coaching endpoint now does
   `_enforce_*(_parse_*(response.text), gctx)`. The dead `reflective_question` field was removed from
   `schemas.DebriefResponse`, `_parse_debrief`, and `tracker.html`. **Model seam:** coaching uses
-  `COACHING_MODEL = os.getenv("COACHING_MODEL", "gemini-3.1-flash-lite")`, kept SEPARATE from
-  `GEMINI_MODEL` (the per-sample `/focus/analyze` hot path and the `/learn` call stay flash-lite). On the
+  `COACHING_MODEL = os.getenv("COACHING_MODEL", "gemini-3.5-flash")`, kept SEPARATE from
+  `GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")` (the per-sample
+  `/focus/analyze` hot path and the `/learn` call stay on `GEMINI_MODEL`). On the
   free-tier key, **`gemini-3.1-pro-preview` 429s immediately (no free quota — needs billing)** and
-  **`gemini-3.5-flash` is capped at ~20 requests/day** (and 503s under load), so flash-lite is the
-  reliable default; set `COACHING_MODEL=gemini-3.1-pro-preview` in `.env` after enabling billing to
-  upgrade all three with no code change. Verified at code level (compile, app import, 30 enforcement/
+  **`gemini-3.5-flash` can still hit quota/503s under load**, so keep model names configurable and
+  diagnose 429/503s from host logs instead of changing prompts or UI code. Verified at code level (compile, app import, 30 enforcement/
   gate/parser assertions). **STILL PENDING (was quota-blocked):** the live-Gemini end-to-end
   (Playwright) smoke test, and the `gemini-3.5-flash` worst-offender comparison — both deferred to a
   quota reset; `promptlab/` (incl. `compare_models.py`) is kept until that's done, then deleted.
