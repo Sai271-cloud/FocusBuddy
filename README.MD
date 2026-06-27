@@ -9,8 +9,8 @@ sessions feed analytics, daily/weekly unwind flows, and pattern memory.
 - `frontend/` is the real app UI: plain HTML, CSS, and JavaScript served over HTTP.
 - `backend/` is the FastAPI API: SQLite storage locally, Postgres storage when hosted,
   task/session endpoints, analytics helpers, and Gemini proxy endpoints.
-- `render.yaml` and `frontend/vercel.json` prepare the public judge demo deployment: Render runs
-  the FastAPI API, and Vercel serves the static frontend.
+- `pyproject.toml`, `vercel.json`, and `vercel_build.py` prepare the free public judge demo
+  deployment: Vercel runs the FastAPI API and serves the static frontend copied from `frontend/`.
 - `extension/` is an unpacked Chrome/Edge MV3 extension that can report the current tab title and a
   stripped URL to the local backend while tracking is active.
 - `promptlab/` is a prompt experimentation harness. It is useful for testing candidate coaching
@@ -28,7 +28,7 @@ sessions feed analytics, daily/weekly unwind flows, and pattern memory.
   backend, which keeps the latest activity in memory with a short TTL.
 - SQLite stores tasks, sessions, work-period reflections/recaps, profile text, hourly focus rows,
   and qualitative pattern-memory observations during local development. The hosted judge demo stores
-  the same app data in Render Postgres, split by demo workspace.
+  the same app data in Neon Postgres, split by demo workspace.
 - Seeded judge demos use readable links (`/demo/early-morning`, `/demo/doomscroller`,
   `/demo/overplanner`, `/demo/night-owl`, `/demo/self-improver`) with sample data frozen around
   June 28, 2026. `/demo/new` is a blank per-browser sandbox.
@@ -64,17 +64,17 @@ GEMINI_API_KEY=...
 
 Do not commit `.env`.
 
-For the hosted backend, Render provides `DATABASE_URL` from Postgres. Set these environment
-variables in Render:
+For the hosted app, Neon provides `DATABASE_URL` from Postgres. Set these environment variables in
+Vercel:
 
 ```text
+DATABASE_URL=postgresql://...
 GEMINI_API_KEY=...
-FOCUS_BUDDY_CORS_ORIGINS=https://<your-vercel-project>.vercel.app
 COACHING_MODEL=gemini-3.5-flash
 ```
 
-After Render gives you the backend URL, update `frontend/js/config.js` if the service is not named
-`focus-buddy-api`.
+Do not paste those values into code. Add them in the Vercel project dashboard under Environment
+Variables.
 
 ## Public Judge Demo
 
@@ -97,15 +97,15 @@ the blank sandbox.
 
 ## Hosting
 
-The intended demo setup is:
+The intended free demo setup is:
 
-- **Render** hosts the FastAPI backend and Postgres database from `render.yaml`.
-- **Vercel** hosts the static frontend from `frontend/` and rewrites `/demo/:slug` to the app.
-- The Gemini API key stays only in Render environment variables.
+- **Vercel Hobby** hosts the static frontend and the FastAPI backend from this repo root.
+- **Neon Free** hosts the Postgres database.
+- The Gemini API key stays only in Vercel environment variables.
 
-Deploy Render first, copy its backend URL, then deploy Vercel. If the backend URL differs from
-`https://focus-buddy-api.onrender.com`, update `frontend/js/config.js` and redeploy Vercel. Finally,
-set Render's `FOCUS_BUDDY_CORS_ORIGINS` to the exact Vercel origin.
+Vercel needs `pyproject.toml` because the FastAPI app lives in `backend/main.py`, not one of
+Vercel's default entrypoint folders. `vercel_build.py` copies `frontend/` into Vercel's `public/`
+folder during deployment so the plain HTML app is served as static assets.
 
 ## Browser Extension
 

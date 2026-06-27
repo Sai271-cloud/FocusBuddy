@@ -1,4 +1,4 @@
-const API = window.FOCUS_BUDDY_API || 'http://127.0.0.1:8000';
+const API = window.FOCUS_BUDDY_API !== undefined ? window.FOCUS_BUDDY_API : 'http://127.0.0.1:8000';
 
 function demoHeaders() {
   // Demo mode returns either X-Demo-Slug or X-Demo-Anonymous-Id.

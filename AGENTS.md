@@ -75,7 +75,7 @@ AI calls).
 - **SQLAlchemy** — lets the code talk to the database from Python instead of raw SQL; it defines the
   data models (Task, FocusSession).
 - **SQLite / Postgres** — SQLite is the local zero-setup database. The hosted public judge demo uses
-  Render Postgres through `DATABASE_URL`, with the same SQLAlchemy models and workspace-scoped demo data.
+  Neon Postgres through `DATABASE_URL`, with the same SQLAlchemy models and workspace-scoped demo data.
 - **Pydantic** — validates request/response data and powers the clean `/docs` (ships with FastAPI).
 
 **Frontend (browser)**
@@ -118,7 +118,9 @@ focus-buddy/
   AGENTS.md                  # Codex project memory; keep synced with CLAUDE.md
   CLAUDE.md                  # Claude Code project memory; keep synced with AGENTS.md
   README.MD                  # what it is, how to run, how it works
-  render.yaml                # Render backend + Postgres blueprint for the public demo
+  pyproject.toml             # Vercel FastAPI entrypoint: backend.main:app
+  vercel.json                # Vercel rewrite for readable /demo/:slug links
+  vercel_build.py            # copies frontend/ to public/ during Vercel builds
   requirements.txt           # Python dependencies for backend/local checks
   .agents/skills/            # Codex task-specific skills
   .codex/
@@ -153,7 +155,6 @@ focus-buddy/
     database.py              # SQLite/Postgres DB setup (+ local SQLite repair helpers)
     focus_buddy.db           # the SQLite file (created on first run)
   frontend/
-    vercel.json              # Vercel rewrite for readable /demo/:slug links
     index.html               # homepage — task list + add a task
     tracker.html             # live session: timer, webcam, chart, totals
     analytics.html           # saved-session analytics
@@ -221,8 +222,8 @@ python -m unittest discover -s tests
   edit). Mention them and move on; that observation is not an error.
 
 **Hosted judge demo workflow**
-- The public demo is split between Render (FastAPI + Postgres from `render.yaml`) and Vercel
-  (static frontend from `frontend/`).
+- The public demo uses Vercel Hobby for both the static frontend and FastAPI backend, plus Neon Free
+  for hosted Postgres. Vercel is pointed at `backend.main:app` through `pyproject.toml`.
 - Named demo links are `/demo/early-morning`, `/demo/doomscroller`, `/demo/overplanner`,
   `/demo/night-owl`, and `/demo/self-improver`; `/demo/new` is the blank per-browser sandbox.
 - In demo mode, `frontend/js/demo-context.js` freezes "today" to the morning of June 28, 2026 and
@@ -298,7 +299,7 @@ Format for each entry:
   **Where it applies:** <file or area, e.g. focus-detector.js>
 
 - **Lesson:** Keep the public judge demo workspace-scoped end to end: seeded links use
-  `X-Demo-Slug`, the blank sandbox uses `X-Demo-Anonymous-Id`, hosted data lives in Render Postgres
+  `X-Demo-Slug`, the blank sandbox uses `X-Demo-Anonymous-Id`, hosted data lives in Neon Postgres
   via `DATABASE_URL`, and demo-mode dates stay frozen to the morning of June 28, 2026 until the demo
   plan intentionally changes.
   **Why it matters:** judges need independent readable links with reliable sample history, reset
@@ -306,7 +307,7 @@ Format for each entry:
   leak into another workspace.
   **Where it applies:** `backend/{models,crud,database,main}.py`,
   `frontend/js/{config,demo-context,api,planning-insights}.js`, `frontend/{index,tracker,analytics,plan}.html`,
-  `render.yaml`, `frontend/vercel.json`.
+  `pyproject.toml`, `vercel.json`, `vercel_build.py`.
 
 - **Lesson:** For local verification, agents should default to in-process checks (`python -m unittest
   discover -s tests` or FastAPI `TestClient`) and only use live servers for browser-level smoke tests;

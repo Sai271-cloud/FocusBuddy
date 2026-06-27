@@ -71,6 +71,7 @@ docs/
 # Hosting CLI local state
 .vercel/
 .render/
+/public/
 
 # Local logs / runtime output
 *.log
