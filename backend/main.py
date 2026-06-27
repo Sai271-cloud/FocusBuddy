@@ -166,6 +166,15 @@ def health():
     return {"ok": True}
 
 
+@app.get("/deployment-check")
+def deployment_check():
+    return {
+        "ok": True,
+        "frontend_root_route": True,
+        "deployment": "vercel-neon-static-frontend-v2",
+    }
+
+
 @app.get("/demo/{slug}", response_model=schemas.DemoWorkspaceOut)
 def get_demo_workspace(slug: str, request: Request, db: Session = Depends(get_db)):
     if _wants_html(request):
