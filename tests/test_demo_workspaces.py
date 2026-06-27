@@ -146,6 +146,8 @@ class DemoFrontendStaticTests(unittest.TestCase):
         self.assertIn("Clear my demo data", demo_js)
         self.assertIn("AI credits are unavailable", demo_js)
         self.assertIn("FocusBuddyDemo.now", planning_js)
+        self.assertNotIn("fb-demo-slug", demo_js)
+        self.assertIn("fb-demo-anon-id", demo_js)
 
 
 if __name__ == "__main__":

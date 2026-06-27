@@ -1,7 +1,6 @@
 (function () {
   var SEEDED = ['early-morning', 'doomscroller', 'overplanner', 'night-owl', 'self-improver'];
   var DEMO_NOW = new Date(2026, 5, 28, 9, 0, 0);
-  var STORAGE_SLUG = 'fb-demo-slug';
   var STORAGE_ANON = 'fb-demo-anon-id';
 
   function escapeHtml(value) {
@@ -52,12 +51,7 @@
   }
 
   var explicit = parsePathSlug() || parseQuerySlug();
-  if (explicit && validSlug(explicit)) {
-    try { localStorage.setItem(STORAGE_SLUG, explicit); } catch {}
-  }
-  var stored = '';
-  try { stored = localStorage.getItem(STORAGE_SLUG) || ''; } catch {}
-  var slug = validSlug(explicit) ? explicit : (validSlug(stored) ? stored : '');
+  var slug = validSlug(explicit) ? explicit : '';
   var active = !!slug;
   var anonymousId = '';
   if (slug === 'new') {

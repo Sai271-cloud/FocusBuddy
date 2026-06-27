@@ -297,6 +297,14 @@ Format for each entry:
   **Why it matters:** <what broke, or what it prevents>
   **Where it applies:** <file or area, e.g. focus-detector.js>
 
+- **Lesson:** Seeded judge demo identity must be URL-scoped, not stored in shared browser
+  localStorage: derive seeded personas only from `/demo/:slug` or `?demo=slug`; only `/demo/new`
+  should keep an anonymous browser ID in localStorage.
+  **Why it matters:** localStorage is shared across tabs on the same origin, so persisting
+  `early-morning` globally can make other judge links or the normal app silently inherit the wrong
+  demo workspace.
+  **Where it applies:** `frontend/js/demo-context.js`, demo links, hosted Vercel judge demos.
+
 - **Lesson:** Keep the public judge demo workspace-scoped end to end: seeded links use
   `X-Demo-Slug`, the blank sandbox uses `X-Demo-Anonymous-Id`, hosted data lives in Neon Postgres
   via `DATABASE_URL`, and demo-mode dates stay frozen to the morning of June 28, 2026 until the demo
