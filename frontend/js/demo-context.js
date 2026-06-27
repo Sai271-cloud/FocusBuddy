@@ -149,6 +149,61 @@
     return Math.round(avg);
   }
 
+  function parseRecap(raw) {
+    if (!raw) return null;
+    try {
+      var recap = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return recap && (recap.summary || recap.win || recap.next_action) ? recap : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function formatHM(seconds) {
+    seconds = Math.max(0, Math.round(Number(seconds) || 0));
+    var h = Math.floor(seconds / 3600);
+    var m = Math.round((seconds % 3600) / 60);
+    return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+  }
+
+  function focusPct(sum) {
+    var total = (sum.focused || 0) + (sum.distracted || 0) + (sum.uncertain || 0) + (sum.away || 0);
+    return total > 0 ? Math.round(100 * (sum.focused || 0) / total) : 0;
+  }
+
+  function sessionSummary(sessions) {
+    var sum = sumStates(sessions);
+    return sessions.length + ' session' + (sessions.length === 1 ? '' : 's') +
+      ' - ' + formatHM(sum.focused) + ' focused - ' + focusPct(sum) + '% focused';
+  }
+
+  function isoForDayAt(dayKey, hour, minute) {
+    var parts = String(dayKey || '').split('-').map(Number);
+    return isoWithLocalOffset(new Date(parts[0], parts[1] - 1, parts[2], hour, minute || 0, 0));
+  }
+
+  function historicalDays(sessions) {
+    var todayKey = localDayKey(now());
+    var byKey = {};
+    (sessions || []).forEach(function (s) {
+      var key = localDayKey(new Date(s.started_at));
+      if (key >= todayKey || sessionSeconds(s) <= 0) return;
+      if (!byKey[key]) byKey[key] = [];
+      byKey[key].push(s);
+    });
+    return Object.keys(byKey).sort().map(function (key) {
+      return { period_key: key, sessions: byKey[key] };
+    });
+  }
+
+  function workPeriodsByDay(periods) {
+    var out = {};
+    (periods || []).forEach(function (p) {
+      if (p.kind === 'day') out[p.period_key] = p;
+    });
+    return out;
+  }
+
   function renderRecapHtml(recap) {
     if (!recap) return '';
     var items = [];
@@ -190,11 +245,104 @@
       });
       status.innerHTML = renderRecapHtml(recap);
     } catch (err) {
-      var msg = String(err && err.message || '');
-      if (msg.indexOf('502') !== -1 || msg.indexOf('503') !== -1 || msg.indexOf('429') !== -1 || /quota|credit|temporarily/i.test(msg)) {
-        status.textContent = 'AI credits are unavailable right now, so live daily unwind generation cannot run. The seeded examples above still show what the feature produces.';
-      } else {
-        status.textContent = 'Could not generate the daily unwind yet. Finish a June 28 session and check that the backend is running.';
+      status.textContent = generationErrorText(err, false);
+    }
+  }
+
+  function generationErrorText(err, historical) {
+    var msg = String(err && err.message || '');
+    if (msg.indexOf('502') !== -1 || msg.indexOf('503') !== -1 || msg.indexOf('429') !== -1 || /quota|credit|temporarily|model/i.test(msg)) {
+      return 'AI credits are unavailable or the model is unreachable right now, so live daily unwind generation could not run. Check the backend or Gemini quota, then try again.';
+    }
+    return historical
+      ? 'Could not generate this saved day yet. Check that the backend is running, then try again.'
+      : 'Could not generate the daily unwind yet. Finish a June 28 session and check that the backend is running.';
+  }
+
+  function renderHistoryRows(days, periodsByKey) {
+    if (!days.length) {
+      return '<p class="text-sm" style="color:var(--text-muted);line-height:1.55;margin:0">No seeded history loaded yet.</p>';
+    }
+    return '<div class="judge-unwind-list">' +
+      days.map(function (day) {
+        var key = day.period_key;
+        var period = periodsByKey[key] || {};
+        var recap = parseRecap(period.ai_recap);
+        return '<article class="judge-unwind-row" data-history-row="' + escapeHtml(key) + '">' +
+          '<div class="flex items-start justify-between gap-3 flex-wrap">' +
+            '<div>' +
+              '<p class="section-label" style="margin:0 0 4px">' + escapeHtml(dayLabel(key)) + '</p>' +
+              '<p class="text-sm" style="color:var(--text);line-height:1.45;margin:0">' + escapeHtml(sessionSummary(day.sessions)) + '</p>' +
+            '</div>' +
+            '<button class="' + (recap ? 'btn-ghost' : 'btn-primary') + '" data-act="generate-history-daily" data-period-key="' + escapeHtml(key) + '">' + (recap ? 'Regenerate' : 'Generate daily unwind') + '</button>' +
+          '</div>' +
+          '<div data-history-status="' + escapeHtml(key) + '" class="text-sm" style="color:var(--text-muted);margin-top:10px;line-height:1.5">' +
+            (recap ? renderRecapHtml(recap) : '<p style="margin:0">Not generated yet. Use this day\'s seeded sessions to generate the unwind live.</p>') +
+          '</div>' +
+        '</article>';
+      }).join('') +
+    '</div>';
+  }
+
+  async function renderSeededDemoBody(bodyEl) {
+    var sessions = await window.getSessions();
+    var periods = await window.getWorkPeriods();
+    var days = historicalDays(sessions);
+    var periodsByKey = workPeriodsByDay(periods);
+    bodyEl.innerHTML =
+      '<p class="text-sm" style="color:var(--text-muted);line-height:1.55;margin:0 0 12px">This seeded persona shows the week before June 28. Generate a historical daily unwind live from the saved sessions, or keep June 28 blank for a judge-run session.</p>' +
+      renderHistoryRows(days, periodsByKey) +
+      '<div class="judge-demo-actions">' +
+        '<button class="btn-primary" data-act="generate-daily">Generate daily unwind for June 28</button>' +
+        '<button class="btn-ghost" data-act="reset-demo">Reset demo data</button>' +
+      '</div>' +
+      '<div id="judge-demo-status" class="text-sm" style="color:var(--text-muted);margin-top:12px"></div>';
+  }
+
+  async function generateHistoricalDailyUnwind(bodyEl, periodKey) {
+    var row = bodyEl.querySelector('[data-history-row="' + periodKey + '"]');
+    var status = bodyEl.querySelector('[data-history-status="' + periodKey + '"]');
+    var button = row ? row.querySelector('[data-act="generate-history-daily"]') : null;
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Generating...';
+    }
+    if (status) status.textContent = 'Generating live daily unwind...';
+    try {
+      var sessions = await window.getSessions();
+      var daySessions = sessions.filter(function (s) { return localDayKey(new Date(s.started_at)) === periodKey; });
+      if (!daySessions.length) {
+        if (status) status.textContent = 'No sessions were found for this seeded day.';
+        if (button) {
+          button.disabled = false;
+          button.textContent = 'Generate daily unwind';
+        }
+        return;
+      }
+      var periods = await window.getWorkPeriods();
+      var existing = (periods || []).find(function (p) { return p.kind === 'day' && p.period_key === periodKey; });
+      var sum = sumStates(daySessions);
+      var recap = await window.getDailyUnwind({
+        session_ids: daySessions.map(function (s) { return s.id; }),
+        recent_avg_focus_pct: recentAverage(sessions, periodKey),
+        period_key: periodKey,
+      });
+      await window.createWorkPeriod({
+        kind: 'day',
+        period_key: periodKey,
+        ended_at: existing && existing.ended_at ? existing.ended_at : isoForDayAt(periodKey, 21, 0),
+        seconds_focused: sum.focused,
+        seconds_distracted: sum.distracted,
+        seconds_uncertain: sum.uncertain,
+        seconds_away: sum.away,
+        ai_recap: JSON.stringify(recap),
+      });
+      await renderSeededDemoBody(bodyEl);
+    } catch (err) {
+      if (status) status.textContent = generationErrorText(err, true);
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Try again';
       }
     }
   }
@@ -231,6 +379,8 @@
     function onKey(e) { if (e.key === 'Escape') close(); }
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay || e.target.closest('[data-act="close"]')) close();
+      var hist = e.target.closest('[data-act="generate-history-daily"]');
+      if (hist) generateHistoricalDailyUnwind(body, hist.getAttribute('data-period-key'));
       var gen = e.target.closest('[data-act="generate-daily"]');
       if (gen) generateTodayDailyUnwind(body);
       var reset = e.target.closest('[data-act="reset-demo"]');
@@ -251,23 +401,7 @@
           '<div id="judge-demo-status" class="text-sm" style="color:var(--text-muted);margin-top:12px"></div>';
         return;
       }
-      var rows = await window.getDemoDailyUnwinds(slug);
-      body.innerHTML =
-        '<p class="text-sm" style="color:var(--text-muted);line-height:1.55;margin:0 0 12px">This seeded persona shows the week before June 28. June 28 is blank so judges can run their own session and generate that day\'s daily unwind.</p>' +
-        '<div class="judge-unwind-list">' +
-          rows.map(function (r) {
-            return '<article class="judge-unwind-row">' +
-              '<p class="section-label" style="margin:0 0 4px">' + escapeHtml(dayLabel(r.period_key)) + '</p>' +
-              '<p class="text-sm" style="color:var(--text);line-height:1.45;margin:0">' + escapeHtml(r.summary) + '</p>' +
-              (r.next_action ? '<p class="text-xs" style="color:var(--text-muted);line-height:1.45;margin:6px 0 0">' + escapeHtml(r.next_action) + '</p>' : '') +
-            '</article>';
-          }).join('') +
-        '</div>' +
-        '<div class="judge-demo-actions">' +
-          '<button class="btn-primary" data-act="generate-daily">Generate daily unwind for June 28</button>' +
-          '<button class="btn-ghost" data-act="reset-demo">Reset demo data</button>' +
-        '</div>' +
-        '<div id="judge-demo-status" class="text-sm" style="color:var(--text-muted);margin-top:12px"></div>';
+      await renderSeededDemoBody(body);
     } catch {
       body.innerHTML = '<p class="text-sm" style="color:var(--terracotta)">Could not load the Judge Demo panel. Check that the backend is running.</p>';
     }

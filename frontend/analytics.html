@@ -293,6 +293,7 @@
     if (period && period.plan_reality_json) {
       try { savedReality = JSON.parse(period.plan_reality_json); } catch (e) { savedReality = null; }
     }
+    if (savedReality && !savedReality.has_plan) savedReality = null;
 
     el.innerHTML = `
       <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -463,9 +464,11 @@
     if (existingPeriod && existingPeriod.plan_reality_json) {
       try { saved = JSON.parse(existingPeriod.plan_reality_json); } catch (e) { saved = null; }
     }
+    if (saved && !saved.has_plan) saved = null;
     if (!window.PlanningInsights || !window.getPlanReality) return saved;
     try {
-      return await getPlanReality(periodKey, PlanningInsights.dayBounds(periodKey));
+      const report = await getPlanReality(periodKey, PlanningInsights.dayBounds(periodKey));
+      return report && report.has_plan ? report : null;
     } catch {
       return saved;
     }
@@ -550,7 +553,7 @@
   }
 
   function planRealityHtml(report) {
-    if (!report || (!report.has_plan && !(report.rows || []).length)) return '';
+    if (!report || !report.has_plan) return '';
     const rows = (report.rows || []).map(row => {
       const planned = row.status === 'unscheduled_work'
         ? 'Unplanned'
@@ -772,7 +775,7 @@
         session_ids: unwind.snapshot.sessions.map(s => s.id),
         recent_avg_focus_pct: recentAvgFocusPct(unwind.snapshot.periodKey),
         period_key: unwind.snapshot.periodKey,
-        plan_reality_summary: unwind.snapshot.planReality ? unwind.snapshot.planReality.summary : null,
+        plan_reality_summary: unwind.snapshot.planReality && unwind.snapshot.planReality.has_plan ? unwind.snapshot.planReality.summary : null,
       });
       unwind.aiRecap = {
         summary: r.summary || '', plan_echo: r.plan_echo || '', win: r.win || '', pattern_notes: r.pattern_notes || [],
@@ -787,7 +790,7 @@
           seconds_focused: sum.focused, seconds_distracted: sum.distracted,
           seconds_uncertain: sum.uncertain, seconds_away: sum.away,
           ai_recap: JSON.stringify(unwind.aiRecap),
-          plan_reality_json: unwind.snapshot.planReality ? JSON.stringify(unwind.snapshot.planReality) : null,
+          plan_reality_json: unwind.snapshot.planReality && unwind.snapshot.planReality.has_plan ? JSON.stringify(unwind.snapshot.planReality) : null,
         });
         workPeriods = await getWorkPeriods();
       } catch (e) { /* save failed but still show the recap */ }
@@ -903,7 +906,7 @@
         kind, period_key: snapshot.periodKey, ended_at: endedAtIso(),
         seconds_focused: sum.focused, seconds_distracted: sum.distracted,
         seconds_uncertain: sum.uncertain, seconds_away: sum.away, reflection: reflection || '',
-        plan_reality_json: kind === 'day' && snapshot.planReality ? JSON.stringify(snapshot.planReality) : null,
+        plan_reality_json: kind === 'day' && snapshot.planReality && snapshot.planReality.has_plan ? JSON.stringify(snapshot.planReality) : null,
       });
       workPeriods = await getWorkPeriods();
       unwind.finished = true;

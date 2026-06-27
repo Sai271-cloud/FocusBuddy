@@ -74,7 +74,7 @@ GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 Do not paste those values into code. Add them in the Vercel project dashboard under Environment
-Variables. The coaching model is fixed in code as `gemini-3.5-flash`. After redeploying, visit
+Variables. The coaching model is fixed in code as `gemini-3.1-flash-lite`. After redeploying, visit
 `/ai/status` on the deployed site to confirm the key loaded.
 
 ## Public Judge Demo

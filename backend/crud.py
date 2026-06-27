@@ -8,7 +8,7 @@ from . import models, schemas
 
 DEFAULT_WORKSPACE_SLUG = "local"
 DEFAULT_WORKSPACE_ID = 1
-CURRENT_DEMO_SEED_VERSION = 1
+CURRENT_DEMO_SEED_VERSION = 2
 DEMO_TODAY_KEY = "2026-06-28"
 DEMO_HISTORY_DATES = [
     "2026-06-22",
@@ -198,7 +198,11 @@ def ensure_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | No
     if seed is None:
         return None
     workspace = get_workspace_by_slug(db, slug)
-    if workspace is None:
+    if (
+        workspace is None
+        or workspace.workspace_type != "seeded"
+        or workspace.seed_version != CURRENT_DEMO_SEED_VERSION
+    ):
         workspace = reset_seeded_workspace(db, slug)
     return workspace
 
@@ -759,34 +763,6 @@ def _journal_json(summary: str, distracted_min: int) -> str:
     return json.dumps(entries)
 
 
-def _daily_recap_json(seed: dict, date_key: str, note: str, focus_pct: int) -> str:
-    slug = seed["slug"]
-    if slug == "doomscroller":
-        advice = ["When the work gets hard, start a site blocker before opening the browser."]
-        next_action = "When the first urge to check a feed appears, you could let the blocker handle it before you negotiate with yourself."
-    elif slug == "overplanner":
-        advice = ["Choose the top two tasks first, then leave a real buffer instead of filling every gap."]
-        next_action = "After the first task runs long, you could move one lower-priority task off today's plan instead of compressing the rest."
-    elif slug == "night-owl":
-        advice = ["Use an easy warm-up in the morning and save the deepest work for the later block."]
-        next_action = "When the morning feels slow, you could start with the warm-up task and protect the later deep-work slot."
-    elif slug == "self-improver":
-        advice = ["Repeat the reset routine before the first block so recovery stays intentional."]
-        next_action = "When you sit down, you could write the one-sentence intention before opening anything else."
-    else:
-        advice = ["Put the hardest task in the morning and make evening work intentionally smaller."]
-        next_action = "When evening energy drops, you could switch to a short admin task instead of forcing deep study."
-    return json.dumps({
-        "summary": f"{date_key} ran at about {focus_pct}% focused. {note}",
-        "plan_echo": "Seeded demo day: planned work is compared with the completed sessions.",
-        "win": note,
-        "pattern_notes": [seed["archetype"]],
-        "advice": advice,
-        "next_action": next_action,
-        "shutdown_question": "What is the one open loop from today you could park before stopping?",
-    })
-
-
 def _plan_json(tasks: list[models.Task], day_index: int) -> str:
     entries = []
     for i, task in enumerate(tasks[:4]):
@@ -891,8 +867,6 @@ def reset_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | Non
             day_secs["uncertain"] += uncertain * 60
             day_secs["away"] += away * 60
 
-        total = sum(day_secs.values())
-        focus_pct = round(100 * day_secs["focused"] / total) if total else 0
         db.add(models.WorkPeriod(
             workspace_id=workspace.id,
             kind="day",
@@ -903,7 +877,7 @@ def reset_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | Non
             seconds_uncertain=day_secs["uncertain"],
             seconds_away=day_secs["away"],
             reflection=f"Seeded reflection: {daily_note}",
-            ai_recap=_daily_recap_json(seed, day_key, daily_note, focus_pct),
+            ai_recap="",
             plan_reality_json=json.dumps({
                 "period_key": day_key,
                 "summary": "Seeded plan compared with completed sessions for the judge demo.",

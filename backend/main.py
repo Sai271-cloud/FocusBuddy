@@ -36,10 +36,15 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 # The coaching endpoints (debrief, daily unwind, weekly unwind, and plan advice)
 # intentionally use one fixed model so local/.env and hosted Vercel settings cannot
 # drift into different coaching behavior.
-COACHING_MODEL = "gemini-3.5-flash"
+COACHING_MODEL = "gemini-3.1-flash-lite"
 
 VALID_STATES = ["focused", "distracted", "uncertain", "away"]
 _VALID_SET = set(VALID_STATES)
+PLAIN_COACHING_LANGUAGE = (
+    "Plain-language voice: use short, natural sentences. Use everyday words. "
+    "Put one idea in each sentence. Sound like a helpful older student, not a "
+    "therapist or a productivity book."
+)
 MAX_FRAME_BASE64_CHARS = 1_400_000
 MAX_FRAME_BYTES = 1_000_000
 
@@ -1121,7 +1126,8 @@ def debrief_session(
     }
     about = _about_block(db, workspace)
     prompt = f"""You are a warm, perceptive focus coach giving a short debrief right after ONE work session. Talk
-like a thoughtful friend. Reinforce what genuinely worked, then offer one evidence-based thing to try next. THOUROUGLY READ THROUGH EVERY SINGLE POINT MADE TO GIVE THE BEST ADVICE. The session's data is below, including the task name, total tracked time, focused/distracted/uncertain/away breakdown, timeline of state changes, and a timestamped journal of what they were doing and which sites they opened.
+like a thoughtful friend. Reinforce what genuinely worked, then offer one evidence-based thing to try next. The session's data is below, including the task name, total tracked time, focused/distracted/uncertain/away breakdown, timeline of state changes, and a timestamped journal of what they were doing and which sites they opened.
+{PLAIN_COACHING_LANGUAGE}
 
 {summary_lines}{about}
 
@@ -1821,6 +1827,7 @@ def daily_unwind(
 
     prompt = f"""You are a warm, perceptive focus coach helping a person unwind from ONE day and close it out.
 Talk like a thoughtful friend.
+{PLAIN_COACHING_LANGUAGE}
 
 {summary_lines}{recent}{hourly_block}{plan_block}{about}
 
@@ -2151,6 +2158,7 @@ def weekly_unwind(
     about = _about_block(db, workspace)
 
     prompt = f"""You are a warm, perceptive focus coach reviewing ONE week for a person. Talk like a thoughtful friend.
+{PLAIN_COACHING_LANGUAGE}
 
 {summary_lines}{hourly_block}{trend_block}{cur_pomo}{about}
 
