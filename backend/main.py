@@ -33,16 +33,25 @@ if _gemini_key:
     )
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
-# The three end-of-session/day/week COACHING calls (debrief, daily, weekly) use this
-# model. It is kept SEPARATE from GEMINI_MODEL: the per-sample /focus/analyze hot path
-# and the /learn pattern call stay on GEMINI_MODEL. Set COACHING_MODEL in the host
-# environment to switch the debrief/daily/weekly model without touching code.
-COACHING_MODEL = os.getenv("COACHING_MODEL", "gemini-3.5-flash")
+# The coaching endpoints (debrief, daily unwind, weekly unwind, and plan advice)
+# intentionally use one fixed model so local/.env and hosted Vercel settings cannot
+# drift into different coaching behavior.
+COACHING_MODEL = "gemini-3.5-flash"
 
 VALID_STATES = ["focused", "distracted", "uncertain", "away"]
 _VALID_SET = set(VALID_STATES)
 MAX_FRAME_BASE64_CHARS = 1_400_000
 MAX_FRAME_BYTES = 1_000_000
+
+
+def _gemini_text(response, context: str) -> str:
+    """Read Gemini text defensively; some valid responses contain no text part."""
+    try:
+        return response.text or ""
+    except Exception:
+        logger.warning("%s returned no text", context, exc_info=True)
+        return ""
+
 
 # Latest active-tab URL reported by the browser extension. Kept IN MEMORY only
 # (never written to SQLite) — browsing URLs are sensitive and transient. Goes
@@ -180,6 +189,7 @@ def ai_status():
         "client_ready": _client is not None,
         "focus_model": GEMINI_MODEL,
         "coaching_model": COACHING_MODEL,
+        "coaching_model_source": "hardcoded",
     }
 
 
@@ -1193,7 +1203,7 @@ Reply with ONLY valid JSON, no markdown, exactly:
             model=COACHING_MODEL,
             contents=[prompt],
         )
-        return _enforce_debrief(_parse_debrief(response.text), secs)
+        return _enforce_debrief(_parse_debrief(_gemini_text(response, "Debrief")), secs)
     except Exception:
         logger.exception("Gemini debrief call failed")
         raise HTTPException(status_code=502, detail="Debrief is temporarily unavailable")
@@ -1488,7 +1498,7 @@ Reply with ONLY valid JSON, no markdown: {json_shape}"""
                 prompt,
             ],
         )
-        state, note, reason = _parse_focus(response.text)
+        state, note, reason = _parse_focus(_gemini_text(response, "Focus analysis"))
         return schemas.FocusAnalyzeResponse(state=state, note=note, reason=reason if request.explain else "")
     except Exception:
         logger.exception("Gemini call failed")
@@ -1635,7 +1645,7 @@ Reply with ONLY valid JSON, no markdown, in exactly this shape:
 
     try:
         response = _client.models.generate_content(model=GEMINI_MODEL, contents=[prompt])
-        result = _parse_observations(response.text)
+        result = _parse_observations(_gemini_text(response, "Pattern learning"))
 
         active_ids = {o.id for o in active}
         affirm_ids = [i for i in result["affirm"] if i in active_ids]
@@ -1887,7 +1897,7 @@ Reply with ONLY valid JSON, no markdown, exactly:
 
     try:
         response = _client.models.generate_content(model=COACHING_MODEL, contents=[prompt])
-        parsed = _enforce_daily(_parse_daily_unwind(response.text), secs)
+        parsed = _enforce_daily(_parse_daily_unwind(_gemini_text(response, "Daily unwind")), secs)
         if req.plan_reality_summary:
             parsed.plan_echo = _plan_echo(req.plan_reality_summary)
         return parsed
@@ -1985,7 +1995,7 @@ Reply with ONLY valid JSON, no markdown, exactly:
     ctx = {"cold_start": cold_start, "gated": gated}
     try:
         response = _client.models.generate_content(model=COACHING_MODEL, contents=[prompt])
-        return _enforce_plan_advice(_parse_plan_advice(response.text), entries, req.available_min, ctx)
+        return _enforce_plan_advice(_parse_plan_advice(_gemini_text(response, "Plan advice")), entries, req.available_min, ctx)
     except HTTPException:
         raise
     except Exception:
@@ -2213,7 +2223,7 @@ Give 2-4 insights (best day + best hours + trend + top tasks/distractions) on a 
 
     try:
         response = _client.models.generate_content(model=COACHING_MODEL, contents=[prompt])
-        return _enforce_weekly(_parse_weekly_unwind(response.text), day_tuples, prior_dicts)
+        return _enforce_weekly(_parse_weekly_unwind(_gemini_text(response, "Weekly unwind")), day_tuples, prior_dicts)
     except Exception:
         logger.exception("Weekly unwind call failed")
         raise HTTPException(status_code=502, detail="Weekly unwind is temporarily unavailable")

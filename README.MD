@@ -71,11 +71,11 @@ Vercel:
 DATABASE_URL=postgresql://...
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.1-flash-lite
-COACHING_MODEL=gemini-3.5-flash
 ```
 
 Do not paste those values into code. Add them in the Vercel project dashboard under Environment
-Variables. After redeploying, visit `/ai/status` on the deployed site to confirm the key loaded.
+Variables. The coaching model is fixed in code as `gemini-3.5-flash`. After redeploying, visit
+`/ai/status` on the deployed site to confirm the key loaded.
 
 ## Public Judge Demo
 
