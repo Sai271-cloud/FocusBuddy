@@ -4,10 +4,12 @@ import json
 import time
 import base64
 import logging
+from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
-from fastapi import FastAPI, Depends, HTTPException, Body, Header
+from fastapi import FastAPI, Depends, HTTPException, Body, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from google import genai
@@ -93,6 +95,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+
+
+def _frontend_file(relative_path: str) -> Path:
+    target = (FRONTEND_DIR / relative_path).resolve()
+    if FRONTEND_DIR.resolve() not in target.parents and target != FRONTEND_DIR.resolve():
+        raise HTTPException(status_code=404, detail="Not Found")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Not Found")
+    return target
+
+
+def _frontend_page(name: str = "index.html"):
+    return FileResponse(_frontend_file(name))
+
+
+def _wants_html(request: Request) -> bool:
+    return "text/html" in (request.headers.get("accept") or "")
+
+
+@app.get("/", include_in_schema=False)
+def frontend_root():
+    return _frontend_page("index.html")
+
+
+@app.get("/index.html", include_in_schema=False)
+def frontend_index():
+    return _frontend_page("index.html")
+
+
+@app.get("/plan.html", include_in_schema=False)
+def frontend_plan():
+    return _frontend_page("plan.html")
+
+
+@app.get("/tracker.html", include_in_schema=False)
+def frontend_tracker():
+    return _frontend_page("tracker.html")
+
+
+@app.get("/analytics.html", include_in_schema=False)
+def frontend_analytics():
+    return _frontend_page("analytics.html")
+
+
+@app.get("/js/{asset_path:path}", include_in_schema=False)
+def frontend_js(asset_path: str):
+    return FileResponse(_frontend_file(f"js/{asset_path}"))
+
+
+@app.get("/css/{asset_path:path}", include_in_schema=False)
+def frontend_css(asset_path: str):
+    return FileResponse(_frontend_file(f"css/{asset_path}"))
+
 
 def get_workspace(
     x_demo_slug: Optional[str] = Header(None, alias="X-Demo-Slug"),
@@ -111,7 +167,9 @@ def health():
 
 
 @app.get("/demo/{slug}", response_model=schemas.DemoWorkspaceOut)
-def get_demo_workspace(slug: str, db: Session = Depends(get_db)):
+def get_demo_workspace(slug: str, request: Request, db: Session = Depends(get_db)):
+    if _wants_html(request):
+        return _frontend_page("index.html")
     if slug == "new":
         return {
             "slug": "new",

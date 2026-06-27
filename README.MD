@@ -9,8 +9,8 @@ sessions feed analytics, daily/weekly unwind flows, and pattern memory.
 - `frontend/` is the real app UI: plain HTML, CSS, and JavaScript served over HTTP.
 - `backend/` is the FastAPI API: SQLite storage locally, Postgres storage when hosted,
   task/session endpoints, analytics helpers, and Gemini proxy endpoints.
-- `pyproject.toml`, `vercel.json`, and `vercel_build.py` prepare the free public judge demo
-  deployment: Vercel runs the FastAPI API and serves the static frontend copied from `frontend/`.
+- `pyproject.toml` and `vercel_build.py` prepare the free public judge demo deployment: Vercel runs
+  the FastAPI API, and FastAPI serves the static frontend from `frontend/`.
 - `extension/` is an unpacked Chrome/Edge MV3 extension that can report the current tab title and a
   stripped URL to the local backend while tracking is active.
 - `promptlab/` is a prompt experimentation harness. It is useful for testing candidate coaching
@@ -104,8 +104,8 @@ The intended free demo setup is:
 - The Gemini API key stays only in Vercel environment variables.
 
 Vercel needs `pyproject.toml` because the FastAPI app lives in `backend/main.py`, not one of
-Vercel's default entrypoint folders. `vercel_build.py` copies `frontend/` into Vercel's `public/`
-folder during deployment so the plain HTML app is served as static assets.
+Vercel's default entrypoint folders. FastAPI serves `/`, the `.html` pages, `/js/*`, `/css/*`, and
+browser navigations to `/demo/:slug`; API fetches to `/demo/:slug` still return JSON.
 
 ## Browser Extension
 

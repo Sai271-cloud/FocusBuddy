@@ -119,7 +119,6 @@ focus-buddy/
   CLAUDE.md                  # Claude Code project memory; keep synced with AGENTS.md
   README.MD                  # what it is, how to run, how it works
   pyproject.toml             # Vercel FastAPI entrypoint: backend.main:app
-  vercel.json                # Vercel rewrite for readable /demo/:slug links
   vercel_build.py            # copies frontend/ to public/ during Vercel builds
   requirements.txt           # Python dependencies for backend/local checks
   .agents/skills/            # Codex task-specific skills
@@ -307,7 +306,7 @@ Format for each entry:
   leak into another workspace.
   **Where it applies:** `backend/{models,crud,database,main}.py`,
   `frontend/js/{config,demo-context,api,planning-insights}.js`, `frontend/{index,tracker,analytics,plan}.html`,
-  `pyproject.toml`, `vercel.json`, `vercel_build.py`.
+  `pyproject.toml`, `vercel_build.py`, `backend/main.py`.
 
 - **Lesson:** For local verification, agents should default to in-process checks (`python -m unittest
   discover -s tests` or FastAPI `TestClient`) and only use live servers for browser-level smoke tests;
