@@ -1,23 +1,52 @@
-# Secrets — never commit your API keys
+# Secrets - never commit API keys or local deployment credentials
 .env
 .env.local
+.env.*.local
+*.pem
+*.key
 
-# Database — generated data, not source code
+# Database - generated data, not source code
 *.db
+*.db-shm
+*.db-wal
+*.sqlite
 *.sqlite3
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
 venv/
 .venv/
 .venv.broken-*/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# JavaScript / frontend tooling
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
 
 # OS / editor junk
 .DS_Store
 Thumbs.db
-
+desktop.ini
 .vscode/
+.idea/
 
 # Generated/context-heavy project artifacts
 promptlab/out/
@@ -25,6 +54,8 @@ v0-export/
 .pnpm-store/
 .playwright-mcp/
 playwright-*.png
+playwright-report/
+test-results/
 skills-lock.json
 promptlab/
 tools/
@@ -37,7 +68,17 @@ docs/
 .agents/
 .codex/
 
-# Claude Code — local config / skills and project memory
+# Hosting CLI local state
+.vercel/
+.render/
+
+# Local logs / runtime output
+*.log
+logs/
+tmp/
+temp/
+
+# Claude Code - local config / skills and project memory
 .claude/
 CLAUDE.md
 AGENTS.md
