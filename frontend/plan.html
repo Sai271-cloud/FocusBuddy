@@ -154,6 +154,7 @@
     adviceGeneratedThisVisit: false,
     adviceLoading: false,
     calibration: null,
+    focusWindows: [],
     saveStatus: '',
     finished: false,           // set once the plan is saved/dashboard-only
   };
@@ -401,6 +402,31 @@
     return `${fmtClock(start)} - ${fmtClock(start + length)}`;
   }
 
+  function renderBestFocusWindows() {
+    const ranked = Array.isArray(state.focusWindows)
+      ? state.focusWindows
+          .filter(row => Number(row.sessions) > 0)
+          .sort((a, b) => Number(b.focus_pct || 0) - Number(a.focus_pct || 0))
+          .slice(0, 3)
+      : [];
+    if (!ranked.length) {
+      return `
+        <div class="plan-advice-tips">
+          <p class="section-label">Best focus windows</p>
+          <p>Tracked sessions will reveal which hours tend to be strongest.</p>
+        </div>`;
+    }
+    const windows = ranked
+      .map(row => `${fmtClock(Number(row.hour) * 60)} (${Math.round(Number(row.focus_pct) || 0)}%)`)
+      .join(', ');
+    return `
+      <div class="plan-advice-tips">
+        <p class="section-label">Best focus windows</p>
+        <p>${escapeHtml(windows)} have your strongest focus history.</p>
+        <p>Harder tasks usually fit these windows better than light admin.</p>
+      </div>`;
+  }
+
   function renderAdvicePanel() {
     const stale = state.adviceStale && (state.advice || state.hadSavedAdvice);
     let body = '';
@@ -477,6 +503,7 @@
           <p class="section-label">AI suggestions</p>
           <span>${hasCurrentAdvice() ? 'Ready' : state.adviceLoading ? 'Thinking' : 'Optional'}</span>
         </div>
+        ${renderBestFocusWindows()}
         ${body}
       </aside>`;
   }
@@ -1009,6 +1036,9 @@
     try {
       state.calibration = await getPlanCalibration(14);
     } catch { state.calibration = null; }
+    try {
+      state.focusWindows = await getHourlyFocus();
+    } catch { state.focusWindows = []; }
     state.tasks = (tasks || []).filter(t => !t.completed);
     if (plan && plan.plan_json) {
       try {

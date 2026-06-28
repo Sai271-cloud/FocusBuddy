@@ -13,6 +13,10 @@ class ChunkDPlanningTests(unittest.TestCase):
         plan_html = (root / "frontend" / "plan.html").read_text(encoding="utf-8")
         calendar_js = (root / "frontend" / "js" / "plan-calendar.js").read_text(encoding="utf-8")
 
+        self.assertIn("renderBestFocusWindows", plan_html)
+        self.assertIn("Best focus windows", plan_html)
+        self.assertIn("getHourlyFocus()", plan_html)
+        self.assertLess(plan_html.index("renderBestFocusWindows"), plan_html.index("renderAdvicePanel"))
         self.assertIn("renderAdvicePanel", plan_html)
         self.assertIn("plan-advice-panel", plan_html)
         self.assertNotIn("hourly: state.hourly", plan_html)

@@ -8,7 +8,7 @@ from . import models, schemas
 
 DEFAULT_WORKSPACE_SLUG = "local"
 DEFAULT_WORKSPACE_ID = 1
-CURRENT_DEMO_SEED_VERSION = 2
+CURRENT_DEMO_SEED_VERSION = 3
 DEMO_TODAY_KEY = "2026-06-28"
 DEMO_HISTORY_DATES = [
     "2026-06-22",
@@ -37,14 +37,14 @@ DEMO_PERSONA_SEEDS = [
             ("Evening study tends to fade after the first short block.", 2, 0),
             ("Admin tasks fit better after energy dips.", 2, 1),
         ],
-        "hourly": {7: 86, 8: 91, 9: 88, 10: 84, 11: 79, 18: 50, 19: 42, 20: 35},
+        "hourly": {7: 92, 8: 94, 9: 90, 10: 86, 11: 78, 18: 38, 19: 32, 20: 26},
         "days": [
-            (0, [(0, 8, 10, 42, 7, 2, 0), (1, 19, 0, 20, 14, 4, 2)], "Morning math stayed crisp; evening review faded when fatigue showed up."),
-            (1, [(2, 8, 30, 36, 5, 2, 0), (1, 18, 45, 18, 16, 5, 1)], "The first block carried the day, while the later flashcards needed a smaller target."),
-            (2, [(0, 7, 50, 48, 6, 1, 0), (3, 20, 0, 15, 17, 6, 2)], "Calculus before school was strong; inbox cleanup was the right kind of low-energy task."),
-            (3, [(2, 8, 20, 40, 8, 3, 0), (1, 19, 20, 16, 18, 5, 1)], "The outline worked best early, and the evening block showed the usual drop-off."),
-            (4, [(0, 8, 0, 44, 4, 2, 0), (2, 18, 30, 22, 13, 4, 1)], "Starting with the hardest task in the morning was the strongest move."),
-            (5, [(1, 9, 0, 35, 7, 2, 0), (3, 19, 15, 18, 15, 5, 2)], "The day stayed workable when evening expectations were kept small."),
+            (0, [(0, 8, 10, 42, 7, 2, 0), (1, 19, 0, 20, 14, 4, 2)], "The morning calculus block was the clear focus window; the 7pm review faded once fatigue showed up."),
+            (1, [(2, 8, 30, 36, 5, 2, 0), (1, 18, 45, 18, 16, 5, 1)], "The 8:30am outline carried the day, while the later flashcards needed a much smaller target."),
+            (2, [(0, 7, 50, 48, 6, 1, 0), (3, 20, 0, 15, 17, 6, 2)], "Calculus before school landed in the strongest window; 8pm inbox cleanup was intentionally low-energy."),
+            (3, [(2, 8, 20, 40, 8, 3, 0), (1, 19, 20, 16, 18, 5, 1)], "The morning outline was steady, and the 7:20pm block showed the usual late-day drop-off."),
+            (4, [(0, 8, 0, 44, 4, 2, 0), (2, 18, 30, 22, 13, 4, 1)], "Putting the hardest task at 8am was the strongest move; the evening task stayed intentionally lighter."),
+            (5, [(1, 9, 0, 35, 7, 2, 0), (3, 19, 15, 18, 15, 5, 2)], "The day stayed workable because the real focus work happened before lunch and evening expectations stayed small."),
         ],
     },
     {
@@ -116,14 +116,14 @@ DEMO_PERSONA_SEEDS = [
             ("Morning blocks need a small warm-up before hard work.", 2, 0),
             ("Creative work fits later energy better than early drills.", 2, 0),
         ],
-        "hourly": {8: 40, 9: 45, 10: 52, 15: 68, 16: 76, 17: 82, 18: 79, 19: 74},
+        "hourly": {8: 34, 9: 39, 10: 44, 15: 70, 16: 80, 17: 87, 18: 84, 19: 78},
         "days": [
-            (0, [(2, 9, 0, 18, 16, 4, 0), (0, 17, 0, 42, 6, 2, 0)], "The warm-up was shaky, but the evening reading block was the strongest part."),
-            (1, [(1, 10, 0, 22, 15, 3, 0), (3, 16, 30, 45, 5, 2, 0)], "Slides clicked later in the day after a slower start."),
-            (2, [(2, 8, 45, 20, 14, 4, 0), (1, 17, 15, 40, 7, 2, 0)], "Algebra worked better after school than in the early block."),
-            (3, [(0, 9, 30, 24, 13, 3, 0), (3, 18, 0, 47, 5, 1, 0)], "The later creative block had the clearest attention."),
-            (4, [(2, 10, 15, 25, 9, 2, 0), (0, 17, 30, 44, 6, 2, 0)], "Starting gently helped, but late reading still carried the day."),
-            (5, [(1, 11, 0, 28, 10, 2, 0), (3, 18, 20, 46, 5, 1, 0)], "The strongest focus kept showing up after the day had warmed up."),
+            (0, [(2, 9, 0, 18, 16, 4, 0), (0, 17, 0, 42, 6, 2, 0)], "The 9am warm-up was shaky, but the 5pm literature block was the strongest part."),
+            (1, [(1, 10, 0, 22, 15, 3, 0), (3, 16, 30, 45, 5, 2, 0)], "The morning algebra block dragged; slides clicked once the later focus window opened."),
+            (2, [(2, 8, 45, 20, 14, 4, 0), (1, 17, 15, 40, 7, 2, 0)], "Algebra worked much better after school than in the early warm-up block."),
+            (3, [(0, 9, 30, 24, 13, 3, 0), (3, 18, 0, 47, 5, 1, 0)], "The 6pm creative block had the clearest attention after the slow morning start."),
+            (4, [(2, 10, 15, 25, 9, 2, 0), (0, 17, 30, 44, 6, 2, 0)], "Starting gently helped, but late-day reading still carried the day."),
+            (5, [(1, 11, 0, 28, 10, 2, 0), (3, 18, 20, 46, 5, 1, 0)], "The strongest focus kept showing up in the evening after the day had warmed up."),
         ],
     },
     {
@@ -763,17 +763,183 @@ def _journal_json(summary: str, distracted_min: int) -> str:
     return json.dumps(entries)
 
 
-def _plan_json(tasks: list[models.Task], day_index: int) -> str:
+def _seed_session_total_min(session: models.FocusSession) -> int:
+    seconds = (
+        (session.seconds_focused or 0)
+        + (session.seconds_distracted or 0)
+        + (session.seconds_uncertain or 0)
+        + (session.seconds_away or 0)
+    )
+    return round(seconds / 60)
+
+
+def _seed_session_start_min(session: models.FocusSession) -> int:
+    return session.started_at.hour * 60 + session.started_at.minute
+
+
+def _seed_plan_entries(seed: dict, tasks: list[models.Task], sessions: list[models.FocusSession]) -> list[dict]:
     entries = []
-    for i, task in enumerate(tasks[:4]):
+    seen_task_ids = set()
+    slug = seed["slug"]
+    difficulties = ["hard", "medium", "easy", "medium", "hard"]
+
+    for order, session in enumerate(sorted(sessions, key=lambda s: (s.started_at, s.id or 0))):
+        if session.task_id in seen_task_ids:
+            continue
+        seen_task_ids.add(session.task_id)
+        actual_min = _seed_session_total_min(session)
+        estimate = max(15, actual_min - 10) if slug == "overplanner" else actual_min
         entries.append({
-            "task_id": task.id,
-            "name": task.name,
-            "estimate_min": 30 + (i * 10),
-            "difficulty": ["hard", "medium", "easy", "medium"][i % 4],
-            "scheduled_min": (8 + i) * 60 + (15 if day_index % 2 else 0),
+            "task_id": session.task_id,
+            "name": session.task_name or "",
+            "estimate_min": estimate,
+            "difficulty": difficulties[order % len(difficulties)],
+            "scheduled_min": _seed_session_start_min(session),
         })
-    return json.dumps(entries)
+
+    if slug == "overplanner":
+        next_slot = max(
+            [entry["scheduled_min"] + entry["estimate_min"] for entry in entries] or [9 * 60]
+        ) + 15
+        for task in tasks:
+            if task.id in seen_task_ids:
+                continue
+            estimate = 25 + (5 if len(entries) % 2 else 0)
+            entries.append({
+                "task_id": task.id,
+                "name": task.name,
+                "estimate_min": estimate,
+                "difficulty": difficulties[len(entries) % len(difficulties)],
+                "scheduled_min": min(next_slot, 21 * 60),
+            })
+            next_slot += estimate + 15
+
+    return entries
+
+
+def _seed_row_status(has_session: bool, start_delta: int | None, duration_delta: int) -> str:
+    if not has_session:
+        return "not_started"
+    if start_delta is not None and start_delta >= 10:
+        return "started_late"
+    if start_delta is not None and start_delta <= -10:
+        return "started_early"
+    if duration_delta >= 10:
+        return "ran_long"
+    if duration_delta <= -10:
+        return "ran_short"
+    return "on_track"
+
+
+def _seed_plan_reality_json(day_key: str, entries: list[dict], sessions: list[models.FocusSession]) -> str:
+    by_task: dict[int, list[models.FocusSession]] = {}
+    for session in sessions:
+        by_task.setdefault(session.task_id, []).append(session)
+
+    rows = []
+    planned_total = 0
+    actual_total = 0
+    focused_total = 0
+    planned_ids = {entry["task_id"] for entry in entries}
+
+    for entry in entries:
+        task_sessions = sorted(by_task.get(entry["task_id"], []), key=lambda s: (s.started_at, s.id or 0))
+        planned = int(entry.get("estimate_min") or 0)
+        planned_total += planned
+        actual = sum(_seed_session_total_min(session) for session in task_sessions)
+        focused = round(sum((session.seconds_focused or 0) for session in task_sessions) / 60)
+        actual_total += actual
+        focused_total += focused
+        actual_start = _seed_session_start_min(task_sessions[0]) if task_sessions else None
+        planned_start = entry.get("scheduled_min")
+        start_delta = actual_start - planned_start if actual_start is not None and planned_start is not None else None
+        duration_delta = actual - planned
+        rows.append(schemas.PlanRealityRow(
+            task_id=entry["task_id"],
+            name=entry.get("name") or (task_sessions[0].task_name if task_sessions else ""),
+            planned_start_min=planned_start,
+            planned_estimate_min=planned,
+            actual_start_min=actual_start,
+            actual_total_min=actual,
+            actual_focused_min=focused,
+            start_delta_min=start_delta,
+            duration_delta_min=duration_delta,
+            session_ids=[session.id for session in task_sessions],
+            status=_seed_row_status(bool(task_sessions), start_delta, duration_delta),
+        ))
+
+    for task_id, task_sessions in sorted(by_task.items(), key=lambda item: _seed_session_start_min(item[1][0])):
+        if task_id in planned_ids:
+            continue
+        actual = sum(_seed_session_total_min(session) for session in task_sessions)
+        focused = round(sum((session.seconds_focused or 0) for session in task_sessions) / 60)
+        actual_total += actual
+        focused_total += focused
+        first = sorted(task_sessions, key=lambda s: (s.started_at, s.id or 0))[0]
+        rows.append(schemas.PlanRealityRow(
+            task_id=task_id,
+            name=first.task_name or "Unplanned work",
+            planned_estimate_min=0,
+            actual_start_min=_seed_session_start_min(first),
+            actual_total_min=actual,
+            actual_focused_min=focused,
+            duration_delta_min=actual,
+            session_ids=[session.id for session in task_sessions],
+            status="unscheduled_work",
+        ))
+
+    skipped = sum(1 for row in rows if row.status == "not_started")
+    ran_long = sum(1 for row in rows if row.status == "ran_long")
+    pieces = [f"Planned {planned_total}m; tracked {actual_total}m"]
+    if skipped:
+        pieces.append(f"{skipped} planned task{'s' if skipped != 1 else ''} not started")
+    if ran_long:
+        pieces.append(f"{ran_long} task{'s' if ran_long != 1 else ''} ran long")
+
+    report = schemas.PlanRealityReport(
+        period_key=day_key,
+        has_plan=bool(entries),
+        planned_total_min=planned_total,
+        actual_total_min=actual_total,
+        focused_total_min=focused_total,
+        rows=rows,
+        summary=". ".join(pieces) + ".",
+    )
+    return json.dumps(report.model_dump())
+
+
+def _seed_plan_advice_json(seed: dict, entries: list[dict], available_min: int) -> str:
+    scheduled = []
+    for entry in entries:
+        start = int(entry.get("scheduled_min") or 0)
+        if seed["slug"] == "early-morning" and start < 12 * 60:
+            reason = "This puts the deeper work inside the morning focus window."
+        elif seed["slug"] == "night-owl" and start >= 15 * 60:
+            reason = "This fits the later best focus window after the day warms up."
+        elif seed["slug"] == "overplanner":
+            reason = "This is part of the intentionally crowded plan the recap compares with reality."
+        else:
+            reason = "This timing follows the pattern shown in the seeded history."
+        scheduled.append({
+            "task_id": entry["task_id"],
+            "start_hour": start // 60,
+            "start_min": start % 60,
+            "length_min": entry["estimate_min"],
+            "reason": reason,
+        })
+
+    planned_total = sum(entry["estimate_min"] for entry in entries)
+    over_plan_note = ""
+    if planned_total > available_min:
+        over_plan_note = "This plan asks for more minutes than the available window, so one task likely needs to move."
+
+    return json.dumps({
+        "summary": "Seeded AI timing advice for this persona's day.",
+        "cold_start": False,
+        "scheduled": scheduled,
+        "over_plan_note": over_plan_note,
+        "general_advice": [seed["archetype"]],
+    })
 
 
 def clear_workspace_data(db: Session, workspace) -> None:
@@ -843,12 +1009,13 @@ def reset_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | Non
     for day_index, sessions, daily_note in seed["days"]:
         day_key = DEMO_HISTORY_DATES[day_index]
         day_secs = {"focused": 0, "distracted": 0, "uncertain": 0, "away": 0}
+        day_sessions = []
         for task_index, hour, minute, focused, distracted, uncertain, away in sessions:
             task = tasks[task_index % len(tasks)]
             start = _demo_dt(day_key, hour, minute)
             total_min = focused + distracted + uncertain + away
             end = start + timedelta(minutes=total_min)
-            db.add(models.FocusSession(
+            session = models.FocusSession(
                 workspace_id=workspace.id,
                 task_id=task.id,
                 task_name=task.name,
@@ -861,11 +1028,22 @@ def reset_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | Non
                 timeline_json=_timeline_json(focused, distracted, uncertain, away),
                 journal_json=_journal_json(daily_note, distracted),
                 intention=f"Make visible progress on {task.name}.",
-            ))
+            )
+            db.add(session)
+            day_sessions.append(session)
             day_secs["focused"] += focused * 60
             day_secs["distracted"] += distracted * 60
             day_secs["uncertain"] += uncertain * 60
             day_secs["away"] += away * 60
+
+        db.flush()
+        plan_entries = _seed_plan_entries(seed, tasks, day_sessions)
+        planned_total = sum(entry["estimate_min"] for entry in plan_entries)
+        actual_total = round(sum(day_secs.values()) / 60)
+        available_min = max(60, actual_total + 15)
+        if seed["slug"] == "overplanner":
+            available_min = max(75, actual_total + 20)
+        plan_available_min = available_min if seed["slug"] == "overplanner" else max(available_min, planned_total)
 
         db.add(models.WorkPeriod(
             workspace_id=workspace.id,
@@ -878,22 +1056,18 @@ def reset_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | Non
             seconds_away=day_secs["away"],
             reflection=f"Seeded reflection: {daily_note}",
             ai_recap="",
-            plan_reality_json=json.dumps({
-                "period_key": day_key,
-                "summary": "Seeded plan compared with completed sessions for the judge demo.",
-                "rows": [],
-            }),
+            plan_reality_json=_seed_plan_reality_json(day_key, plan_entries, day_sessions),
         ))
         db.add(models.DailyPlan(
             workspace_id=workspace.id,
             period_key=day_key,
-            available_min=180,
-            plan_json=_plan_json(tasks, day_index),
-            advice_json=json.dumps({
-                "summary": "Seeded AI advice for this persona's day.",
-                "scheduled": [],
-                "general_advice": [seed["archetype"]],
-            }),
+            available_min=plan_available_min,
+            plan_json=json.dumps(plan_entries),
+            advice_json=_seed_plan_advice_json(
+                seed,
+                plan_entries,
+                plan_available_min,
+            ),
         ))
 
     db.commit()
