@@ -8,7 +8,7 @@ from . import models, schemas
 
 DEFAULT_WORKSPACE_SLUG = "local"
 DEFAULT_WORKSPACE_ID = 1
-CURRENT_DEMO_SEED_VERSION = 3
+CURRENT_DEMO_SEED_VERSION = 4
 DEMO_TODAY_KEY = "2026-06-28"
 DEMO_HISTORY_DATES = [
     "2026-06-22",
@@ -25,7 +25,7 @@ DEMO_PERSONA_SEEDS = [
         "slug": "early-morning",
         "display_name": "Early Morning",
         "archetype": "Focused early, fades late",
-        "about": "I do my clearest work before lunch. After dinner my focus falls quickly, so shorter evening blocks work better.",
+        "about": "",
         "tasks": [
             ("Morning calculus review", "Best done before lunch while attention is high."),
             ("Biology flashcards", "Spaced repetition for the quiz."),
@@ -51,7 +51,7 @@ DEMO_PERSONA_SEEDS = [
         "slug": "doomscroller",
         "display_name": "Doomscroller",
         "archetype": "Predictable social-scroll loop",
-        "about": "I can start well, but when a task gets hard I reach for Instagram, YouTube, or Reddit. A blocker helps more than willpower.",
+        "about": "",
         "tasks": [
             ("Essay intro draft", "Needs one uninterrupted writing pass."),
             ("Statistics problem set", "Hardest class this week."),
@@ -77,7 +77,7 @@ DEMO_PERSONA_SEEDS = [
         "slug": "overplanner",
         "display_name": "Overplanner",
         "archetype": "Too many tasks, low estimates",
-        "about": "I like planning everything, but I usually underestimate how long tasks take. I need a smaller plan with buffers.",
+        "about": "",
         "tasks": [
             ("Chemistry lab writeup", "Needs careful formatting."),
             ("History reading", "Long chapter with notes."),
@@ -104,7 +104,7 @@ DEMO_PERSONA_SEEDS = [
         "slug": "night-owl",
         "display_name": "Night Owl",
         "archetype": "Slow start, stronger later",
-        "about": "I am sluggish early and focus better later in the day. Morning work needs a warm-up task, not the hardest task first.",
+        "about": "",
         "tasks": [
             ("AP literature annotations", "Deep reading work."),
             ("Algebra practice", "Problem solving."),
@@ -130,7 +130,7 @@ DEMO_PERSONA_SEEDS = [
         "slug": "self-improver",
         "display_name": "Self Improver",
         "archetype": "Messy start, visible recovery",
-        "about": "I am practicing better focus habits. This week starts messy, but I improve when I write one clear intention and recover quickly after slips.",
+        "about": "",
         "tasks": [
             ("Coding practice", "Build one small feature."),
             ("Reading notes", "Summarize the chapter."),

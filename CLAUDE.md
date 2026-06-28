@@ -298,6 +298,15 @@ Format for each entry:
   **Why it matters:** <what broke, or what it prevents>
   **Where it applies:** <file or area, e.g. focus-detector.js>
 
+- **Lesson:** Seeded judge demo personas should leave the About-me profile blank; keep persona
+  behavior in seeded tasks, sessions, plans, hourly focus, and observations instead. Bump
+  `CURRENT_DEMO_SEED_VERSION` when changing seeded profile defaults so hosted seeded workspaces
+  reseed automatically.
+  **Why it matters:** About-me text is sent into coaching/planning prompts, and the judge demo should
+  not prefill personal profile context for the demo models.
+  **Where it applies:** `backend/crud.py`, demo seed resets, hosted Vercel judge demos,
+  `.agents/skills/privacy-guard/data-flow.md`, `.claude/skills/privacy-guard/data-flow.md`.
+
 - **Lesson:** Judge Demo historical daily unwind rows must show saved `plan_reality_json`
   before the AI recap, pass its summary as `plan_reality_summary` during live generation, and
   preserve the same `plan_reality_json` when saving the generated recap.

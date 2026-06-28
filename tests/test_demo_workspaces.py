@@ -164,6 +164,15 @@ class DemoWorkspaceApiTests(unittest.TestCase):
                         self.assertIsInstance(report.get("summary"), str)
                         self.assertTrue(report.get("rows"), period.period_key)
 
+    def test_seeded_demo_profiles_have_empty_about_me(self):
+        for seed in crud.DEMO_PERSONA_SEEDS:
+            with self.subTest(slug=seed["slug"]):
+                self.client.post(f"/demo/{seed['slug']}/reset")
+
+                profile = self.client.get("/profile", headers={"X-Demo-Slug": seed["slug"]}).json()
+
+                self.assertEqual(profile["about"], "")
+
     def test_overplanner_seed_shows_more_planned_than_tracked_or_not_started_work(self):
         self.client.post("/demo/overplanner/reset")
         with self.SessionLocal() as db:
