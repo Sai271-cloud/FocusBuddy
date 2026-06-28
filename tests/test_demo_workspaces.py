@@ -102,6 +102,33 @@ class DemoWorkspaceApiTests(unittest.TestCase):
         self.assertTrue(all((p["seconds_focused"] + p["seconds_distracted"] + p["seconds_uncertain"] + p["seconds_away"]) > 0 for p in history_periods))
         self.assertFalse(any(p["period_key"] == "2026-06-28" for p in periods))
 
+    def test_demo_daily_unwinds_expose_seeded_plan_reality(self):
+        self.client.post("/demo/overplanner/reset")
+
+        recaps = self.client.get("/demo/overplanner/daily-unwinds").json()
+
+        reports = []
+        self.assertEqual(len(recaps), len(crud.DEMO_HISTORY_DATES))
+        for item in recaps:
+            raw = item.get("plan_reality_json")
+            self.assertIsInstance(raw, str)
+            self.assertTrue(raw, item["period_key"])
+            report = json.loads(raw)
+            reports.append(report)
+
+            self.assertTrue(report.get("has_plan"), item["period_key"])
+            self.assertGreater(report.get("planned_total_min", 0), 0)
+            self.assertGreater(report.get("actual_total_min", 0), 0)
+            self.assertTrue(report.get("rows"), item["period_key"])
+
+        self.assertTrue(
+            any(
+                report["planned_total_min"] > report["actual_total_min"]
+                or any(row["status"] == "not_started" for row in report["rows"])
+                for report in reports
+            )
+        )
+
     def test_seeded_personas_have_historical_plans_and_plan_reality_rows(self):
         for seed in crud.DEMO_PERSONA_SEEDS:
             with self.subTest(slug=seed["slug"]):
@@ -277,6 +304,18 @@ class DemoFrontendStaticTests(unittest.TestCase):
         self.assertIn("FocusBuddyDemo.now", planning_js)
         self.assertNotIn("fb-demo-slug", demo_js)
         self.assertIn("fb-demo-anon-id", demo_js)
+
+    def test_demo_context_renders_historical_plan_reality(self):
+        root = Path(__file__).resolve().parents[1]
+        demo_js = (root / "frontend" / "js" / "demo-context.js").read_text(encoding="utf-8")
+
+        self.assertIn("Plan vs reality", demo_js)
+        self.assertIn("Task", demo_js)
+        self.assertIn("Planned", demo_js)
+        self.assertIn("Actual", demo_js)
+        self.assertIn("Status", demo_js)
+        self.assertIn("plan_reality_summary", demo_js)
+        self.assertIn("plan_reality_json", demo_js)
 
     def test_coaching_prompts_share_plain_student_language_rule(self):
         root = Path(__file__).resolve().parents[1]

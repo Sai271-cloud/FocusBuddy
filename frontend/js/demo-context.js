@@ -159,6 +159,16 @@
     }
   }
 
+  function parsePlanReality(raw) {
+    if (!raw) return null;
+    try {
+      var report = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return report && report.has_plan ? report : null;
+    } catch {
+      return null;
+    }
+  }
+
   function formatHM(seconds) {
     seconds = Math.max(0, Math.round(Number(seconds) || 0));
     var h = Math.floor(seconds / 3600);
@@ -180,6 +190,57 @@
   function isoForDayAt(dayKey, hour, minute) {
     var parts = String(dayKey || '').split('-').map(Number);
     return isoWithLocalOffset(new Date(parts[0], parts[1] - 1, parts[2], hour, minute || 0, 0));
+  }
+
+  function fmtMinuteOfDay(min) {
+    if (min == null || min === '') return 'Unscheduled';
+    min = Number(min);
+    if (!Number.isFinite(min)) return 'Unscheduled';
+    min = ((min % 1440) + 1440) % 1440;
+    var h = Math.floor(min / 60);
+    var m = min % 60;
+    var ap = h < 12 ? 'am' : 'pm';
+    return (h % 12 || 12) + ':' + pad(m) + ap;
+  }
+
+  function statusLabel(status) {
+    return {
+      not_started: 'Not started',
+      on_track: 'Close to plan',
+      started_late: 'Started late',
+      started_early: 'Started early',
+      ran_short: 'Ran short',
+      ran_long: 'Ran long',
+      unscheduled_work: 'Unplanned work',
+    }[status] || 'Logged';
+  }
+
+  function renderPlanRealityHtml(report) {
+    if (!report || !report.has_plan) return '';
+    var rows = (report.rows || []).map(function (row) {
+      var planned = row.status === 'unscheduled_work'
+        ? 'Unplanned'
+        : fmtMinuteOfDay(row.planned_start_min) + ' / ' + (row.planned_estimate_min || 0) + 'm';
+      var actual = row.actual_total_min > 0
+        ? fmtMinuteOfDay(row.actual_start_min) + ' / ' + row.actual_total_min + 'm'
+        : 'No session';
+      var statusClass = String(row.status || 'logged').replace(/[^a-z0-9_-]/gi, '-');
+      return '<div class="plan-reality-row">' +
+        '<span data-label="Task">' + escapeHtml(row.name || 'Untitled') + '</span>' +
+        '<span data-label="Planned">' + escapeHtml(planned) + '</span>' +
+        '<span data-label="Actual">' + escapeHtml(actual) + '</span>' +
+        '<span data-label="Status"><span class="plan-reality-status ' + statusClass + '">' + escapeHtml(statusLabel(row.status)) + '</span></span>' +
+      '</div>';
+    }).join('');
+    return '<div class="plan-reality-card" style="margin:10px 0 10px">' +
+      '<div class="flex items-center justify-between gap-3">' +
+        '<p class="section-label" style="margin:0">Plan vs reality</p>' +
+        '<p class="text-xs" style="color:var(--text-faint);margin:0">' + (report.planned_total_min || 0) + 'm planned - ' + (report.actual_total_min || 0) + 'm tracked</p>' +
+      '</div>' +
+      '<p class="text-xs" style="color:var(--text-muted);margin:6px 0 10px">' + escapeHtml(report.summary || '') + '</p>' +
+      '<div class="plan-reality-head"><span>Task</span><span>Planned</span><span>Actual</span><span>Status</span></div>' +
+      rows +
+    '</div>';
   }
 
   function historicalDays(sessions) {
@@ -213,6 +274,14 @@
       '<p>' + escapeHtml(recap.summary || 'Daily unwind generated.') + '</p>' +
       items.join('') +
       '</div>';
+  }
+
+  function renderHistoryStatusHtml(recap, planReality) {
+    var planHtml = renderPlanRealityHtml(planReality);
+    var recapHtml = recap
+      ? renderRecapHtml(recap)
+      : '<p style="margin:0">Not generated yet. Use this day\'s seeded sessions to generate the unwind live.</p>';
+    return planHtml + recapHtml;
   }
 
   async function generateTodayDailyUnwind(bodyEl) {
@@ -268,6 +337,7 @@
         var key = day.period_key;
         var period = periodsByKey[key] || {};
         var recap = parseRecap(period.ai_recap);
+        var planReality = parsePlanReality(period.plan_reality_json);
         return '<article class="judge-unwind-row" data-history-row="' + escapeHtml(key) + '">' +
           '<div class="flex items-start justify-between gap-3 flex-wrap">' +
             '<div>' +
@@ -277,7 +347,7 @@
             '<button class="' + (recap ? 'btn-ghost' : 'btn-primary') + '" data-act="generate-history-daily" data-period-key="' + escapeHtml(key) + '">' + (recap ? 'Regenerate' : 'Generate daily unwind') + '</button>' +
           '</div>' +
           '<div data-history-status="' + escapeHtml(key) + '" class="text-sm" style="color:var(--text-muted);margin-top:10px;line-height:1.5">' +
-            (recap ? renderRecapHtml(recap) : '<p style="margin:0">Not generated yet. Use this day\'s seeded sessions to generate the unwind live.</p>') +
+            renderHistoryStatusHtml(recap, planReality) +
           '</div>' +
         '</article>';
       }).join('') +
@@ -321,11 +391,16 @@
       }
       var periods = await window.getWorkPeriods();
       var existing = (periods || []).find(function (p) { return p.kind === 'day' && p.period_key === periodKey; });
+      var planReality = parsePlanReality(existing && existing.plan_reality_json);
       var sum = sumStates(daySessions);
+      if (status) {
+        status.innerHTML = renderPlanRealityHtml(planReality) + '<p style="margin:0">Generating live daily unwind...</p>';
+      }
       var recap = await window.getDailyUnwind({
         session_ids: daySessions.map(function (s) { return s.id; }),
         recent_avg_focus_pct: recentAverage(sessions, periodKey),
         period_key: periodKey,
+        plan_reality_summary: planReality && planReality.has_plan ? planReality.summary : null,
       });
       await window.createWorkPeriod({
         kind: 'day',
@@ -336,6 +411,7 @@
         seconds_uncertain: sum.uncertain,
         seconds_away: sum.away,
         ai_recap: JSON.stringify(recap),
+        plan_reality_json: existing && existing.plan_reality_json ? existing.plan_reality_json : null,
       });
       await renderSeededDemoBody(bodyEl);
     } catch (err) {

@@ -145,6 +145,7 @@ class DemoDailyUnwindOut(BaseModel):
     win: str = ''
     next_action: str = ''
     ai_recap: str = ''
+    plan_reality_json: str = ''
 
 
 class FocusAnalyzeRequest(BaseModel):

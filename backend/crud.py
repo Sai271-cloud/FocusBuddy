@@ -1109,5 +1109,6 @@ def seeded_daily_unwinds(db: Session, slug: str) -> list[dict] | None:
             "win": (recap.get("win") or "").strip(),
             "next_action": (recap.get("next_action") or "").strip(),
             "ai_recap": row.ai_recap or "",
+            "plan_reality_json": row.plan_reality_json or "",
         })
     return out

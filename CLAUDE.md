@@ -298,6 +298,15 @@ Format for each entry:
   **Why it matters:** <what broke, or what it prevents>
   **Where it applies:** <file or area, e.g. focus-detector.js>
 
+- **Lesson:** Judge Demo historical daily unwind rows must show saved `plan_reality_json`
+  before the AI recap, pass its summary as `plan_reality_summary` during live generation, and
+  preserve the same `plan_reality_json` when saving the generated recap.
+  **Why it matters:** seeded demo days already store the plan-vs-reality comparison; hiding it
+  makes judges miss the planned-vs-actual loop, and saving a recap without preserving it can erase
+  the deterministic comparison.
+  **Where it applies:** `backend/{schemas,crud}.py`, `frontend/js/demo-context.js`,
+  `tests/test_demo_workspaces.py`.
+
 - **Lesson:** Seeded judge demo identity must be URL-scoped, not stored in shared browser
   localStorage: derive seeded personas only from `/demo/:slug` or `?demo=slug`; only `/demo/new`
   should keep an anonymous browser ID in localStorage.
