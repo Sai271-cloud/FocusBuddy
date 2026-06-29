@@ -153,6 +153,7 @@ focus-buddy/
     crud.py                  # ✓ SQLAlchemy query helpers (one job each)
     models.py                # SQLAlchemy models: DemoWorkspace, Task, FocusSession, profile/pattern/plan tables
     database.py              # SQLite/Postgres DB setup (+ local SQLite repair helpers)
+    reset_db.py              # dev helper: delete the local SQLite file and recreate empty tables
     focus_buddy.db           # the SQLite file (created on first run)
   frontend/
     index.html               # homepage — task list + add a task
@@ -164,6 +165,9 @@ focus-buddy/
     js/
       api.js                 # ✓ all fetch() calls to the backend live here
       config.js              # hosted frontend API base URL
+      theme.js               # dark/light theme; loaded first in <head> to avoid a light-theme flash
+      notify.js              # shared toasts, chime, browser notifications, styled confirm dialog
+      settings-menu.js       # gear-icon settings dropdown (appearance, interval, About me, etc.)
       demo-context.js        # judge demo routing, headers, fixed demo clock, reset panel
       plan-calendar.js       # Today's Plan schedule calendar: placement, drag/resize, AI ghosts
       planning-insights.js   # shared plan helpers: local day bounds, plan parsing, focus goal/streak math

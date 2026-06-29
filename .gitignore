@@ -1,3 +1,9 @@
+# What this file is for:
+# Keep the repo to just what someone needs to clone and run Focus Buddy locally
+# (backend/, frontend/, requirements.txt, README, tests, extension, deploy config,
+# and the project-memory docs). Everything below is a secret, generated locally,
+# or agent/dev-only tooling that the app does not need to run.
+
 # Secrets - never commit API keys or local deployment credentials
 .env
 .env.local
@@ -5,14 +11,14 @@
 *.pem
 *.key
 
-# Database - generated data, not source code
+# Database - generated on first run, not source code
 *.db
 *.db-shm
 *.db-wal
 *.sqlite
 *.sqlite3
 
-# Python
+# Python - virtualenvs, bytecode, build output, test caches
 __pycache__/
 *.pyc
 *.pyo
@@ -30,12 +36,13 @@ build/
 dist/
 *.egg-info/
 
-# JavaScript / frontend tooling
+# JavaScript / frontend tooling (we use CDNs + no build step, so none of this ships)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.pnpm-store/
 .next/
 .nuxt/
 .svelte-kit/
@@ -48,25 +55,28 @@ desktop.ini
 .vscode/
 .idea/
 
-# Generated/context-heavy project artifacts
-promptlab/out/
+# Generated / context-heavy artifacts - not needed to run the app
+promptlab/
 v0-export/
-.pnpm-store/
 .playwright-mcp/
 playwright-*.png
 playwright-report/
 test-results/
 skills-lock.json
-promptlab/
-tools/
-!tools/
+
+# Agent / dev-only tooling - not needed to run the app.
+# tools/ ships only the two human-run serve helpers; everything else stays local.
 tools/*
 !tools/serve.ps1
 !tools/stop-serve.ps1
 tools/.serve/
-docs/
+.claude/
 .agents/
 .codex/
+
+# docs/ holds agent handoff notes. The one handoff already committed stays tracked
+# (git keeps tracked files even when ignored); new handoffs are ignored by default.
+docs/
 
 # Hosting CLI local state
 .vercel/
@@ -78,8 +88,3 @@ docs/
 logs/
 tmp/
 temp/
-
-# Claude Code - local config / skills and project memory
-.claude/
-CLAUDE.md
-AGENTS.md
