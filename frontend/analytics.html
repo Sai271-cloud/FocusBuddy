@@ -39,7 +39,7 @@
 </header>
 
 <main id="analytics-main" class="app-main analytics-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
-  <div id="tiles" class="analytics-tiles grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+  <div id="tiles" class="analytics-tiles grid grid-cols-2 md:grid-cols-3 gap-3"></div>
   <section id="today-card" class="card"></section>
   <section id="week-card" class="card"></section>
   <div class="history-panel">
@@ -224,22 +224,6 @@
   }
 
   /* ---------- dashboard renderers ---------- */
-  function computeStreak() {
-    if (window.PlanningInsights) {
-      return PlanningInsights.focusStreak(allSessions, PlanningInsights.focusGoalMin(), localDayKey(currentDate())).count;
-    }
-    const set = new Set(allSessions.map(s => localDayKey(new Date(s.started_at))));
-    if (set.size === 0) return 0;
-    const t = currentDate();
-    let cursor = new Date(t.getFullYear(), t.getMonth(), t.getDate());
-    if (!set.has(localDayKey(cursor))) {          // today blank → streak can still run up to yesterday
-      cursor.setDate(cursor.getDate() - 1);
-      if (!set.has(localDayKey(cursor))) return 0;
-    }
-    let streak = 0;
-    while (set.has(localDayKey(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1); }
-    return streak;
-  }
   function personalBest() {
     const byDay = {};
     allSessions.forEach(s => {
@@ -256,16 +240,7 @@
     const weekKey = weekKeyOf(currentDate());
     const week = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey);
     const wSum = sumStates(week);
-    const goal = window.PlanningInsights ? PlanningInsights.focusGoalMin() : 0;
-    const progress = window.PlanningInsights ? PlanningInsights.focusGoalProgress(allSessions, todayKey, goal) : null;
-    const streak = goal > 0 ? computeStreak() : 0;
     const best = personalBest();
-    const goalValue = goal > 0 && progress ? `${progress.focused_min}/${goal}m` : 'Off';
-    const goalSub = goal > 0
-      ? (progress.met
-        ? (streak ? `${streak}-day rhythm` : 'Goal met today')
-        : `${Math.max(0, goal - progress.focused_min)}m left today`)
-      : 'Set on Today';
 
     const tile = (label, value, sub) => `
       <div class="card" style="padding:1rem 1.1rem">
@@ -277,7 +252,6 @@
     document.getElementById('tiles').innerHTML =
       tile('Today', focusPct(tSum) + '%', formatHM(tSum.focused) + ' focused') +
       tile('This week', focusPct(wSum) + '%', formatHM(wSum.focused) + ' focused') +
-      tile('Focus goal', goalValue, goalSub) +
       tile('Personal best', best > 0 ? formatHM(best) : '0m', best > 0 ? 'focused in a day' : 'No focus yet');
   }
 
@@ -449,6 +423,7 @@
   }
 
   function closeUnwind() {
+    syncReflection();   // keep typed reflection in memory when closing via ✕/Escape/overlay, like Next/Back
     document.getElementById('unwind-overlay').style.display = 'none';
     document.body.style.overflow = '';
     closePomoSuggest();

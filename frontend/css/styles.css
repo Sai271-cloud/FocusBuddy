@@ -153,6 +153,35 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 .badge-distracted { background: var(--terracotta-soft); color: var(--terracotta); }
 .badge-uncertain  { background: var(--ochre-soft);      color: var(--ochre); }
 .badge-away       { background: var(--taupe-soft);      color: var(--taupe); }
+/* Neutral badge for non-states: startup ("Analyzing…") and camera-off — kept
+   visually distinct from the four real focus states so it isn't misread as one. */
+.badge-neutral    { background: var(--surface-2);       color: var(--text-muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .badge-pulse::before { animation: badge-pulse 1.4s ease-in-out infinite; }
+}
+@keyframes badge-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* "Paused" chip on the tracker hero so a paused session reads clearly at a glance. */
+.paused-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding: 4px 11px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--hero-on);
+  vertical-align: middle;
+}
+.paused-chip::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
 
 .card {
   background: var(--surface);

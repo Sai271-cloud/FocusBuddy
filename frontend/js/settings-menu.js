@@ -100,7 +100,10 @@
 
     var ta = overlay.querySelector('#about-text');
     if (window.getProfile) {
-      window.getProfile().then(function (p) { ta.value = (p && p.about) || ''; }).catch(function () {});
+      window.getProfile().then(function (p) { ta.value = (p && p.about) || ''; }).catch(function () {
+        // Don't silently show a blank box that could be saved over the real value.
+        if (window.showToast) showToast('Couldn’t load your About-me — check the backend before saving.', { danger: true });
+      });
     }
 
     var listEl = overlay.querySelector('#patterns-list');
@@ -165,7 +168,10 @@
         act.disabled = true; act.textContent = 'Saving…';
         window.saveProfile(ta.value)
           .then(closeModal)
-          .catch(function () { act.disabled = false; act.textContent = 'Save'; });
+          .catch(function () {
+            act.disabled = false; act.textContent = 'Save';   // keep the modal open so the text isn't lost
+            if (window.showToast) showToast('Couldn’t save your About-me — is the backend running?', { danger: true });
+          });
       } else if (act.dataset.act === 'cancel') {
         closeModal();
       }

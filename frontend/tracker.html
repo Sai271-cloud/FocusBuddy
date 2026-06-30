@@ -56,9 +56,10 @@
           <p class="section-label" style="color:var(--hero-label)">Session time</p>
           <p class="timer-display" id="timer" style="color:var(--hero-on);margin:2px 0 18px">00:00:00</p>
           <p class="section-label" style="color:var(--hero-label);margin-bottom:8px">Right now</p>
-          <span id="state-badge" class="badge badge-uncertain state-badge-lg" role="status" aria-live="polite">
+          <span id="state-badge" class="badge badge-neutral badge-pulse state-badge-lg" role="status" aria-live="polite">
             Analyzing…
           </span>
+          <span id="paused-chip" class="paused-chip hidden" role="status" aria-live="polite">Paused</span>
           <label class="flex items-center gap-2" style="margin-top:18px;cursor:pointer;width:max-content">
             <span class="section-label" style="color:var(--hero-label);margin:0">Pomodoro</span>
             <span class="switch"><input type="checkbox" id="pomo-toggle" /><span class="slider"></span></span>
@@ -215,6 +216,7 @@
   let trackingHeartbeat = null;   // keeps the extension's "is tracking?" gate fresh
   let pendingSave = Promise.resolve();
   let lastSavedPayload = null;
+  let autosaveErrorShown = false;   // so a mid-session save outage warns once, not every 5s
   let isPaused = false;
   let timeline = [];
   let journal = [];          // timestamped events: state changes, site switches, activity notes
@@ -508,7 +510,18 @@
       sessionRecordStart = new Date(session.started_at);
       sessionStart = window.FocusBuddyDemo && FocusBuddyDemo.active ? new Date() : sessionRecordStart;
       timerInterval = setInterval(tick, 1000);
-      autosaveInterval = setInterval(() => enqueueSessionSave(false), 5000);
+      autosaveInterval = setInterval(() => {
+        enqueueSessionSave(false)
+          .then(() => { autosaveErrorShown = false; })
+          .catch(() => {
+            // Warn once if autosave starts failing (e.g. backend went down) so the
+            // user knows before they hit End & Save. The session keeps running.
+            if (!autosaveErrorShown) {
+              autosaveErrorShown = true;
+              if (window.showToast) showToast('Couldn’t save progress — check the backend. Your session is still running.', { danger: true });
+            }
+          });
+      }, 5000);
 
       await startDetection(videoEl, taskName, taskDescription, setState, setStatus, setActivity);
 
@@ -524,9 +537,33 @@
         showStartupError('Check that the backend is running and the task still exists.');
         return;
       }
-      document.getElementById('webcam-row').classList.add('hidden');
-      document.getElementById('webcam-error').classList.remove('hidden');
+      // The session was created, so the failure is the camera/detector starting.
+      // Say specifically what went wrong and how to fix it — the timer keeps running.
+      showCameraError(err);
     }
+  }
+
+  function showCameraError(err) {
+    const name = err && err.name ? err.name : '';
+    let msg;
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      msg = '<strong>Camera access is blocked.</strong> Allow the camera in your browser’s site settings, then reload. Your timer is still running.';
+    } else if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError') {
+      msg = '<strong>No camera found.</strong> Connect a webcam and reload to enable focus detection. Your timer is still running.';
+    } else if (name === 'NotReadableError') {
+      msg = '<strong>Camera is in use by another app.</strong> Close other apps using it and reload. Your timer is still running.';
+    } else {
+      msg = '<strong>Couldn’t start the camera.</strong> Reload to try again. Your timer is still running.';
+    }
+    document.getElementById('webcam-row').classList.add('hidden');
+    const errEl = document.getElementById('webcam-error');
+    errEl.querySelector('span').innerHTML = msg;
+    errEl.classList.remove('hidden');
+    // Make the live badge honest: detection isn't running, so don't sit on "Analyzing…".
+    const badge = document.getElementById('state-badge');
+    badge.className = 'badge badge-neutral state-badge-lg';
+    badge.textContent = 'Camera off';
+    if (window.showToast) showToast('Focus detection is off — ' + (name === 'NotFoundError' ? 'no camera found.' : 'camera unavailable.'), { danger: true });
   }
 
   const pauseBtn = document.getElementById('pause-btn');
@@ -539,6 +576,7 @@
       pauseDetection();
       document.getElementById('pause-ico').innerHTML = ICON_PLAY;
       document.getElementById('pause-lbl').textContent = 'Resume';
+      document.getElementById('paused-chip').classList.remove('hidden');
       pauseBtn.className = 'btn-primary flex-1';
       pauseBtn.style.minHeight = '48px';
     } else {
@@ -550,6 +588,7 @@
       if (!onBreak) resumeDetection();   // stay paused if we're mid Pomodoro break
       document.getElementById('pause-ico').innerHTML = ICON_PAUSE;
       document.getElementById('pause-lbl').textContent = 'Pause';
+      document.getElementById('paused-chip').classList.add('hidden');
       pauseBtn.className = 'btn-ghost flex-1';
       pauseBtn.style.minHeight = '48px';
     }
