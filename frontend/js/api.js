@@ -266,12 +266,17 @@ async function analyzeFocus(frameBase64, taskName, description = '', activity = 
     }),
   }));
   if (!r.ok) {
+    // Keep the pieces on the Error so the tracker can show a specific reason
+    // (quota, bad key, overloaded, …) instead of parsing a string.
     let detail = '';
     try {
       const body = await r.json();
-      detail = body && body.detail ? `: ${body.detail}` : '';
+      detail = (body && body.detail) || '';
     } catch {}
-    throw new Error(`analyzeFocus failed: ${r.status}${detail}`);
+    const err = new Error(detail || `Focus analysis failed (${r.status})`);
+    err.status = r.status;
+    err.detail = detail;
+    throw err;
   }
   return r.json();
 }

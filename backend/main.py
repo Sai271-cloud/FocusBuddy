@@ -12,8 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+import httpx
 from google import genai
 from google.genai import types
+from google.genai import errors as genai_errors
 
 from .database import get_db, init_db
 from . import crud, models, schemas
@@ -56,6 +58,28 @@ def _gemini_text(response, context: str) -> str:
     except Exception:
         logger.warning("%s returned no text", context, exc_info=True)
         return ""
+
+
+def _gemini_error(exc) -> tuple[int, str]:
+    """Turn a Gemini/network exception into (http_status, short honest message)
+    the tracker can show the user. Never leaks raw internals — just enough to know
+    what's wrong (quota, key, model, overloaded, timeout, network)."""
+    if isinstance(exc, genai_errors.APIError):
+        code = getattr(exc, "code", None)
+        if code == 429:
+            return 429, "Gemini is out of quota or rate-limited right now — focus detection will resume once it resets."
+        if code in (401, 403):
+            return 401, "The Gemini API key looks invalid or expired — check the key on the backend."
+        if code == 404:
+            return 404, "The configured Gemini model wasn't found — check GEMINI_MODEL on the backend."
+        if code and 500 <= code < 600:
+            return 503, "Gemini is temporarily overloaded — focus detection will keep retrying."
+        return 502, "Gemini rejected the request — focus detection is paused for now."
+    if isinstance(exc, httpx.TimeoutException):
+        return 504, "Gemini took too long to respond — focus detection will keep retrying."
+    if isinstance(exc, httpx.RequestError):
+        return 503, "Couldn't reach Gemini (network issue) — focus detection will keep retrying."
+    return 502, "Focus analysis is temporarily unavailable."
 
 
 # Latest active-tab URL reported by the browser extension. Kept IN MEMORY only
@@ -1434,7 +1458,10 @@ def analyze_focus(
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
     if _client is None:
-        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set in .env")
+        raise HTTPException(
+            status_code=503,
+            detail="AI focus detection isn't configured — the Gemini API key is missing on the backend.",
+        )
 
     if len(request.frame_base64) > MAX_FRAME_BASE64_CHARS:
         raise HTTPException(status_code=413, detail="Frame data is too large")
@@ -1506,9 +1533,10 @@ Reply with ONLY valid JSON, no markdown: {json_shape}"""
         )
         state, note, reason = _parse_focus(_gemini_text(response, "Focus analysis"))
         return schemas.FocusAnalyzeResponse(state=state, note=note, reason=reason if request.explain else "")
-    except Exception:
+    except Exception as exc:
         logger.exception("Gemini call failed")
-        raise HTTPException(status_code=502, detail="Focus analysis is temporarily unavailable")
+        status, msg = _gemini_error(exc)
+        raise HTTPException(status_code=status, detail=msg)
 
 
 # --- Pattern Memory: AI-learned focus observations --------------------------

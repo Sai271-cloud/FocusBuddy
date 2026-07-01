@@ -56,7 +56,9 @@
         <h2 id="replay-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0">Session replay</h2>
         <p id="replay-subtitle" class="text-xs" style="color:var(--text-faint);margin:3px 0 0"></p>
       </div>
-      <button id="replay-close" aria-label="Close replay" class="btn-ghost" style="padding:2px 9px;border:none;font-size:1rem;color:var(--text-muted)">x</button>
+      <button id="replay-close" aria-label="Close replay" class="btn-ghost" style="padding:2px 9px;border:none;font-size:1rem;color:var(--text-muted)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
     </div>
     <div id="replay-body" style="margin-top:12px"></div>
   </div>
@@ -411,15 +413,30 @@
     else                { sessions = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey); periodKey = weekKey; }
     const sum = sumStates(sessions);
     const existing = findPeriod(kind, periodKey);
-    const planReality = kind === 'day' ? await loadPlanReality(periodKey, existing) : null;
     let aiRecap = null;
     if (existing && existing.ai_recap) { try { aiRecap = JSON.parse(existing.ai_recap); } catch (e) { aiRecap = null; } }
-    unwind = { kind, step: 0, reflection: existing && existing.reflection ? existing.reflection : '', snapshot: { sessions, periodKey, sum, planReality }, finished: false, aiRecap, aiState: 'idle' };
+    // Open the modal immediately with planReality unresolved — the overview step doesn't
+    // need it, and fetching it before opening made "End day" feel dead on a slow backend.
+    unwind = { kind, step: 0, reflection: existing && existing.reflection ? existing.reflection : '', snapshot: { sessions, periodKey, sum, planReality: null }, finished: false, aiRecap, aiState: 'idle' };
+    const myUnwind = unwind;
 
     document.getElementById('unwind-overlay').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     renderUnwindStep();
     document.getElementById('unwind-next').focus();
+
+    // Fetch plan-vs-reality in the background (day only), then fill it in.
+    if (kind === 'day') {
+      const planReality = await loadPlanReality(periodKey, existing);
+      // Ignore if the modal was closed and reopened (a newer unwind superseded this one).
+      if (unwind !== myUnwind) return;
+      myUnwind.snapshot.planReality = planReality;
+      // If the user already reached the AI step, refresh it so the card shows up.
+      if (document.getElementById('unwind-overlay').style.display === 'flex'
+          && unwindStepKeys(myUnwind.kind)[myUnwind.step] === 'ai') {
+        renderUnwindStep();
+      }
+    }
   }
 
   function closeUnwind() {
@@ -922,6 +939,7 @@
   const replayOverlay = document.getElementById('replay-overlay');
   function closeReplay() {
     replayOverlay.style.display = 'none';
+    document.body.style.overflow = '';
   }
   function openReplay(session) {
     document.getElementById('replay-title').textContent = 'Session replay';
@@ -936,6 +954,7 @@
       ? FocusSessionReplay.render(session)
       : '<p class="text-sm" style="color:var(--text-muted)">Replay is unavailable right now.</p>';
     replayOverlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
     document.getElementById('replay-close').focus();
   }
   document.getElementById('replay-close').addEventListener('click', closeReplay);

@@ -99,8 +99,10 @@
     document.body.appendChild(overlay);
 
     var ta = overlay.querySelector('#about-text');
+    var initialAbout = '';        // the loaded value, so we can warn before discarding edits
+    var confirming = false;       // a discard-confirm is open (avoid stacking a second one)
     if (window.getProfile) {
-      window.getProfile().then(function (p) { ta.value = (p && p.about) || ''; }).catch(function () {
+      window.getProfile().then(function (p) { ta.value = (p && p.about) || ''; initialAbout = ta.value; }).catch(function () {
         // Don't silently show a blank box that could be saved over the real value.
         if (window.showToast) showToast('Couldn’t load your About-me — check the backend before saving.', { danger: true });
       });
@@ -155,10 +157,18 @@
     renderHourly();
 
     function closeModal() { overlay.remove(); document.removeEventListener('keydown', onKey); }
-    function onKey(e) { if (e.key === 'Escape') closeModal(); }
+    // Warn before losing typed-but-unsaved edits (Cancel / backdrop / Escape).
+    function requestClose() {
+      if (confirming) return;
+      if (ta.value.trim() === initialAbout.trim() || !window.confirmDialog) { closeModal(); return; }
+      confirming = true;
+      window.confirmDialog('Discard your unsaved changes?', { danger: true, confirmText: 'Discard' })
+        .then(function (ok) { confirming = false; if (ok) closeModal(); });
+    }
+    function onKey(e) { if (e.key === 'Escape') requestClose(); }
 
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) return closeModal();   // backdrop
+      if (e.target === overlay) return requestClose();   // backdrop
       var act = e.target.closest('[data-act]');
       if (!act) return;
       if (act.dataset.act === 'del' && window.deleteObservation) {
@@ -173,7 +183,7 @@
             if (window.showToast) showToast('Couldn’t save your About-me — is the backend running?', { danger: true });
           });
       } else if (act.dataset.act === 'cancel') {
-        closeModal();
+        requestClose();
       }
     });
     document.addEventListener('keydown', onKey);

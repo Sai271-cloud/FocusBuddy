@@ -198,7 +198,10 @@
 <script>
   const params = new URLSearchParams(location.search);
   const taskId = Number.parseInt(params.get('taskId'), 10);
-  if (!Number.isInteger(taskId) || taskId <= 0) {
+  const validTaskId = Number.isInteger(taskId) && taskId > 0;
+  if (!validTaskId) {
+    // Bad/missing taskId: bounce back to Today and don't run the rest of the startup
+    // code (init() is gated at the bottom) so we never fetch against a NaN id.
     location.href = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html';
   }
 
@@ -228,6 +231,8 @@
   let pauseStartedAt = null;
   let driftMs = 0;
   let driftNotified = false;
+  let aiEverLive = false;     // has any focus sample ever succeeded? (drives the "AI unavailable" badge)
+  let lastAiErrorKey = null;  // last error category we surfaced (avoid re-toasting every sample)
   // Pomodoro (opt-in cyclic timer)
   let pomoEnabled = false;
   let pomoFocusSec = 25 * 60;
@@ -356,11 +361,53 @@
     }
   }
 
-  function setStatus(ok) {
+  // Turn a failed focus-sample error into a short pill label + a full message.
+  // `key` is a stable category so we only toast once per kind of problem.
+  function aiErrorInfo(err) {
+    // No .status means fetch never reached the backend (it rejected before a response).
+    if (!err || err.status === undefined) {
+      return {
+        key: 'backend',
+        short: 'Backend offline',
+        message: 'Can’t reach the backend — is it running? Your timer is still going.',
+      };
+    }
+    const shorts = { 429: 'Rate-limited', 401: 'Key problem', 403: 'Key problem',
+                     404: 'Model problem', 503: 'AI overloaded', 504: 'AI slow' };
+    return {
+      key: 'http-' + err.status,
+      short: shorts[err.status] || 'AI unavailable',
+      message: err.detail || err.message || 'Focus detection is temporarily unavailable.',
+    };
+  }
+
+  function setStatus(ok, err) {
     const dot = document.getElementById('status-dot');
     const txt = document.getElementById('status-text');
-    if (ok) { dot.style.background = ''; txt.textContent = 'Live'; }
-    else { dot.style.background = 'var(--ochre)'; txt.textContent = 'Reconnecting…'; }
+    if (ok) {
+      aiEverLive = true;
+      dot.style.background = '';
+      txt.textContent = 'Live';
+      if (lastAiErrorKey) {
+        lastAiErrorKey = null;
+        if (window.showToast) showToast('Focus detection reconnected.');
+      }
+      return;
+    }
+    const info = aiErrorInfo(err);
+    dot.style.background = 'var(--ochre)';
+    txt.textContent = info.short;
+    // Don't sit on "Analyzing…" forever: if a real state never arrived, make the badge honest.
+    if (!aiEverLive) {
+      const badge = document.getElementById('state-badge');
+      badge.className = 'badge badge-neutral state-badge-lg';
+      badge.textContent = 'AI unavailable';
+    }
+    // Explain the specific reason once per category (samples run every ~10s — don't spam).
+    if (info.key !== lastAiErrorKey) {
+      lastAiErrorKey = info.key;
+      if (window.showToast) showToast(info.message, { danger: true });
+    }
   }
 
   // Shows what's being sent to the AI (transparency) when Website awareness is on.
@@ -831,7 +878,7 @@
     }
   });
 
-  init();
+  if (validTaskId) init();
 </script>
 </body>
 </html>

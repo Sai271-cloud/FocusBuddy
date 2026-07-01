@@ -101,9 +101,9 @@ async function _sampleFrame() {
       _onStateChange(result.state, result.note, result.reason);
     }
   } catch (err) {
-    // AI call failed — flag it, but keep the last known state (don't reset).
+    // AI call failed — flag it (with the reason), but keep the last known state (don't reset).
     console.warn('focus-detector: frame sample failed', err);
-    if (_onStatus) _onStatus(false);
+    if (_onStatus) _onStatus(false, err);
   } finally {
     _sampling = false;
   }
