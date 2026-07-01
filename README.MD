@@ -1,7 +1,5 @@
 # Focus Buddy
 
-An AI coach that helps students actually track their productivity.
-
 ## Inspiration
 
 I struggle with ADHD, and it's something I have had to face my entire life. I would switch between different productivity tools, plan out my entire day, and still end up not doing my work.
@@ -16,7 +14,7 @@ That inspired me to build Focus Buddy: an AI coach that helps students actually 
 
 Focus Buddy is a productivity tool that helps students start focus sessions and understand how focused they were during that time.
 
-During a session, Focus Buddy classifies the user's time into four states: **focused**, **distracted**, **uncertain**, and **away**. It does this by using webcam frames together with the task the user is working on. For example, if the task is "read a biology chapter," the AI uses both the webcam frame and the task name/description to decide whether the user appears to be on task.
+During a session, Focus Buddy classifies the user's time into four states: focused, distracted, uncertain, and away. It does this by using webcam frames together with the task the user is working on. For example, if the task is "read a biology chapter," the AI uses both the webcam frame and the task name/description to decide whether the user appears to be on task.
 
 I also built a browser extension that can optionally give Focus Buddy more context from the active tab. For example, if the task is "write an essay," the extension can share the active website title and URL. This helps the AI make a more accurate prediction because it can compare what the user said they wanted to do with what they are actually doing.
 
@@ -30,17 +28,17 @@ For example, this is a debrief I recorded while writing the project story:
 
 > You built a solid foundation here by staying locked into your writing for most of the session, even with a few interruptions.
 >
-> **Win:** At the 8-minute mark, you successfully navigated away from YouTube and back to Devpost, showing you can steer your attention back when it drifts.
+> Win: At the 8-minute mark, you successfully navigated away from YouTube and back to Devpost, showing you can steer your attention back when it drifts.
 >
-> **What happened**
+> What happened
 >
 > Your focus was quite resilient, though your attention tended to wander toward YouTube when you were midway through your writing.
 >
-> **Try next time**
+> Try next time
 >
 > Since your browser tabs are currently a bit of a pull, you could use a site blocker for the specific duration of your writing session to keep those distractions out of sight.
 >
-> **Your one next step:** When you feel the urge to open a new site while writing, commit to writing just one more sentence before switching tabs.
+> Your one next step: When you feel the urge to open a new site while writing, commit to writing just one more sentence before switching tabs.
 
 The daily unwind uses information from all the sessions recorded that day to give a general overview of what happened. During each session, the model records important changes in the user's state. For example, if a user shifts from working on an essay to watching YouTube, the model can note that change. These state changes are then used as context for the daily unwind.
 
@@ -72,15 +70,6 @@ I also used Gemini for the debrief and unwind features. After a session, Focus B
 
 For the hosted demo, I deployed the app with Vercel and connected it to Neon Postgres so judges can open the project directly in their browser. For the demo, I listed 5 URLs, each with its own seeded data, so that the judges can experiment with the daily and weekly unwinds.
 
-### Tech Stack
-
-- **Frontend:** HTML, CSS, JavaScript, Tailwind CSS
-- **Backend:** FastAPI (Python), SQLAlchemy
-- **Database:** SQLite (local), Neon Postgres (hosted)
-- **AI:** Gemini API
-- **Computer Vision:** MediaPipe
-- **Deployment:** Vercel + Neon Postgres
-
 ## Challenges we ran into
 
 One of the biggest challenges that I faced was the AI feedback. At first, the AI feedback was extremely generic, with advice that sounded helpful but wasn't specific to the user. I had to continuously iterate the prompts and provide more context so that the AI could provide good advice. I also forced the AI to follow a consistent template so that it gave more structured feedback with the prompts.
@@ -100,6 +89,8 @@ I learned many things from this project. This was the first project I officially
 On the technical side, I learned how to connect a frontend, backend, and database into one fully working product. I also learned a lot about FastAPI, which I was a complete beginner with before starting this project.
 
 ## What's next for Focus Buddy
+
+There are a couple more features I would like to implement for Focus Buddy:
 
 - Building a posture coach alongside a focus coach that helps users correct their posture.
 - In this app, I only used the free model of Gemini for the AI features. Later, I want to test out other models and compare their performances in order to provide the best insight possible.
