@@ -1,5 +1,3 @@
-// Shared planner insight helpers for Today, Tracker, Plan, and Analytics.
-// These are deterministic browser-side helpers; they do not call the AI.
 (function () {
   const GOAL_KEY = 'fb-daily-focus-goal';
   const DEFAULT_GOAL_MIN = 60;

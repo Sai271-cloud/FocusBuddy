@@ -48,7 +48,7 @@
   </div>
 </main>
 
-<!-- Session replay modal -->
+
 <div id="replay-overlay" class="modal-overlay" style="display:none">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="replay-title" style="max-width:620px">
     <div class="flex items-start justify-between gap-3 mb-1">
@@ -64,7 +64,7 @@
   </div>
 </div>
 
-<!-- Unwind ritual modal -->
+
 <div id="unwind-overlay" class="modal-overlay" style="display:none">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="unwind-title">
     <div class="flex items-start justify-between gap-3 mb-1">
@@ -99,7 +99,6 @@
     uncertain: '#b08a38', away: '#8a7a6c',
   };
 
-  /* ---------- formatting helpers ---------- */
   function formatSeconds(s) {
     const m = Math.floor(s / 60), sec = Math.floor(s % 60);
     return `${m}m ${sec}s`;
@@ -118,11 +117,8 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 
-  // Doughnut used by the Daily Unwind ritual (step 1).
   function buildChart(session) {
     const ctx   = document.getElementById(`chart-${session.id}`).getContext('2d');
-    // Destroy any prior chart on this canvas so re-rendering doesn't throw
-    // "Canvas is already in use".
     const existing = Chart.getChart(ctx.canvas);
     if (existing) existing.destroy();
     const total = session.seconds_focused + session.seconds_distracted +
@@ -150,7 +146,6 @@
     });
   }
 
-  /* ---------- date / aggregation helpers (local time) ---------- */
   let allSessions = [];
   let workPeriods = [];
 
@@ -167,7 +162,7 @@
   function parseDayKey(key) { const [y, m, dd] = key.split('-').map(Number); return new Date(y, m - 1, dd); }
   function mondayOf(d) {
     const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const dow = (date.getDay() + 6) % 7;   // Mon=0 … Sun=6
+    const dow = (date.getDay() + 6) % 7;
     date.setDate(date.getDate() - dow);
     return date;
   }
@@ -225,7 +220,6 @@
     }).join('')}</div>`;
   }
 
-  /* ---------- dashboard renderers ---------- */
   function personalBest() {
     const byDay = {};
     allSessions.forEach(s => {
@@ -316,7 +310,6 @@
     if (!disabled) document.getElementById('end-week-btn').addEventListener('click', () => openUnwind('week'));
   }
 
-  // One compact line per session: time · focus bar · focus% · duration.
   function compactRow(session, isFirst) {
     const total = session.seconds_focused + session.seconds_distracted +
                   session.seconds_uncertain + session.seconds_away;
@@ -374,7 +367,7 @@
       group.style.padding = '0';
 
       const btn = document.createElement('button');
-      btn.className = 'completed-header collapsed';   // all days collapsed by default
+      btn.className = 'completed-header collapsed';
       btn.style.cssText = 'width:100%;justify-content:flex-start;padding:0.9rem 1.25rem;font-size:0.85rem;color:var(--text)';
       btn.setAttribute('aria-expanded', 'false');
       btn.innerHTML = `<span class="chev" style="display:inline-flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 9l6 6 6-6"/></svg></span> <span>${label}</span>`;
@@ -402,7 +395,6 @@
     renderHistory();
   }
 
-  /* ---------- Unwind ritual (unchanged) ---------- */
   let unwind = { kind: null, step: 0, reflection: '', snapshot: null, finished: false };
 
   async function openUnwind(kind) {
@@ -415,8 +407,6 @@
     const existing = findPeriod(kind, periodKey);
     let aiRecap = null;
     if (existing && existing.ai_recap) { try { aiRecap = JSON.parse(existing.ai_recap); } catch (e) { aiRecap = null; } }
-    // Open the modal immediately with planReality unresolved — the overview step doesn't
-    // need it, and fetching it before opening made "End day" feel dead on a slow backend.
     unwind = { kind, step: 0, reflection: existing && existing.reflection ? existing.reflection : '', snapshot: { sessions, periodKey, sum, planReality: null }, finished: false, aiRecap, aiState: 'idle' };
     const myUnwind = unwind;
 
@@ -425,13 +415,10 @@
     renderUnwindStep();
     document.getElementById('unwind-next').focus();
 
-    // Fetch plan-vs-reality in the background (day only), then fill it in.
     if (kind === 'day') {
       const planReality = await loadPlanReality(periodKey, existing);
-      // Ignore if the modal was closed and reopened (a newer unwind superseded this one).
       if (unwind !== myUnwind) return;
       myUnwind.snapshot.planReality = planReality;
-      // If the user already reached the AI step, refresh it so the card shows up.
       if (document.getElementById('unwind-overlay').style.display === 'flex'
           && unwindStepKeys(myUnwind.kind)[myUnwind.step] === 'ai') {
         renderUnwindStep();
@@ -440,7 +427,7 @@
   }
 
   function closeUnwind() {
-    syncReflection();   // keep typed reflection in memory when closing via ✕/Escape/overlay, like Next/Back
+    syncReflection();
     document.getElementById('unwind-overlay').style.display = 'none';
     document.body.style.overflow = '';
     closePomoSuggest();
@@ -466,7 +453,6 @@
     }
   }
 
-  // Daily unwind has an extra AI step; weekly is unchanged (3 steps).
   function unwindStepKeys(kind) {
     return kind === 'day' ? ['overview', 'tasks', 'ai', 'reflect'] : ['overview', 'weekbreak', 'ai', 'reflect'];
   }
@@ -476,7 +462,6 @@
     return (s.focused || 0) + (s.distracted || 0) + (s.uncertain || 0) + (s.away || 0);
   }
 
-  // Average focus % over the last ~14 days, excluding today — the AI's "recent" baseline.
   function recentAvgFocusPct(excludeKey) {
     const cutoff = currentDate(); cutoff.setDate(cutoff.getDate() - 14);
     const byDay = {};
@@ -510,8 +495,6 @@
       ${shutdown}`;
   }
 
-  // Exact, app-computed stats for the day — shown with the advice so the AI step is
-  // self-contained. Numbers come from the data, not the model.
   function aiStatsHtml() {
     const sum = unwind.snapshot.sum;
     return `<div style="padding:12px;background:var(--surface-2);border-radius:10px;margin-bottom:14px">
@@ -603,7 +586,6 @@
     if (op) op.addEventListener('click', () => { if (unwind.aiRecap && unwind.aiRecap.pomodoro) openPomoSuggest(unwind.aiRecap.pomodoro); });
   }
 
-  // ----- Weekly AI step -----
   function buildWeekDays() {
     const monday = mondayOf(currentDate());
     const out = [];
@@ -690,16 +672,14 @@
           ai_recap: JSON.stringify(unwind.aiRecap),
         });
         workPeriods = await getWorkPeriods();
-      } catch (e) { /* save failed but still show recap */ }
+      } catch (e) {  }
       renderUnwindStep();
-      // AI-gated: open the Pomodoro popup beside the unwind only when recommended.
       if (unwind.aiRecap.pomodoro && unwind.aiRecap.pomodoro.recommend) openPomoSuggest(unwind.aiRecap.pomodoro);
     } catch (e) {
       unwind.aiState = 'error'; renderUnwindStep();
     }
   }
 
-  // ----- Pomodoro recommendation popup (sits beside the unwind modal) -----
   function pomoEsc(e) { if (e.key === 'Escape') closePomoSuggest(); }
   function closePomoSuggest() {
     const el = document.getElementById('pomo-suggest');
@@ -774,7 +754,6 @@
         advice: r.advice || [], next_action: r.next_action || '', shutdown_question: r.shutdown_question || '',
       };
       unwind.aiState = 'done';
-      // Save with the day (reflection omitted → backend preserves it).
       const sum = unwind.snapshot.sum;
       try {
         await createWorkPeriod({
@@ -785,7 +764,7 @@
           plan_reality_json: unwind.snapshot.planReality && unwind.snapshot.planReality.has_plan ? JSON.stringify(unwind.snapshot.planReality) : null,
         });
         workPeriods = await getWorkPeriods();
-      } catch (e) { /* save failed but still show the recap */ }
+      } catch (e) {  }
     } catch (e) {
       unwind.aiState = 'error';
     }
@@ -935,7 +914,6 @@
   document.getElementById('unwind-overlay').addEventListener('click', e => { if (e.target.id === 'unwind-overlay') closeUnwind(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('unwind-overlay').style.display === 'flex') closeUnwind(); });
 
-  /* ---------- session replay ---------- */
   const replayOverlay = document.getElementById('replay-overlay');
   function closeReplay() {
     replayOverlay.style.display = 'none';
@@ -961,7 +939,6 @@
   replayOverlay.addEventListener('click', e => { if (e.target.id === 'replay-overlay') closeReplay(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && replayOverlay.style.display === 'flex') closeReplay(); });
 
-  /* ---------- boot ---------- */
   async function loadAll() {
     const main = document.getElementById('analytics-main');
     try {
@@ -979,7 +956,6 @@
     renderAll();
   }
 
-  // Delete a session from any history row (delegated; #history-list persists across re-renders).
   document.getElementById('history-list').addEventListener('click', async (e) => {
     const replay = e.target.closest('[data-replay-session]');
     if (replay) {

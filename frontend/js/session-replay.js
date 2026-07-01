@@ -80,12 +80,7 @@
     }
 
     events.sort((a, b) => a.t - b.t);
-    // No synthetic 'uncertain' when there were zero recorded state events — that would
-    // misrepresent a session with saved totals but no per-state timeline. The caller falls
-    // back to an aggregate-only view instead.
     if (!events.length) return [];
-    // Extend the first real state back to t=0 (the pre-first-event gap is unknown; assume the
-    // first known state held) rather than defaulting that gap to 'uncertain'.
     if (events[0].t > 0) events.unshift({ t: 0, state: events[0].state });
 
     const compact = [];
@@ -98,8 +93,6 @@
   }
 
   function aggregateSegments(session) {
-    // No per-state timeline was recorded — build a proportional bar from the saved per-state
-    // second counters, so we show the real focused/distracted split instead of one fake block.
     const order = ['focused', 'distracted', 'uncertain', 'away'];
     let cursor = 0;
     const segs = [];
@@ -129,8 +122,6 @@
         }
       }
     } else {
-      // No recorded state events: fall back to an honest aggregate-only bar (or, if even the
-      // counters are zero, an empty timeline rendered by renderTimeline).
       segments = aggregateSegments(session);
       aggregateOnly = segments.length > 0;
     }
@@ -156,8 +147,6 @@
         aria-label="${esc(LABELS[seg.state])} for ${esc(formatDuration(seg.duration))}">
       </div>`).join('');
 
-    // With a real timeline the legend marks when each state began. In the aggregate-only
-    // fallback the start times aren't real clock moments, so show each state's total instead.
     const legend = aggregateOnly
       ? segments.map(seg => `
         <span style="display:inline-flex;align-items:center;gap:5px;color:var(--text-muted);font-size:0.72rem">

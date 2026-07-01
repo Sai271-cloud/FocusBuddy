@@ -2,7 +2,6 @@ from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, Foreig
 from sqlalchemy.sql import func
 from .database import Base
 
-
 class DemoWorkspace(Base):
     __tablename__ = "demo_workspaces"
 
@@ -15,7 +14,6 @@ class DemoWorkspace(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
-
 class Task(Base):
     __tablename__ = "tasks"
 
@@ -26,7 +24,6 @@ class Task(Base):
     completed = Column(Boolean, default=False, nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
 
 class FocusSession(Base):
     __tablename__ = "focus_sessions"
@@ -47,7 +44,6 @@ class FocusSession(Base):
     journal_json = Column(String, default="[]")
     intention = Column(String, nullable=True, default="")
 
-
 class WorkPeriod(Base):
     """A finalized ("unwound") day or week — a snapshot of focus totals plus an
     optional reflection. Identified by (kind, period_key); one row per period."""
@@ -56,8 +52,8 @@ class WorkPeriod(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     workspace_id = Column(Integer, ForeignKey("demo_workspaces.id"), nullable=False, default=1, index=True)
-    kind = Column(String, nullable=False)        # "day" | "week"
-    period_key = Column(String, nullable=False)  # day: local YYYY-MM-DD; week: that week's Monday
+    kind = Column(String, nullable=False)
+    period_key = Column(String, nullable=False)
     ended_at = Column(DateTime(timezone=True), nullable=False)
 
     seconds_focused = Column(Integer, default=0)
@@ -66,9 +62,8 @@ class WorkPeriod(Base):
     seconds_away = Column(Integer, default=0)
 
     reflection = Column(String, nullable=True, default="")
-    ai_recap = Column(String, nullable=True, default="")  # saved AI daily/weekly recap JSON/text
-    plan_reality_json = Column(String, nullable=True, default="")  # saved deterministic plan-vs-reality report
-
+    ai_recap = Column(String, nullable=True, default="")
+    plan_reality_json = Column(String, nullable=True, default="")
 
 class UserProfile(Base):
     """Single-row "About me" — free-text context the user gives the AI about their
@@ -78,7 +73,6 @@ class UserProfile(Base):
     id = Column(Integer, primary_key=True)
     workspace_id = Column(Integer, ForeignKey("demo_workspaces.id"), nullable=False, default=1, unique=True, index=True)
     about = Column(String, nullable=False, default="")
-
 
 class Observation(Base):
     """One AI-learned focus pattern about the user (the "Pattern Memory"). Unlike
@@ -97,7 +91,6 @@ class Observation(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
-
 class HourlyFocus(Base):
     """A 24-row "focus by hour" profile (one row per local clock hour 0-23). Each
     row keeps a running average focus % across every session that touched that hour,
@@ -106,10 +99,9 @@ class HourlyFocus(Base):
     __tablename__ = "hourly_focus"
 
     workspace_id = Column(Integer, ForeignKey("demo_workspaces.id"), primary_key=True, default=1)
-    hour = Column(Integer, primary_key=True)          # 0-23 (local)
-    focus_pct = Column(Float, default=0.0, nullable=False)   # running average, 0-100
-    sessions = Column(Integer, default=0, nullable=False)    # sessions that touched this hour
-
+    hour = Column(Integer, primary_key=True)
+    focus_pct = Column(Float, default=0.0, nullable=False)
+    sessions = Column(Integer, default=0, nullable=False)
 
 class DailyPlan(Base):
     """One day's optional plan: the tasks the user chose for a local day, each with an
@@ -122,9 +114,9 @@ class DailyPlan(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     workspace_id = Column(Integer, ForeignKey("demo_workspaces.id"), nullable=False, default=1, index=True)
-    period_key = Column(String, nullable=False)                # local YYYY-MM-DD (frontend-computed)
-    available_min = Column(Integer, default=0, nullable=False)  # "time available today", minutes
-    plan_json = Column(String, default="[]")                   # [{task_id, name, estimate_min, difficulty}]
-    advice_json = Column(String, nullable=True, default=None)  # saved AI advice JSON; null until generated
+    period_key = Column(String, nullable=False)
+    available_min = Column(Integer, default=0, nullable=False)
+    plan_json = Column(String, default="[]")
+    advice_json = Column(String, nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())

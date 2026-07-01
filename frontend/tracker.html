@@ -46,7 +46,7 @@
 <main class="app-main app-main-wide tracker-main max-w-4xl mx-auto px-6 py-8">
   <div class="tracker-grid grid gap-5 md:grid-cols-[1.5fr_1fr] items-start">
 
-    <!-- LEFT — focal panel -->
+    
     <div class="tracker-workflow flex flex-col gap-5">
 
       <div class="card tracker-hero" style="background:var(--hero-bg);border-color:transparent;box-shadow:var(--shadow-lg);position:relative;overflow:hidden">
@@ -65,7 +65,7 @@
             <span class="switch"><input type="checkbox" id="pomo-toggle" /><span class="slider"></span></span>
           </label>
 
-          <!-- Pomodoro config + live phase (shown when Pomodoro is on) -->
+          
           <div id="pomo-row" class="hidden" style="margin-top:10px">
             <div class="flex items-center gap-3" style="flex-wrap:wrap;color:var(--hero-label);font-size:0.8rem">
               <label class="flex items-center gap-1.5">Focus
@@ -109,7 +109,7 @@
         <a href="index.html" class="btn-primary">Back to Today</a>
       </div>
 
-      <!-- Dev: AI reasoning for the latest sample (shown when "Show AI reasoning" is on) -->
+      
       <div id="ai-reason" class="card hidden">
         <p class="section-label" style="margin-bottom:6px">AI reasoning <span style="color:var(--text-faint);font-weight:400">· dev</span></p>
         <p id="ai-reason-text" class="text-xs" style="color:var(--text-muted);line-height:1.55">Waiting for the next analysis…</p>
@@ -118,7 +118,7 @@
 
     </div>
 
-    <!-- RIGHT — webcam + breakdown rail -->
+    
     <div class="card tracker-rail flex flex-col gap-4">
       <div>
         <p class="section-label" style="margin-bottom:8px">Camera</p>
@@ -163,7 +163,7 @@
   </div>
 </main>
 
-<!-- Styled "end session" confirm -->
+
 <div id="confirm-overlay" class="modal-overlay" style="display:none">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" style="max-width:380px">
     <h2 id="confirm-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0 0 6px">End this session?</h2>
@@ -175,7 +175,7 @@
   </div>
 </div>
 
-<!-- AI debrief (shown after Stop & Save) -->
+
 <div id="debrief-overlay" class="modal-overlay" style="display:none">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="debrief-title" style="max-width:480px">
     <h2 id="debrief-title" class="serif" style="font-size:1.2rem;font-weight:600;margin:0 0 12px">Session debrief</h2>
@@ -200,8 +200,6 @@
   const taskId = Number.parseInt(params.get('taskId'), 10);
   const validTaskId = Number.isInteger(taskId) && taskId > 0;
   if (!validTaskId) {
-    // Bad/missing taskId: bounce back to Today and don't run the rest of the startup
-    // code (init() is gated at the bottom) so we never fetch against a NaN id.
     location.href = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html';
   }
 
@@ -216,31 +214,30 @@
   let elapsedSeconds = 0;
   let timerInterval = null;
   let autosaveInterval = null;
-  let trackingHeartbeat = null;   // keeps the extension's "is tracking?" gate fresh
+  let trackingHeartbeat = null;
   let pendingSave = Promise.resolve();
   let lastSavedPayload = null;
-  let autosaveErrorShown = false;   // so a mid-session save outage warns once, not every 5s
+  let autosaveErrorShown = false;
   let isPaused = false;
   let timeline = [];
-  let journal = [];          // timestamped events: state changes, site switches, activity notes
-  let lastSite = null;       // last logged domain (dedupe site switches)
-  let lastNote = null;       // last logged activity note (dedupe notes)
+  let journal = [];
+  let lastSite = null;
+  let lastNote = null;
   let lastRecordedMinute = -1;
   let lastTickMs = null;
   let pausedMs = 0;
   let pauseStartedAt = null;
   let driftMs = 0;
   let driftNotified = false;
-  let aiEverLive = false;     // has any focus sample ever succeeded? (drives the "AI unavailable" badge)
-  let lastAiErrorKey = null;  // last error category we surfaced (avoid re-toasting every sample)
-  // Pomodoro (opt-in cyclic timer)
+  let aiEverLive = false;
+  let lastAiErrorKey = null;
   let pomoEnabled = false;
   let pomoFocusSec = 25 * 60;
   let pomoBreakSec = 5 * 60;
   let onBreak = false;
-  let phaseStartElapsed = 0;   // elapsedSeconds at the start of the current focus block
-  let breakEndsAt = 0;         // wall-clock ms when the current break ends
-  const NUDGE_AFTER_MS = 120000;   // nudge after ~2 min of continuous drift
+  let phaseStartElapsed = 0;
+  let breakEndsAt = 0;
+  const NUDGE_AFTER_MS = 120000;
 
   const COLORS = {
     focused: '#5e8a65', distracted: '#b35c3a',
@@ -256,9 +253,6 @@
   function websiteTrackingOn() {
     try { return localStorage.getItem('fb-website-tracking') === 'on'; } catch (e) { return false; }
   }
-  // The extension only reports its active-tab URL while this is true: a live session,
-  // not paused or on a Pomodoro break, and website awareness turned on. We push it to
-  // the backend (heartbeated) so the extension can check it before sending anything.
   function trackingGateOn() {
     return sessionId !== null && !isPaused && !onBreak && websiteTrackingOn();
   }
@@ -288,7 +282,6 @@
 
   function setState(state, note, reason) {
     if (!validStates.has(state)) state = 'uncertain';
-    // Journal: log the model's activity note (deduped) and any state change.
     if (note && note !== lastNote) {
       journal.push({ t: elapsedSeconds, type: 'note', note: String(note).slice(0, 120) });
       lastNote = note;
@@ -302,7 +295,6 @@
     badge.className = `badge badge-${state} state-badge-lg`;
     document.getElementById('state-accent').style.background = COLORS[state];
     document.getElementById('state-tint').style.background = COLORS[state];
-    // Dev: show the AI's reasoning for this sample (when "Show AI reasoning" is on).
     if (reason) {
       document.getElementById('ai-reason').classList.remove('hidden');
       const rt = document.getElementById('ai-reason-text');
@@ -318,7 +310,6 @@
     const deltaSec = (now - lastTickMs) / 1000;
     lastTickMs = now;
 
-    // Pomodoro break: freeze focus time, count down, don't accumulate or track.
     if (pomoEnabled && onBreak) {
       pausedMs += deltaSec * 1000;
       const remaining = Math.max(0, Math.round((breakEndsAt - now) / 1000));
@@ -330,7 +321,6 @@
 
     totals[currentState] += deltaSec;
 
-    // Gentle nudge — accumulate continuous Distracted/Away time, reset on return.
     if (currentState === 'distracted' || currentState === 'away') {
       driftMs += deltaSec * 1000;
       if (driftMs >= NUDGE_AFTER_MS && !driftNotified && localStorage.getItem('fb-nudges') !== 'off') {
@@ -353,7 +343,6 @@
     document.getElementById('timer').textContent = formatTimer(elapsedSeconds);
     updateLive();
 
-    // Pomodoro focus phase: when the work block is up, start a break.
     if (pomoEnabled && !onBreak) {
       const left = pomoFocusSec - (elapsedSeconds - phaseStartElapsed);
       if (left <= 0) startBreak();
@@ -361,10 +350,7 @@
     }
   }
 
-  // Turn a failed focus-sample error into a short pill label + a full message.
-  // `key` is a stable category so we only toast once per kind of problem.
   function aiErrorInfo(err) {
-    // No .status means fetch never reached the backend (it rejected before a response).
     if (!err || err.status === undefined) {
       return {
         key: 'backend',
@@ -397,30 +383,23 @@
     const info = aiErrorInfo(err);
     dot.style.background = 'var(--ochre)';
     txt.textContent = info.short;
-    // Don't sit on "Analyzing…" forever: if a real state never arrived, make the badge honest.
     if (!aiEverLive) {
       const badge = document.getElementById('state-badge');
       badge.className = 'badge badge-neutral state-badge-lg';
       badge.textContent = 'AI unavailable';
     }
-    // Explain the specific reason once per category (samples run every ~10s — don't spam).
     if (info.key !== lastAiErrorKey) {
       lastAiErrorKey = info.key;
       if (window.showToast) showToast(info.message, { danger: true });
     }
   }
 
-  // Shows what's being sent to the AI (transparency) when Website awareness is on.
-  // Called by the detector each sample with { url, title } (or null to hide).
-  // Prefers the page title — it's more readable than a raw URL — and shows the
-  // domain alongside so it's clear which site it is.
   function setActivity(activity) {
     const el = document.getElementById('site-caption');
     if (!el) return;
     if (activity && activity.url) {
       let domain = activity.url;
       try { domain = new URL(activity.url).hostname.replace(/^www\./, ''); } catch (e) {}
-      // Journal: log a tab/site switch (deduped by domain).
       if (domain && domain !== lastSite) {
         journal.push({ t: elapsedSeconds, type: 'site', site: domain, title: activity.title || '' });
         lastSite = domain;
@@ -435,13 +414,12 @@
   }
 
   function fireNudge() {
-    const msg = `Drifting from "${taskName}" — come back?`;   // showToast escapes internally
+    const msg = `Drifting from "${taskName}" — come back?`;
     if (window.showToast) showToast(msg);
     if (window.playChime) playChime();
     if (window.notifyUser) notifyUser('Focus Buddy', msg);
   }
 
-  // ---- Pomodoro cycle ----
   function formatMMSS(s) {
     const m = Math.floor(s / 60), sec = Math.floor(s % 60);
     return `${m}:${String(sec).padStart(2, '0')}`;
@@ -469,20 +447,20 @@
     if (window.playChime) playChime();
     if (window.notifyUser) notifyUser('Focus Buddy', msg);
     updatePomoPhase('break', pomoBreakSec);
-    syncTrackingGate();   // a break closes the extension's gate
+    syncTrackingGate();
   }
 
   function endBreak() {
     onBreak = false;
-    phaseStartElapsed = elapsedSeconds;   // next focus block measures from here
-    lastTickMs = Date.now();              // avoid a delta jump back into focus
+    phaseStartElapsed = elapsedSeconds;
+    lastTickMs = Date.now();
     resumeDetection();
     const msg = 'Break over — back to focus';
     if (window.showToast) showToast(msg, { icon: '🍅' });
     if (window.playChime) playChime();
     if (window.notifyUser) notifyUser('Focus Buddy', msg);
     updatePomoPhase('focus', pomoFocusSec);
-    syncTrackingGate();   // back to focus reopens the gate (if website awareness is on)
+    syncTrackingGate();
   }
 
   function sessionPayload() {
@@ -561,8 +539,6 @@
         enqueueSessionSave(false)
           .then(() => { autosaveErrorShown = false; })
           .catch(() => {
-            // Warn once if autosave starts failing (e.g. backend went down) so the
-            // user knows before they hit End & Save. The session keeps running.
             if (!autosaveErrorShown) {
               autosaveErrorShown = true;
               if (window.showToast) showToast('Couldn’t save progress — check the backend. Your session is still running.', { danger: true });
@@ -572,10 +548,6 @@
 
       await startDetection(videoEl, taskName, taskDescription, setState, setStatus, setActivity);
 
-      // Open the extension's reporting gate (if website awareness is on) and keep it
-      // fresh. Explicit events close it promptly; this heartbeat just keeps it alive
-      // (and is the crash backstop via the backend's ~90s TTL). 20s stays well under
-      // the TTL even if Chrome throttles this tab's timers in the background.
       syncTrackingGate();
       trackingHeartbeat = setInterval(syncTrackingGate, 20000);
     } catch (err) {
@@ -584,8 +556,6 @@
         showStartupError('Check that the backend is running and the task still exists.');
         return;
       }
-      // The session was created, so the failure is the camera/detector starting.
-      // Say specifically what went wrong and how to fix it — the timer keeps running.
       showCameraError(err);
     }
   }
@@ -606,7 +576,6 @@
     const errEl = document.getElementById('webcam-error');
     errEl.querySelector('span').innerHTML = msg;
     errEl.classList.remove('hidden');
-    // Make the live badge honest: detection isn't running, so don't sit on "Analyzing…".
     const badge = document.getElementById('state-badge');
     badge.className = 'badge badge-neutral state-badge-lg';
     badge.textContent = 'Camera off';
@@ -632,17 +601,16 @@
         pauseStartedAt = null;
       }
       lastTickMs = Date.now();
-      if (!onBreak) resumeDetection();   // stay paused if we're mid Pomodoro break
+      if (!onBreak) resumeDetection();
       document.getElementById('pause-ico').innerHTML = ICON_PAUSE;
       document.getElementById('pause-lbl').textContent = 'Pause';
       document.getElementById('paused-chip').classList.add('hidden');
       pauseBtn.className = 'btn-ghost flex-1';
       pauseBtn.style.minHeight = '48px';
     }
-    syncTrackingGate();   // pausing/resuming opens or closes the extension's gate
+    syncTrackingGate();
   });
 
-  // Stop -> styled confirm modal (calmer than window.confirm)
   const confirmOverlay = document.getElementById('confirm-overlay');
   const stopBtn = document.getElementById('stop-btn');
   const stopLabel = document.getElementById('stop-lbl');
@@ -661,7 +629,6 @@
   confirmOverlay.addEventListener('click', e => { if (e.target.id === 'confirm-overlay') closeConfirm(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && confirmOverlay.style.display === 'flex') closeConfirm(); });
 
-  // --- AI debrief modal (shown after a successful save) ---
   const debriefOverlay = document.getElementById('debrief-overlay');
   let debriefReplayHtml = '';
   function goHome() { location.href = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html'; }
@@ -719,7 +686,6 @@
       '<p class="section-label" style="margin:0 0 6px">AI debrief</p>' +
       '<p class="text-sm" style="color:var(--text-muted);line-height:1.55">Could not generate your debrief right now, but your session is saved. Head back to your tasks whenever you are ready.</p>';
   }
-  // There is ALWAYS a way out of the modal, even if the debrief fails or hangs.
   document.getElementById('debrief-done').addEventListener('click', goHome);
   debriefOverlay.addEventListener('click', e => { if (e.target.id === 'debrief-overlay') goHome(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && debriefOverlay.style.display === 'flex') goHome(); });
@@ -731,13 +697,11 @@
     clearInterval(autosaveInterval);
     clearInterval(trackingHeartbeat);
     stopDetection();
-    // Session ending → close the extension's gate explicitly (sessionId still set here).
     try { if (window.setTrackingState) setTrackingState(false).catch(() => {}); } catch (e) {}
 
     stopLabel.textContent = 'Saving…';
     stopBtn.disabled = true;
 
-    // 1) Save first — this must succeed independently; the debrief never risks it.
     try {
       await enqueueSessionSave(true);
     } catch (err) {
@@ -750,17 +714,11 @@
       return;
     }
 
-    // 2) Nothing tracked → nothing to coach on; go straight home.
     const tracked = totals.focused + totals.distracted + totals.uncertain + totals.away;
     if (tracked < 1 || !sessionId) { goHome(); return; }
 
-    // Replay is local: it uses only the saved timeline_json + journal_json.
     openDebriefLoading(renderReplayFromSavedPayload());
 
-    // 2.5) Background: update the hourly focus profile + the AI Pattern Memory from
-    // this session. We send the LOCAL start/end clock hours so the backend can fold
-    // this session's focus % into the right hours (it stores UTC, does no tz math).
-    // Fire-and-forget — must never block or break the debrief/save path.
     try {
       const payload = lastSavedPayload || sessionPayload();
       const endDate = new Date(payload.ended_at);
@@ -769,7 +727,6 @@
       learnFromSession(sessionId, startH, endH).catch(() => {});
     } catch (e) {}
 
-    // 3) Best-effort debrief. Failure/timeout shows an error state; Done always exits.
     try {
       renderDebrief(await getDebrief(sessionId));
     } catch (err) {
@@ -780,7 +737,6 @@
 
   document.getElementById('confirm-end').addEventListener('click', endAndSaveSession);
 
-  // Pomodoro: opt-in cyclic timer (remembered per device)
   const pomoToggle = document.getElementById('pomo-toggle');
   const pomoFocusInput = document.getElementById('pomo-focus');
   const pomoBreakInput = document.getElementById('pomo-break');
@@ -812,13 +768,13 @@
     applyPomoVisibility();
     if (pomoEnabled) {
       onBreak = false;
-      phaseStartElapsed = elapsedSeconds;   // start a fresh focus block now
+      phaseStartElapsed = elapsedSeconds;
       updatePomoPhase('focus', pomoFocusSec);
     } else if (onBreak) {
-      onBreak = false;                       // turning off during a break → resume
+      onBreak = false;
       resumeDetection();
     }
-    syncTrackingGate();   // onBreak may have changed → update the gate
+    syncTrackingGate();
   });
 
   pomoFocusInput.addEventListener('change', () => {
@@ -834,11 +790,9 @@
     try { localStorage.setItem('fb-pomo-break', String(b)); } catch (e) {}
   });
 
-  // Dev: reveal the AI-reasoning panel if "Show AI reasoning" is enabled.
   if (localStorage.getItem('fb-show-reasoning') === 'on') {
     document.getElementById('ai-reason').classList.remove('hidden');
   }
-  // Dev: live on-device sensor labels (for tuning), shown only when the panel is visible.
   setInterval(function () {
     const panel = document.getElementById('ai-reason');
     if (!panel || panel.classList.contains('hidden')) return;
@@ -848,19 +802,16 @@
     el.textContent = labels ? ('sensors: ' + labels) : 'sensors: (loading / unavailable)';
   }, 1000);
 
-  // Keyboard: Space toggles Pause/Resume (unless typing or a dialog is open)
   document.addEventListener('keydown', e => {
     if (e.code !== 'Space') return;
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') return;
     if (confirmOverlay.style.display === 'flex') return;
-    if (debriefOverlay.style.display === 'flex') return;   // session ended — don't toggle pause
+    if (debriefOverlay.style.display === 'flex') return;
     e.preventDefault();
     pauseBtn.click();
   });
 
-  // Final best-effort save when the tab is hidden or closing. `keepalive` lets the
-  // PATCH complete even as the page unloads, where a normal fetch would be cancelled.
   function flushFinalSave() {
     if (!sessionId) return;
     try { updateSession(sessionId, sessionPayload(), { keepalive: true }); } catch (e) {}
@@ -870,9 +821,6 @@
   });
   window.addEventListener('pagehide', () => {
     flushFinalSave();
-    // The page is actually unloading (closed/navigated away) — close the extension's
-    // gate now. NOT on visibilitychange: a plain tab-switch must keep the gate open
-    // so the extension can report the tab the user switched to.
     if (sessionId) {
       try { if (window.setTrackingState) setTrackingState(false, { keepalive: true }).catch(() => {}); } catch (e) {}
     }

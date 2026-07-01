@@ -19,14 +19,12 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-
 if _IS_SQLITE:
     @event.listens_for(engine, "connect")
     def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
-
 
 def init_db():
     from . import models
@@ -36,7 +34,6 @@ def init_db():
         _repair_sqlite_schema()
     _prune_empty_sessions()
     _init_pattern_memory()
-
 
 def _init_pattern_memory():
     """Startup maintenance for the Pattern Memory:
@@ -53,7 +50,6 @@ def _init_pattern_memory():
         crud.decay_stale_observations(db)
     finally:
         db.close()
-
 
 def _prune_empty_sessions():
     """Remove abandoned sessions — ones opened then closed before a single tick
@@ -75,7 +71,6 @@ def _prune_empty_sessions():
                 """
             )
         )
-
 
 def _repair_sqlite_schema():
     inspector = inspect(engine)
@@ -106,8 +101,6 @@ def _repair_sqlite_schema():
                 text("ALTER TABLE tasks ADD COLUMN completed_at DATETIME")
             )
 
-    # Add advice_json to older Chunk A daily_plans tables. `create_all` creates it
-    # for fresh DBs, but SQLite needs ALTER TABLE for an existing table.
     if "daily_plans" in inspect(engine).get_table_names():
         plan_cols_before = {c["name"] for c in inspect(engine).get_columns("daily_plans")}
         if "workspace_id" not in plan_cols_before:
@@ -141,7 +134,6 @@ def _repair_sqlite_schema():
     if any(focus_columns.get(column) != "INTEGER" for column in second_columns):
         _rebuild_focus_sessions_with_integer_seconds()
 
-    # Add journal_json to existing DBs (re-inspect in case a rebuild just ran).
     focus_cols = {c["name"] for c in inspect(engine).get_columns("focus_sessions")}
     if "journal_json" not in focus_cols:
         with engine.begin() as connection:
@@ -154,7 +146,6 @@ def _repair_sqlite_schema():
                 text("ALTER TABLE focus_sessions ADD COLUMN intention VARCHAR DEFAULT ''")
             )
 
-    # Add ai_recap to existing work_periods tables (stores the saved AI daily recap).
     if "work_periods" in inspect(engine).get_table_names():
         wp_cols_before = {c["name"] for c in inspect(engine).get_columns("work_periods")}
         if "workspace_id" not in wp_cols_before:
@@ -206,7 +197,6 @@ def _ensure_default_workspace_row():
             )
         )
 
-
 def _rebuild_daily_plans_with_workspace():
     old_cols = {c["name"] for c in inspect(engine).get_columns("daily_plans")}
     has_advice = "advice_json" in old_cols
@@ -249,7 +239,6 @@ def _rebuild_daily_plans_with_workspace():
         connection.execute(text("ALTER TABLE daily_plans_new RENAME TO daily_plans"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_daily_plans_id ON daily_plans (id)"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_daily_plans_workspace_id ON daily_plans (workspace_id)"))
-
 
 def _rebuild_work_periods_with_workspace():
     old_cols = {c["name"] for c in inspect(engine).get_columns("work_periods")}
@@ -301,7 +290,6 @@ def _rebuild_work_periods_with_workspace():
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_work_periods_id ON work_periods (id)"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_work_periods_workspace_id ON work_periods (workspace_id)"))
 
-
 def _rebuild_hourly_focus_with_workspace():
     with engine.begin() as connection:
         connection.execute(text("DROP TABLE IF EXISTS hourly_focus_new"))
@@ -331,10 +319,7 @@ def _rebuild_hourly_focus_with_workspace():
         connection.execute(text("DROP TABLE hourly_focus"))
         connection.execute(text("ALTER TABLE hourly_focus_new RENAME TO hourly_focus"))
 
-
 def _rebuild_focus_sessions_with_integer_seconds():
-    # Preserve journal_json if the old table already has it (so a rebuild never
-    # drops journal history). The new table always gets the column.
     old_cols = {c["name"] for c in inspect(engine).get_columns("focus_sessions")}
     has_journal = "journal_json" in old_cols
     has_intention = "intention" in old_cols
@@ -412,7 +397,6 @@ def _rebuild_focus_sessions_with_integer_seconds():
         connection.execute(
             text("CREATE INDEX IF NOT EXISTS ix_focus_sessions_workspace_id ON focus_sessions (workspace_id)")
         )
-
 
 def get_db():
     db = SessionLocal()

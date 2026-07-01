@@ -1,6 +1,3 @@
-// Gear-icon settings dropdown. Enhances a #settings-btn trigger in the header
-// with a popover (appearance, focus-check interval, notifications). Shared by
-// every page that shows the gear, so the markup/logic lives in one place.
 (function () {
   function get(key, fallback) {
     try { var v = localStorage.getItem(key); return v === null ? fallback : v; } catch (e) { return fallback; }
@@ -24,7 +21,6 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  // Colored chip for a pattern's confidence status.
   function statusBadge(status) {
     var map = {
       confirmed: ['#16794422', '#0f6b3e', 'confirmed'],
@@ -36,7 +32,6 @@
       'background:' + c[0] + ';color:' + c[1] + '">' + c[2] + '</span>';
   }
 
-  // Compact 12-hour labels for the focus-by-hour grid: 0 -> "12a", 9 -> "9a", 15 -> "3p".
   function hourLabelShort(h) {
     var ap = h < 12 ? 'a' : 'p';
     var hh = h % 12; if (hh === 0) hh = 12;
@@ -48,8 +43,6 @@
     return hh + ':00 ' + ap;
   }
 
-  // Parts of the day — each hour is tagged by the section it falls in. Night wraps
-  // past midnight, so its hours are listed in reading order (9pm → 4am).
   var DAY_SECTIONS = [
     { label: 'Morning',   range: '5am–12pm', hours: [5, 6, 7, 8, 9, 10, 11] },
     { label: 'Afternoon', range: '12pm–5pm', hours: [12, 13, 14, 15, 16] },
@@ -57,7 +50,6 @@
     { label: 'Night',     range: '9pm–5am',  hours: [21, 22, 23, 0, 1, 2, 3, 4] },
   ];
 
-  // One hour cell: short label + focus % (or “—” when no data), tinted by focus level.
   function hourCellHtml(h) {
     var has = h.sessions > 0;
     var pct = Math.round(h.focus_pct || 0);
@@ -70,8 +62,6 @@
       '</div>';
   }
 
-  // "About you" editor + the read-only "Pattern Memory" the AI builds over time.
-  // Built on demand, available on any page that loads this script + api.js.
   function openAboutModal() {
     var overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -99,11 +89,10 @@
     document.body.appendChild(overlay);
 
     var ta = overlay.querySelector('#about-text');
-    var initialAbout = '';        // the loaded value, so we can warn before discarding edits
-    var confirming = false;       // a discard-confirm is open (avoid stacking a second one)
+    var initialAbout = '';
+    var confirming = false;
     if (window.getProfile) {
       window.getProfile().then(function (p) { ta.value = (p && p.about) || ''; initialAbout = ta.value; }).catch(function () {
-        // Don't silently show a blank box that could be saved over the real value.
         if (window.showToast) showToast('Couldn’t load your About-me — check the backend before saving.', { danger: true });
       });
     }
@@ -139,7 +128,6 @@
         gridEl.style.display = 'block';
         var byHour = {};
         hours.forEach(function (h) { byHour[h.hour] = h; });
-        // One labeled block per part of day; that label is each hour's "tag".
         gridEl.innerHTML = DAY_SECTIONS.map(function (sec) {
           var cells = sec.hours.map(function (hr) {
             return byHour[hr] ? hourCellHtml(byHour[hr]) : '';
@@ -157,7 +145,6 @@
     renderHourly();
 
     function closeModal() { overlay.remove(); document.removeEventListener('keydown', onKey); }
-    // Warn before losing typed-but-unsaved edits (Cancel / backdrop / Escape).
     function requestClose() {
       if (confirming) return;
       if (ta.value.trim() === initialAbout.trim() || !window.confirmDialog) { closeModal(); return; }
@@ -168,7 +155,7 @@
     function onKey(e) { if (e.key === 'Escape') requestClose(); }
 
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) return requestClose();   // backdrop
+      if (e.target === overlay) return requestClose();
       var act = e.target.closest('[data-act]');
       if (!act) return;
       if (act.dataset.act === 'del' && window.deleteObservation) {
@@ -179,7 +166,7 @@
         window.saveProfile(ta.value)
           .then(closeModal)
           .catch(function () {
-            act.disabled = false; act.textContent = 'Save';   // keep the modal open so the text isn't lost
+            act.disabled = false; act.textContent = 'Save';
             if (window.showToast) showToast('Couldn’t save your About-me — is the backend running?', { danger: true });
           });
       } else if (act.dataset.act === 'cancel') {
@@ -233,40 +220,33 @@
 
     wrap.appendChild(panel);
 
-    // Dark mode
     var dark = panel.querySelector('#dark-toggle');
     dark.checked = (window.getTheme && window.getTheme() === 'dark');
     dark.addEventListener('change', function () {
       if (window.setTheme) window.setTheme(dark.checked ? 'dark' : 'light');
     });
 
-    // Focus check interval
     panel.querySelector('#detect-interval').addEventListener('change', function (e) {
       set('fb-detect-interval', e.target.value);
     });
 
-    // Nudges
     panel.querySelector('#nudge-toggle').addEventListener('change', function (e) {
       set('fb-nudges', e.target.checked ? 'on' : 'off');
     });
 
-    // Sounds (play a chime as confirmation when turning on)
     panel.querySelector('#sound-toggle').addEventListener('change', function (e) {
       set('fb-sounds', e.target.checked ? 'on' : 'off');
       if (e.target.checked && window.playChime) window.playChime();
     });
 
-    // Website awareness (opt-in; the tracker reads this flag each sample)
     panel.querySelector('#website-toggle').addEventListener('change', function (e) {
       set('fb-website-tracking', e.target.checked ? 'on' : 'off');
     });
 
-    // Developer: show AI reasoning on the tracker
     panel.querySelector('#reasoning-toggle').addEventListener('change', function (e) {
       set('fb-show-reasoning', e.target.checked ? 'on' : 'off');
     });
 
-    // Desktop notifications (request permission on enable)
     var notify = panel.querySelector('#notify-toggle');
     if (!notifySupported || notifyDenied) {
       notify.disabled = true;
@@ -290,7 +270,6 @@
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { close(); btn.focus(); } });
   }
 
-  // Expose the editor + wire the "About me" nav button (present on every page).
   window.openAboutModal = openAboutModal;
   function start() {
     init();

@@ -1,29 +1,15 @@
-// On-device face sensors (MediaPipe Face Landmarker).
-//
-// Runs the webcam through MediaPipe locally (~4 fps), turns the landmarks into a few
-// SMOOTHED semantic labels — eyes open/closed, head facing/away/down, face present —
-// and exposes them as a short string via getSensorLabels(). The focus detector reads
-// that string and sends it (text only) alongside the frame to Gemini, which fuses it
-// with the image. Landmarks/EAR never leave the browser.
-//
-// Fail-safe by design: if MediaPipe can't load or errors, getSensorLabels() returns
-// null and the app behaves exactly as before (no on-device sensors, no crash).
 (function () {
-  // @latest keeps the JS bundle and the /wasm assets on the same version. Pin a
-  // specific version for production if you want fully reproducible loads.
   var TASKS_VISION = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/+esm';
   var WASM_ROOT = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
   var MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
-  // Tuning constants (eye-aspect-ratio + head geometry). Easy to adjust.
-  var EAR_CLOSED = 0.18;   // smoothed EAR below this → eyes closed
-  var EAR_DROWSY = 0.22;   // between closed and this → half-closed
-  var YAW_AWAY = 0.16;     // |nose offset| / eye-width above this → head turned away
-  var PITCH_DOWN = 0.78;   // (eyes→nose)/(eyes→chin) above this → head tilted down
-  var SAMPLE_MS = 250;     // ~4 fps (per the browser-vision skill: 1–5 fps, not rAF)
-  var WINDOW_MS = 1500;    // EAR smoothing window (rejects blinks)
+  var EAR_CLOSED = 0.18;
+  var EAR_DROWSY = 0.22;
+  var YAW_AWAY = 0.16;
+  var PITCH_DOWN = 0.78;
+  var SAMPLE_MS = 250;
+  var WINDOW_MS = 1500;
 
-  // EAR landmark indices [p1 outer, p2 top, p3 top, p4 inner, p5 bottom, p6 bottom].
   var LEFT_EYE = [33, 160, 158, 133, 153, 144];
   var RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 
@@ -33,9 +19,9 @@
   var loading = false;
   var _video = null;
   var _interval = null;
-  var _earWindow = [];     // [{ t, ear }]
-  var _closedSince = null; // performance.now() when eyes first closed
-  var _last = null;        // latest derived metrics
+  var _earWindow = [];
+  var _closedSince = null;
+  var _last = null;
 
   function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
@@ -90,11 +76,9 @@
     if (eyesClosed) { if (_closedSince === null) _closedSince = now; }
     else { _closedSince = null; }
 
-    // Head yaw: nose tip (1) horizontal offset from the eye-corner midpoint.
     var midX = (lms[33].x + lms[263].x) / 2;
     var eyeW = Math.abs(lms[263].x - lms[33].x) || 1e-6;
     var yaw = Math.abs(lms[1].x - midX) / eyeW;
-    // Head pitch (down): nose drops toward the chin relative to the eye line.
     var eyeY = (lms[33].y + lms[263].y) / 2;
     var span = (lms[152].y - eyeY) || 1e-6;
     var pitchRatio = (lms[1].y - eyeY) / span;
@@ -127,7 +111,7 @@
 
   function start(videoEl) {
     _video = videoEl;
-    load();   // best-effort; analyze() is a no-op until ready
+    load();
     if (_interval) clearInterval(_interval);
     _interval = setInterval(analyze, SAMPLE_MS);
   }

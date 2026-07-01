@@ -153,15 +153,13 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 .badge-distracted { background: var(--terracotta-soft); color: var(--terracotta); }
 .badge-uncertain  { background: var(--ochre-soft);      color: var(--ochre); }
 .badge-away       { background: var(--taupe-soft);      color: var(--taupe); }
-/* Neutral badge for non-states: startup ("Analyzing…") and camera-off — kept
-   visually distinct from the four real focus states so it isn't misread as one. */
+
 .badge-neutral    { background: var(--surface-2);       color: var(--text-muted); }
 @media (prefers-reduced-motion: no-preference) {
   .badge-pulse::before { animation: badge-pulse 1.4s ease-in-out infinite; }
 }
 @keyframes badge-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-/* "Paused" chip on the tracker hero so a paused session reads clearly at a glance. */
 .paused-chip {
   display: inline-flex;
   align-items: center;
@@ -490,7 +488,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   font-weight: 800;
 }
 
-/* Webcam caption pill; avoid claiming focus frames stay fully on-device. */
 .webcam-caption {
   position: absolute;
   bottom: 8px;
@@ -632,7 +629,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
 .switch input:checked + .slider::before { transform: translateX(20px); }
 
-/* ---------- Settings gear dropdown ---------- */
 .settings-trigger {
   display: inline-flex;
   align-items: center;
@@ -676,7 +672,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 }
 .settings-select:focus { outline: none; border-color: var(--accent); }
 
-/* ---------- toast popup ---------- */
 .toast-wrap {
   position: fixed;
   left: 50%;
@@ -715,7 +710,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 
-/* ---------- small icon button (task edit/delete, row delete) ---------- */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -733,12 +727,9 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 .icon-btn:hover { background: var(--surface-2); color: var(--text-muted); }
 .icon-btn.danger:hover { color: var(--terracotta); }
 
-/* ---------- Tracker live screen ---------- */
-/* State badge eases between focus states instead of snapping */
 .badge { transition: background-color 0.45s ease, color 0.45s ease; }
 #state-badge.state-badge-lg { font-size: 1.05rem; padding: 8px 18px 8px 14px; }
 
-/* Ambient state accent bar across the top of the hero */
 #state-accent {
   position: absolute;
   top: 0; left: 0; right: 0;
@@ -748,9 +739,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   z-index: 2;
 }
 
-/* Ambient state tint: a subtle wash of the current focus-state colour over the
-   whole hero. Sits behind the content (which is z-index:1) so text stays crisp.
-   Low opacity keeps it gentle and works over either theme's base hero colour. */
 #state-tint {
   position: absolute;
   inset: 0;
@@ -761,7 +749,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   z-index: 0;
 }
 
-/* Calm focus-ratio bar */
 .focus-bar-track {
   width: 100%;
   height: 10px;
@@ -807,7 +794,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   border-radius: 8px;
 }
 
-/* ---------- Unwind ritual modal ---------- */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -900,7 +886,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 }
 .step-dot.active { background: var(--accent); border-color: var(--accent); width: 18px; }
 
-/* ---------- Weekly Mon–Sun mini-bars ---------- */
 .week-bars {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -943,7 +928,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Today's Plan: sliders, segmented control, budget meter ---------- */
 .plan-main {
   max-width: 1120px !important;
 }
@@ -1152,7 +1136,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   font-size: 0.85rem;
 }
 
-/* Range slider — calm sage track + thumb, works in light + dark */
 input[type="range"].fb-range {
   -webkit-appearance: none;
   appearance: none;
@@ -1182,7 +1165,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   cursor: pointer;
 }
 
-/* Segmented easy / medium / hard control */
 .seg {
   display: inline-flex;
   gap: 4px;
@@ -1206,7 +1188,6 @@ input[type="range"].fb-range::-moz-range-thumb {
 .seg-btn[aria-pressed="true"] { background: var(--sage); color: #fff; }
 .seg-btn:focus-visible { outline: 2px solid var(--sage); outline-offset: 1px; }
 
-/* Time-budget meter */
 .budget-meter {
   height: 10px;
   border-radius: 99px;
@@ -1221,7 +1202,6 @@ input[type="range"].fb-range::-moz-range-thumb {
 }
 .budget-fill.over { background: var(--ochre); }
 
-/* A planned-task row (phases 2–4) */
 .plan-task { padding: 0.9rem 0; border-bottom: 1px solid var(--border); }
 .plan-task:last-child { border-bottom: none; }
 
@@ -1363,7 +1343,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   text-align: center;
 }
 
-/* Plan advice timeline (phase 3) — blocks shaded by each start-hour's focus % */
 .plan-tl { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .plan-tl-block {
   display: flex;
@@ -1372,7 +1351,7 @@ input[type="range"].fb-range::-moz-range-thumb {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface-2);   /* fallback if color-mix is unsupported */
+  background: var(--surface-2);
 }
 .plan-tl-time {
   font-variant-numeric: tabular-nums;
@@ -1387,7 +1366,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   .plan-tl-time { min-width: 0; }
 }
 
-/* Plan schedule step — task list + day calendar (Chunk C) */
 .plan-schedule-intro {
   display: flex;
   align-items: flex-start;
@@ -1936,7 +1914,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   }
 }
 
-/* Chunk D: plan handoff and reality states */
 .is-plan-suggested {
   border-color: color-mix(in srgb, var(--sage) 45%, var(--border));
   box-shadow: var(--shadow-sm);

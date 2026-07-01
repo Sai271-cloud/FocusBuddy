@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from . import models, schemas
 
-
 DEFAULT_WORKSPACE_SLUG = "local"
 DEFAULT_WORKSPACE_ID = 1
 CURRENT_DEMO_SEED_VERSION = 4
@@ -18,7 +17,6 @@ DEMO_HISTORY_DATES = [
     "2026-06-26",
     "2026-06-27",
 ]
-
 
 DEMO_PERSONA_SEEDS = [
     {
@@ -154,15 +152,12 @@ DEMO_PERSONA_SEEDS = [
     },
 ]
 
-
 def _seed_by_slug(slug: str) -> dict | None:
     return next((seed for seed in DEMO_PERSONA_SEEDS if seed["slug"] == slug), None)
-
 
 def _clean_anonymous_id(raw: str) -> str:
     clean = re.sub(r"[^a-zA-Z0-9_-]", "", (raw or "").strip())[:80]
     return clean or "browser"
-
 
 def ensure_default_workspace(db: Session) -> models.DemoWorkspace:
     workspace = db.get(models.DemoWorkspace, DEFAULT_WORKSPACE_ID)
@@ -180,7 +175,6 @@ def ensure_default_workspace(db: Session) -> models.DemoWorkspace:
         db.refresh(workspace)
     return workspace
 
-
 def _workspace_id(db: Session, workspace=None) -> int:
     if workspace is None:
         return ensure_default_workspace(db).id
@@ -188,10 +182,8 @@ def _workspace_id(db: Session, workspace=None) -> int:
         return workspace
     return workspace.id
 
-
 def get_workspace_by_slug(db: Session, slug: str) -> models.DemoWorkspace | None:
     return db.query(models.DemoWorkspace).filter(models.DemoWorkspace.slug == slug).first()
-
 
 def ensure_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | None:
     seed = _seed_by_slug(slug)
@@ -205,7 +197,6 @@ def ensure_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | No
     ):
         workspace = reset_seeded_workspace(db, slug)
     return workspace
-
 
 def ensure_anonymous_workspace(db: Session, anonymous_id: str) -> models.DemoWorkspace:
     clean = _clean_anonymous_id(anonymous_id)
@@ -225,7 +216,6 @@ def ensure_anonymous_workspace(db: Session, anonymous_id: str) -> models.DemoWor
         seed_hourly_focus(db, workspace)
     return workspace
 
-
 def resolve_demo_workspace(
     db: Session,
     demo_slug: str | None = None,
@@ -236,7 +226,6 @@ def resolve_demo_workspace(
     if demo_slug:
         return ensure_seeded_workspace(db, demo_slug)
     return ensure_default_workspace(db)
-
 
 def create_task(db: Session, task: schemas.TaskCreate, workspace=None) -> models.Task:
     wid = _workspace_id(db, workspace)
@@ -250,7 +239,6 @@ def create_task(db: Session, task: schemas.TaskCreate, workspace=None) -> models
     db.refresh(db_task)
     return db_task
 
-
 def get_task(db: Session, task_id: int, workspace=None) -> models.Task | None:
     wid = _workspace_id(db, workspace)
     return (
@@ -258,7 +246,6 @@ def get_task(db: Session, task_id: int, workspace=None) -> models.Task | None:
         .filter(models.Task.id == task_id, models.Task.workspace_id == wid)
         .first()
     )
-
 
 def get_tasks(db: Session, workspace=None) -> list[models.Task]:
     wid = _workspace_id(db, workspace)
@@ -269,11 +256,9 @@ def get_tasks(db: Session, workspace=None) -> list[models.Task]:
         .all()
     )
 
-
 def update_task(db: Session, db_task: models.Task, update: schemas.TaskUpdate, completed_at=None) -> models.Task:
     from datetime import datetime, timezone
 
-    # Partial update: only touch fields the caller actually sent.
     if update.completed is not None:
         db_task.completed = update.completed
         db_task.completed_at = (completed_at or datetime.now(timezone.utc)) if update.completed else None
@@ -285,9 +270,7 @@ def update_task(db: Session, db_task: models.Task, update: schemas.TaskUpdate, c
     db.refresh(db_task)
     return db_task
 
-
 def delete_task(db: Session, db_task: models.Task) -> None:
-    # Cascade: remove the task's sessions first (FK), then the task itself.
     db.query(models.FocusSession).filter(
         models.FocusSession.workspace_id == db_task.workspace_id,
         models.FocusSession.task_id == db_task.id,
@@ -295,11 +278,9 @@ def delete_task(db: Session, db_task: models.Task) -> None:
     db.delete(db_task)
     db.commit()
 
-
 def delete_session(db: Session, db_session: models.FocusSession) -> None:
     db.delete(db_session)
     db.commit()
-
 
 def start_session(db: Session, task: models.Task, workspace=None, started_at=None) -> models.FocusSession:
     wid = _workspace_id(db, workspace)
@@ -323,7 +304,6 @@ def start_session(db: Session, task: models.Task, workspace=None, started_at=Non
     db.refresh(db_session)
     return db_session
 
-
 def create_session(
     db: Session,
     session: schemas.SessionCreate,
@@ -340,7 +320,6 @@ def create_session(
     db.commit()
     db.refresh(db_session)
     return db_session
-
 
 def update_session(
     db: Session,
@@ -362,7 +341,6 @@ def update_session(
     db.refresh(db_session)
     return db_session
 
-
 def get_sessions(db: Session, workspace=None) -> list[models.FocusSession]:
     wid = _workspace_id(db, workspace)
     return (
@@ -371,7 +349,6 @@ def get_sessions(db: Session, workspace=None) -> list[models.FocusSession]:
         .order_by(models.FocusSession.ended_at.desc())
         .all()
     )
-
 
 def get_sessions_between(db: Session, start, end, workspace=None) -> list[models.FocusSession]:
     wid = _workspace_id(db, workspace)
@@ -385,7 +362,6 @@ def get_sessions_between(db: Session, start, end, workspace=None) -> list[models
         .order_by(models.FocusSession.started_at.asc(), models.FocusSession.id.asc())
         .all()
     )
-
 
 def upsert_work_period(db: Session, data: schemas.WorkPeriodCreate, workspace=None) -> models.WorkPeriod:
     wid = _workspace_id(db, workspace)
@@ -407,8 +383,6 @@ def upsert_work_period(db: Session, data: schemas.WorkPeriodCreate, workspace=No
     existing.seconds_distracted = data.seconds_distracted
     existing.seconds_uncertain = data.seconds_uncertain
     existing.seconds_away = data.seconds_away
-    # None means "leave as-is" so the two save paths (reflection vs AI recap) don't
-    # clobber each other; '' explicitly clears.
     if data.reflection is not None:
         existing.reflection = data.reflection
     if data.ai_recap is not None:
@@ -419,7 +393,6 @@ def upsert_work_period(db: Session, data: schemas.WorkPeriodCreate, workspace=No
     db.refresh(existing)
     return existing
 
-
 def get_work_periods(db: Session, workspace=None) -> list[models.WorkPeriod]:
     wid = _workspace_id(db, workspace)
     return (
@@ -428,7 +401,6 @@ def get_work_periods(db: Session, workspace=None) -> list[models.WorkPeriod]:
         .order_by(models.WorkPeriod.ended_at.desc())
         .all()
     )
-
 
 def get_recent_plan_reality_periods(db: Session, limit: int = 14, workspace=None) -> list[models.WorkPeriod]:
     wid = _workspace_id(db, workspace)
@@ -445,9 +417,6 @@ def get_recent_plan_reality_periods(db: Session, limit: int = 14, workspace=None
         .all()
     )
 
-
-# --- Daily plan ("Today's Plan") --------------------------------------------
-
 def get_plan(db: Session, period_key: str, workspace=None) -> models.DailyPlan | None:
     wid = _workspace_id(db, workspace)
     return (
@@ -456,15 +425,12 @@ def get_plan(db: Session, period_key: str, workspace=None) -> models.DailyPlan |
         .first()
     )
 
-
 def upsert_plan(db: Session, data: schemas.DailyPlanUpsert, workspace=None) -> models.DailyPlan:
     wid = _workspace_id(db, workspace)
     existing = get_plan(db, data.period_key, wid)
     if existing is None:
         existing = models.DailyPlan(workspace_id=wid, period_key=data.period_key)
         db.add(existing)
-    # None means "leave as-is" so a plan-only save and an advice-only save don't clobber
-    # each other (same idiom as upsert_work_period).
     if data.available_min is not None:
         existing.available_min = data.available_min
     if data.plan_json is not None:
@@ -476,7 +442,6 @@ def upsert_plan(db: Session, data: schemas.DailyPlanUpsert, workspace=None) -> m
     db.refresh(existing)
     return existing
 
-
 def delete_plan(db: Session, period_key: str, workspace=None) -> bool:
     existing = get_plan(db, period_key, workspace)
     if existing is None:
@@ -484,7 +449,6 @@ def delete_plan(db: Session, period_key: str, workspace=None) -> bool:
     db.delete(existing)
     db.commit()
     return True
-
 
 def get_profile(db: Session, workspace=None) -> models.UserProfile:
     """The workspace's 'About me' row, created empty on first access."""
@@ -497,7 +461,6 @@ def get_profile(db: Session, workspace=None) -> models.UserProfile:
         db.refresh(profile)
     return profile
 
-
 def update_profile(db: Session, about: str, workspace=None) -> models.UserProfile:
     profile = get_profile(db, workspace)
     profile.about = (about or "").strip()[:1000]
@@ -505,22 +468,15 @@ def update_profile(db: Session, about: str, workspace=None) -> models.UserProfil
     db.refresh(profile)
     return profile
 
+CONFIRM_NET = 2
+RETIRE_NET = 2
+MAX_ACTIVE_OBSERVATIONS = 20
 
-# --- Pattern Memory (AI-learned focus observations) -------------------------
-# Simple counting confidence. net = affirmations - rejections.
-CONFIRM_NET = 2          # net >= this  -> "confirmed"
-RETIRE_NET = 2           # (rejections - affirmations) >= this -> retired (active=False)
-MAX_ACTIVE_OBSERVATIONS = 20  # cap so the file can't grow without bound
-
-# Starter hypotheses so the model has direction on what to look for. These are
-# neutral guesses (0/0) the model affirms or rejects over time. (Time-of-day is NOT
-# here — that's handled deterministically by the 24-hour hourly_focus profile.)
 SEED_OBSERVATIONS = [
     "Tends to drift within the first 10-15 minutes of a session",
     "Focus fades the longer a session runs",
     "Recovers focus quickly after a distraction",
 ]
-
 
 def observation_status(obs: models.Observation) -> str:
     net = (obs.affirmations or 0) - (obs.rejections or 0)
@@ -530,17 +486,13 @@ def observation_status(obs: models.Observation) -> str:
         return "confirmed"
     return "emerging"
 
-
-# The old time-of-day seeds, replaced by the deterministic hourly_focus profile.
-# Existing DBs (seeded before the redesign) still hold these; we delete them once.
 LEGACY_TIME_OBSERVATIONS = [
     "Focuses best in the morning",
     "Focuses best around midday",
     "Focuses best in the late afternoon or evening",
 ]
 
-DECAY_DAYS = 30  # a note untouched this long loses one step of confidence
-
+DECAY_DAYS = 30
 
 def cleanup_legacy_time_observations(db: Session, workspace=None) -> int:
     """Remove the obsolete time-of-day seed patterns by exact text. Idempotent —
@@ -552,7 +504,6 @@ def cleanup_legacy_time_observations(db: Session, workspace=None) -> int:
     deleted = q.delete(synchronize_session=False)
     db.commit()
     return deleted
-
 
 def decay_stale_observations(db: Session, days: int = DECAY_DAYS, workspace=None) -> int:
     """Erode confidence in notes not affirmed/rejected in `days`: move each stale
@@ -582,13 +533,12 @@ def decay_stale_observations(db: Session, days: int = DECAY_DAYS, workspace=None
         elif r > a:
             o.rejections = r - 1
         else:
-            continue  # already neutral — nothing to decay
+            continue
         _apply_retire_rule(o)
         o.updated_at = now
         changed += 1
     db.commit()
     return changed
-
 
 def seed_observations(db: Session, workspace=None) -> None:
     """Insert the starter hypotheses, but ONLY when the table is empty. Note: if the
@@ -602,14 +552,12 @@ def seed_observations(db: Session, workspace=None) -> None:
         db.add(models.Observation(workspace_id=wid, text=text))
     db.commit()
 
-
 def list_observations(db: Session, active_only: bool = False, workspace=None) -> list[models.Observation]:
     wid = _workspace_id(db, workspace)
     q = db.query(models.Observation).filter(models.Observation.workspace_id == wid)
     if active_only:
         q = q.filter(models.Observation.active == True)  # noqa: E712
     return q.order_by(models.Observation.active.desc(), models.Observation.id.asc()).all()
-
 
 def get_observation(db: Session, obs_id: int, workspace=None) -> models.Observation | None:
     wid = _workspace_id(db, workspace)
@@ -619,13 +567,11 @@ def get_observation(db: Session, obs_id: int, workspace=None) -> models.Observat
         .first()
     )
 
-
 def _apply_retire_rule(obs: models.Observation) -> None:
     """Recompute active from the counts so an affirm can revive a retired pattern
     and a pile of rejections can retire one."""
     net = (obs.affirmations or 0) - (obs.rejections or 0)
     obs.active = (-net) < RETIRE_NET
-
 
 def affirm_observation(db: Session, obs: models.Observation) -> models.Observation:
     from datetime import datetime, timezone
@@ -637,7 +583,6 @@ def affirm_observation(db: Session, obs: models.Observation) -> models.Observati
     db.refresh(obs)
     return obs
 
-
 def reject_observation(db: Session, obs: models.Observation) -> models.Observation:
     from datetime import datetime, timezone
 
@@ -647,7 +592,6 @@ def reject_observation(db: Session, obs: models.Observation) -> models.Observati
     db.commit()
     db.refresh(obs)
     return obs
-
 
 def create_observation(db: Session, text: str, workspace=None) -> models.Observation | None:
     """Add a new active pattern. Skips if the active count is already at the cap or
@@ -667,13 +611,9 @@ def create_observation(db: Session, text: str, workspace=None) -> models.Observa
     db.refresh(obs)
     return obs
 
-
 def delete_observation(db: Session, obs: models.Observation) -> None:
     db.delete(obs)
     db.commit()
-
-
-# --- Hourly focus profile (deterministic "focus by hour") -------------------
 
 def seed_hourly_focus(db: Session, workspace=None) -> None:
     """Preboot all 24 hour rows (0-23) once, if the table is empty."""
@@ -684,7 +624,6 @@ def seed_hourly_focus(db: Session, workspace=None) -> None:
         db.add(models.HourlyFocus(workspace_id=wid, hour=h, focus_pct=0.0, sessions=0))
     db.commit()
 
-
 def get_hourly_focus(db: Session, workspace=None) -> list[models.HourlyFocus]:
     wid = _workspace_id(db, workspace)
     return (
@@ -693,7 +632,6 @@ def get_hourly_focus(db: Session, workspace=None) -> list[models.HourlyFocus]:
         .order_by(models.HourlyFocus.hour.asc())
         .all()
     )
-
 
 def _hours_in_range(start_hour: int, end_hour: int) -> list[int]:
     """Inclusive list of clock hours a session touched, handling midnight wrap
@@ -709,7 +647,6 @@ def _hours_in_range(start_hour: int, end_hour: int) -> list[int]:
         h = (h + 1) % 24
     return hours
 
-
 def update_hourly_focus(db: Session, start_hour: int, end_hour: int, session_pct: float, workspace=None) -> int:
     """Fold one session's focus % into every hour it touched (running average).
     Returns how many hour rows were updated. Deterministic — no AI involved."""
@@ -718,7 +655,7 @@ def update_hourly_focus(db: Session, start_hour: int, end_hour: int, session_pct
     touched = 0
     for h in _hours_in_range(start_hour, end_hour):
         row = db.get(models.HourlyFocus, (wid, h))
-        if row is None:  # safety: preboot a missing hour
+        if row is None:
             row = models.HourlyFocus(workspace_id=wid, hour=h, focus_pct=0.0, sessions=0)
             db.add(row)
         n = row.sessions or 0
@@ -728,13 +665,9 @@ def update_hourly_focus(db: Session, start_hour: int, end_hour: int, session_pct
     db.commit()
     return touched
 
-
-# --- Demo workspace seeding --------------------------------------------------
-
 def _demo_dt(day_key: str, hour: int, minute: int = 0) -> datetime:
     y, m, d = [int(x) for x in day_key.split("-")]
     return datetime(y, m, d, hour, minute, tzinfo=timezone.utc)
-
 
 def _timeline_json(focused_min: int, distracted_min: int, uncertain_min: int, away_min: int) -> str:
     runs = [
@@ -751,7 +684,6 @@ def _timeline_json(focused_min: int, distracted_min: int, uncertain_min: int, aw
             minute += 1
     return json.dumps(entries)
 
-
 def _journal_json(summary: str, distracted_min: int) -> str:
     entries = [{"t": 0, "type": "note", "note": "Started with a clear task intention."}]
     if distracted_min >= 10:
@@ -762,7 +694,6 @@ def _journal_json(summary: str, distracted_min: int) -> str:
     entries.append({"t": 25 * 60, "type": "note", "note": summary})
     return json.dumps(entries)
 
-
 def _seed_session_total_min(session: models.FocusSession) -> int:
     seconds = (
         (session.seconds_focused or 0)
@@ -772,10 +703,8 @@ def _seed_session_total_min(session: models.FocusSession) -> int:
     )
     return round(seconds / 60)
 
-
 def _seed_session_start_min(session: models.FocusSession) -> int:
     return session.started_at.hour * 60 + session.started_at.minute
-
 
 def _seed_plan_entries(seed: dict, tasks: list[models.Task], sessions: list[models.FocusSession]) -> list[dict]:
     entries = []
@@ -816,7 +745,6 @@ def _seed_plan_entries(seed: dict, tasks: list[models.Task], sessions: list[mode
 
     return entries
 
-
 def _seed_row_status(has_session: bool, start_delta: int | None, duration_delta: int) -> str:
     if not has_session:
         return "not_started"
@@ -829,7 +757,6 @@ def _seed_row_status(has_session: bool, start_delta: int | None, duration_delta:
     if duration_delta <= -10:
         return "ran_short"
     return "on_track"
-
 
 def _seed_plan_reality_json(day_key: str, entries: list[dict], sessions: list[models.FocusSession]) -> str:
     by_task: dict[int, list[models.FocusSession]] = {}
@@ -907,7 +834,6 @@ def _seed_plan_reality_json(day_key: str, entries: list[dict], sessions: list[mo
     )
     return json.dumps(report.model_dump())
 
-
 def _seed_plan_advice_json(seed: dict, entries: list[dict], available_min: int) -> str:
     scheduled = []
     for entry in entries:
@@ -941,7 +867,6 @@ def _seed_plan_advice_json(seed: dict, entries: list[dict], available_min: int) 
         "general_advice": [seed["archetype"]],
     })
 
-
 def clear_workspace_data(db: Session, workspace) -> None:
     wid = _workspace_id(db, workspace)
     db.query(models.FocusSession).filter(models.FocusSession.workspace_id == wid).delete(synchronize_session=False)
@@ -952,7 +877,6 @@ def clear_workspace_data(db: Session, workspace) -> None:
     db.query(models.Observation).filter(models.Observation.workspace_id == wid).delete(synchronize_session=False)
     db.query(models.HourlyFocus).filter(models.HourlyFocus.workspace_id == wid).delete(synchronize_session=False)
     db.commit()
-
 
 def reset_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | None:
     seed = _seed_by_slug(slug)
@@ -1074,13 +998,11 @@ def reset_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | Non
     db.refresh(workspace)
     return workspace
 
-
 def clear_anonymous_workspace(db: Session, anonymous_id: str) -> models.DemoWorkspace:
     workspace = ensure_anonymous_workspace(db, anonymous_id)
     clear_workspace_data(db, workspace)
     seed_hourly_focus(db, workspace)
     return workspace
-
 
 def seeded_daily_unwinds(db: Session, slug: str) -> list[dict] | None:
     workspace = ensure_seeded_workspace(db, slug)

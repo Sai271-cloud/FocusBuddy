@@ -45,7 +45,6 @@ async function startDetection(videoEl, taskName, description, onStateChange, onS
   _canvas.height = 240;
   _ctx = _canvas.getContext('2d');
 
-  // On-device face sensors (best-effort; degrades to nothing if MediaPipe can't load).
   if (window.faceMetrics) window.faceMetrics.start(_videoEl);
 
   _sampleFrame();
@@ -82,8 +81,6 @@ async function _sampleFrame() {
     const dataUrl = _canvas.toDataURL('image/jpeg', 0.7);
     const base64 = dataUrl.split(',')[1];
 
-    // If the user opted in (and the extension is reporting), fold the active-tab
-    // URL + title into the same focus call. Off by default → behaves as before.
     let activity = null;
     if (_websiteTrackingOn()) {
       try {
@@ -101,7 +98,6 @@ async function _sampleFrame() {
       _onStateChange(result.state, result.note, result.reason);
     }
   } catch (err) {
-    // AI call failed — flag it (with the reason), but keep the last known state (don't reset).
     console.warn('focus-detector: frame sample failed', err);
     if (_onStatus) _onStatus(false, err);
   } finally {

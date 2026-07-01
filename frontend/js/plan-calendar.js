@@ -1,11 +1,3 @@
-// Plan calendar — renders the Schedule step's task tray + day calendar.
-//
-// API: PlanCalendar.render(rootEl, {
-//   entries, onUpdate, onChange
-// })
-//   entries  : [{ task_id, name, estimate_min, difficulty, scheduled_min? }]
-//   onUpdate : (taskId, patch) => void, e.g. { scheduled_min: 540 }
-//   onChange : legacy fallback, (taskId, scheduledMin | null) => void
 (function () {
   const HOUR_HEIGHT = 52;
   const DAY_MIN = 24 * 60;

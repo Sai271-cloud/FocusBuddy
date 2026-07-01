@@ -1,16 +1,10 @@
-// Shared notification helpers: in-app toasts, a subtle chime, browser
-// notifications, and a styled confirm dialog. Loaded on every page.
-// Exposes: showToast, playChime, notifyUser, requestNotifyPermission, confirmDialog.
 (function () {
-  // Escape user-controlled text before it goes into innerHTML. These helpers
-  // escape the message internally so callers can pass raw text safely.
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
 
-  /* ---------- in-app toast ---------- */
   function toastWrap() {
     var w = document.getElementById('toast-wrap');
     if (!w) {
@@ -41,7 +35,6 @@
     setTimeout(dismiss, opts.duration || 4500);
   };
 
-  /* ---------- subtle chime (Web Audio, no asset) ---------- */
   var _audioCtx = null;
   window.playChime = function () {
     var on = false;
@@ -65,10 +58,9 @@
         osc.connect(gain); gain.connect(_audioCtx.destination);
         osc.start(t0); osc.stop(t0 + 0.24);
       });
-    } catch (e) { /* audio blocked — ignore */ }
+    } catch (e) {  }
   };
 
-  /* ---------- browser notifications (opt-in) ---------- */
   window.requestNotifyPermission = function () {
     if (!('Notification' in window)) return Promise.resolve('unsupported');
     return Notification.requestPermission();
@@ -81,7 +73,6 @@
     try { new Notification(title, { body: body, silent: true }); } catch (e) {}
   };
 
-  /* ---------- styled confirm dialog (replaces window.confirm) ---------- */
   window.confirmDialog = function (message, opts) {
     opts = opts || {};
     return new Promise(function (resolve) {

@@ -35,9 +35,6 @@ if _gemini_key:
     )
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
-# The coaching endpoints (debrief, daily unwind, weekly unwind, and plan advice)
-# intentionally use one fixed model so local/.env and hosted Vercel settings cannot
-# drift into different coaching behavior.
 COACHING_MODEL = "gemini-3.1-flash-lite"
 
 VALID_STATES = ["focused", "distracted", "uncertain", "away"]
@@ -50,7 +47,6 @@ PLAIN_COACHING_LANGUAGE = (
 MAX_FRAME_BASE64_CHARS = 1_400_000
 MAX_FRAME_BYTES = 1_000_000
 
-
 def _gemini_text(response, context: str) -> str:
     """Read Gemini text defensively; some valid responses contain no text part."""
     try:
@@ -58,7 +54,6 @@ def _gemini_text(response, context: str) -> str:
     except Exception:
         logger.warning("%s returned no text", context, exc_info=True)
         return ""
-
 
 def _gemini_error(exc) -> tuple[int, str]:
     """Turn a Gemini/network exception into (http_status, short honest message)
@@ -81,34 +76,17 @@ def _gemini_error(exc) -> tuple[int, str]:
         return 503, "Couldn't reach Gemini (network issue) — focus detection will keep retrying."
     return 502, "Focus analysis is temporarily unavailable."
 
-
-# Latest active-tab URL reported by the browser extension. Kept IN MEMORY only
-# (never written to SQLite) — browsing URLs are sensitive and transient. Goes
-# stale after ACTIVITY_TTL seconds so an old URL isn't reused once the extension
-# stops reporting (browser closed, tab not switched, etc.).
 ACTIVITY_TTL = 30.0
 _latest_activity = {}
 
-# Whether a tracker session is ACTIVELY tracking with website awareness on. The
-# tracker page heartbeats this (active = session live, not paused/on-break, and the
-# website toggle on). It also closes the gate IMMEDIATELY via explicit events
-# (pause/resume/break/stop/pagehide), so the TTL is only a backstop for a true
-# browser crash (no unload event fires). The TTL must exceed Chrome's background-tab
-# timer throttle (~60s once a tab is hidden a while) or the gate would false-close
-# while the user is working in another tab — which is exactly when we want it open.
-# The extension checks GET /tracking-state before reporting, and POST /activity is
-# ignored unless the gate is open, so the toggle is honored authoritatively.
 TRACKING_TTL = 90.0
 _tracking_state = {}
-
 
 def _activity_slot(workspace_id: int):
     return _latest_activity.setdefault(workspace_id, {"url": None, "title": None, "ts": 0.0})
 
-
 def _tracking_slot(workspace_id: int):
     return _tracking_state.setdefault(workspace_id, {"active": False, "ts": 0.0})
-
 
 def _tracking_active(workspace_id: int) -> bool:
     state = _tracking_slot(workspace_id)
@@ -133,7 +111,6 @@ app.add_middleware(
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 
-
 def _frontend_file(relative_path: str) -> Path:
     target = (FRONTEND_DIR / relative_path).resolve()
     if FRONTEND_DIR.resolve() not in target.parents and target != FRONTEND_DIR.resolve():
@@ -142,49 +119,39 @@ def _frontend_file(relative_path: str) -> Path:
         raise HTTPException(status_code=404, detail="Not Found")
     return target
 
-
 def _frontend_page(name: str = "index.html"):
     return FileResponse(_frontend_file(name))
 
-
 def _wants_html(request: Request) -> bool:
     return "text/html" in (request.headers.get("accept") or "")
-
 
 @app.get("/", include_in_schema=False)
 def frontend_root():
     return _frontend_page("index.html")
 
-
 @app.get("/index.html", include_in_schema=False)
 def frontend_index():
     return _frontend_page("index.html")
-
 
 @app.get("/plan.html", include_in_schema=False)
 def frontend_plan():
     return _frontend_page("plan.html")
 
-
 @app.get("/tracker.html", include_in_schema=False)
 def frontend_tracker():
     return _frontend_page("tracker.html")
-
 
 @app.get("/analytics.html", include_in_schema=False)
 def frontend_analytics():
     return _frontend_page("analytics.html")
 
-
 @app.get("/js/{asset_path:path}", include_in_schema=False)
 def frontend_js(asset_path: str):
     return FileResponse(_frontend_file(f"js/{asset_path}"))
 
-
 @app.get("/css/{asset_path:path}", include_in_schema=False)
 def frontend_css(asset_path: str):
     return FileResponse(_frontend_file(f"css/{asset_path}"))
-
 
 def get_workspace(
     x_demo_slug: Optional[str] = Header(None, alias="X-Demo-Slug"),
@@ -196,11 +163,9 @@ def get_workspace(
         raise HTTPException(status_code=404, detail="Demo workspace not found")
     return workspace
 
-
 @app.get("/health")
 def health():
     return {"ok": True}
-
 
 @app.get("/deployment-check")
 def deployment_check():
@@ -209,7 +174,6 @@ def deployment_check():
         "frontend_root_route": True,
         "deployment": "vercel-neon-static-frontend-v2",
     }
-
 
 @app.get("/ai/status")
 def ai_status():
@@ -220,7 +184,6 @@ def ai_status():
         "coaching_model": COACHING_MODEL,
         "coaching_model_source": "hardcoded",
     }
-
 
 @app.get("/demo/{slug}", response_model=schemas.DemoWorkspaceOut)
 def get_demo_workspace(slug: str, request: Request, db: Session = Depends(get_db)):
@@ -247,7 +210,6 @@ def get_demo_workspace(slug: str, request: Request, db: Session = Depends(get_db
         "demo_today_key": crud.DEMO_TODAY_KEY,
     }
 
-
 @app.post("/demo/{slug}/reset", response_model=schemas.DemoWorkspaceOut)
 def reset_demo_workspace(slug: str, db: Session = Depends(get_db)):
     workspace = crud.reset_seeded_workspace(db, slug)
@@ -262,7 +224,6 @@ def reset_demo_workspace(slug: str, db: Session = Depends(get_db)):
         "demo_today_key": crud.DEMO_TODAY_KEY,
     }
 
-
 @app.post("/demo/new/clear")
 def clear_new_demo(
     x_demo_anonymous_id: Optional[str] = Header(None, alias="X-Demo-Anonymous-Id"),
@@ -273,14 +234,12 @@ def clear_new_demo(
     crud.clear_anonymous_workspace(db, x_demo_anonymous_id)
     return {"ok": True}
 
-
 @app.get("/demo/{slug}/daily-unwinds", response_model=list[schemas.DemoDailyUnwindOut])
 def get_demo_daily_unwinds(slug: str, db: Session = Depends(get_db)):
     rows = crud.seeded_daily_unwinds(db, slug)
     if rows is None:
         raise HTTPException(status_code=404, detail="Demo workspace not found")
     return rows
-
 
 @app.post("/tasks", response_model=schemas.TaskOut)
 def create_task(
@@ -292,14 +251,12 @@ def create_task(
         raise HTTPException(status_code=400, detail="Task name cannot be empty")
     return crud.create_task(db, task, workspace)
 
-
 @app.get("/tasks", response_model=list[schemas.TaskOut])
 def get_tasks(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
     return crud.get_tasks(db, workspace)
-
 
 @app.get("/tasks/{task_id}", response_model=schemas.TaskOut)
 def get_task(
@@ -311,7 +268,6 @@ def get_task(
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
-
 
 @app.patch("/tasks/{task_id}", response_model=schemas.TaskOut)
 def update_task(
@@ -328,7 +284,6 @@ def update_task(
         completed_at = datetime(2026, 6, 28, 9, 0, tzinfo=timezone.utc)
     return crud.update_task(db, task, update, completed_at=completed_at)
 
-
 @app.delete("/tasks/{task_id}")
 def delete_task(
     task_id: int,
@@ -339,13 +294,11 @@ def delete_task(
     crud.delete_task(db, task)
     return {"ok": True}
 
-
 def _get_task_or_404(db: Session, task_id: int, workspace):
     task = crud.get_task(db, task_id, workspace)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
-
 
 def _get_session_or_404(db: Session, session_id: int, workspace):
     session = (
@@ -360,7 +313,6 @@ def _get_session_or_404(db: Session, session_id: int, workspace):
         raise HTTPException(status_code=404, detail="Session not found")
     return session
 
-
 @app.post("/sessions", response_model=schemas.SessionOut)
 def create_session(
     session: schemas.SessionCreate,
@@ -370,7 +322,6 @@ def create_session(
     task = _get_task_or_404(db, session.task_id, workspace)
     return crud.create_session(db, session, task, workspace)
 
-
 @app.post("/sessions/start", response_model=schemas.SessionOut)
 def start_session(
     session: schemas.SessionStart,
@@ -379,7 +330,6 @@ def start_session(
 ):
     task = _get_task_or_404(db, session.task_id, workspace)
     return crud.start_session(db, task, workspace, started_at=session.started_at)
-
 
 @app.patch("/sessions/{session_id}", response_model=schemas.SessionOut)
 def update_session(
@@ -391,7 +341,6 @@ def update_session(
     session = _get_session_or_404(db, session_id, workspace)
     return crud.update_session(db, session, update)
 
-
 @app.post("/sessions/{session_id}/finish", response_model=schemas.SessionOut)
 def finish_session(
     session_id: int,
@@ -402,14 +351,12 @@ def finish_session(
     session = _get_session_or_404(db, session_id, workspace)
     return crud.update_session(db, session, update)
 
-
 @app.get("/sessions", response_model=list[schemas.SessionOut])
 def get_sessions(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
     return crud.get_sessions(db, workspace)
-
 
 @app.delete("/sessions/{session_id}")
 def delete_session(
@@ -421,7 +368,6 @@ def delete_session(
     crud.delete_session(db, session)
     return {"ok": True}
 
-
 def _collapse_timeline(timeline_json: str) -> str:
     """Turn a [{minute, state}] log into compact runs, e.g.
     'focused 0-22m, distracted 22-24m, focused 24-41m'. Returns '' if unusable."""
@@ -432,7 +378,7 @@ def _collapse_timeline(timeline_json: str) -> str:
     if not isinstance(entries, list) or not entries:
         return ""
 
-    runs = []  # (state, start_minute, end_minute)
+    runs = []
     for e in entries:
         if not isinstance(e, dict):
             continue
@@ -450,7 +396,6 @@ def _collapse_timeline(timeline_json: str) -> str:
         return ""
     parts = [f"{s} {a}-{b + 1}m" for (s, a, b) in runs]
     return ", ".join(parts)
-
 
 def _format_journal(journal_json: str) -> str:
     """Turn the session journal (list of {t, type, ...}) into a readable timestamped
@@ -484,22 +429,11 @@ def _format_journal(journal_json: str) -> str:
             break
     return "\n".join(lines)
 
-
-# --- coaching output enforcement -------------------------------------------
-# Deterministic post-processing of the model's parsed coaching output. The
-# flash-lite model follows the prompt's mechanical rules only ~2/3 of the time,
-# so the rules that MUST hold are enforced here in code (ported from the
-# promptlab prompt-optimization sweep). Two jobs: (1) scrub banned openers and
-# any internal guide line the model echoed by mistake; (2) blank the coaching
-# fields when a session/day/week has too little real signal to coach on. The
-# CONTENT quality (which lever, sleep-vs-grit, win wording) stays in the prompt.
 _OPENERS = [
     (re.compile(r"^\s*You successfully\s+", re.I), "You "),
     (re.compile(r"^\s*You built strong momentum[^.!?]*[.!?]\s*", re.I), ""),
     (re.compile(r"^\s*Right out of the gate[,]?\s*", re.I), ""),
 ]
-# Strip any clause that echoes an internal injected guide (the daily honesty line /
-# the weekly COMPUTED TREND line) — the model sometimes copies these meta-lines verbatim.
 _LEAK = re.compile(r"\(?[^.!?\n]*(?:DOMINANT STATE|Honesty guide|COMPUTED TREND)[^.!?\n]*[.!?)\]]?", re.I)
 _PLANNER_BANNED = re.compile(r"\b(efficiency|intensity|output|discipline|productive|momentum)\b", re.I)
 _PLANNER_REPLACEMENTS = {
@@ -511,7 +445,6 @@ _PLANNER_REPLACEMENTS = {
     "momentum": "rhythm",
 }
 
-
 def _scrub(s):
     if not isinstance(s, str):
         return s
@@ -519,11 +452,10 @@ def _scrub(s):
     for pat, repl in _OPENERS:
         t = pat.sub(repl, t)
     t = re.sub(r"\s{2,}", " ", t).strip()
-    t = re.sub(r"^[\s)\].,;:—-]+", "", t).strip()   # drop orphan punctuation a strip leaves behind
+    t = re.sub(r"^[\s)\].,;:—-]+", "", t).strip()
     if t and t[0].islower():
         t = t[0].upper() + t[1:]
     return t
-
 
 def _scrub_planner_text(s):
     t = _scrub(s)
@@ -533,7 +465,6 @@ def _scrub_planner_text(s):
         lambda m: _PLANNER_REPLACEMENTS.get(m.group(0).lower(), ""),
         t,
     )
-
 
 def _scrub_response(resp):
     """Scrub every string / list-of-strings field on a coaching response, in place."""
@@ -545,7 +476,6 @@ def _scrub_response(resp):
             setattr(resp, field, [_scrub(x) if isinstance(x, str) else x for x in v])
     return resp
 
-
 def _session_gated(secs: dict) -> bool:
     """True when one session has too little real signal to coach on (too short, or
     mostly away/uncertain) — then the debrief drops to the summary + win only."""
@@ -555,13 +485,11 @@ def _session_gated(secs: dict) -> bool:
     away_unc = (secs.get("away", 0) + secs.get("uncertain", 0)) / total
     return total < 300 or away_unc >= 0.70
 
-
 def _daily_gated(total_sec: int, uncertain_sec: int) -> bool:
     """True when the day is too thin or too unreliable (mostly uncertain) to coach on."""
     if total_sec <= 0:
         return True
     return total_sec < 600 or (uncertain_sec / total_sec) >= 0.60
-
 
 def _weekly_flags(day_tuples: list, prior_weeks: list) -> dict:
     """day_tuples: list of (focused, distracted, uncertain, away) second tuples.
@@ -586,7 +514,6 @@ def _weekly_flags(day_tuples: list, prior_weeks: list) -> dict:
         "thin": len(active) <= 1,
     }
 
-
 def _daily_dominant_line(secs: dict) -> str:
     """Authoritative internal line so the model stops fabricating a non-focus state
     when focus is actually the largest slice. Scrubbed out if the model echoes it."""
@@ -601,7 +528,6 @@ def _daily_dominant_line(secs: dict) -> str:
              "away": "you were pulled away for much of it (situational, not a focus failure)",
              "uncertain": "the read is unreliable"}.get(name, name)
     return f"\n(Internal honesty guide, do NOT quote: in the summary's first clause, say {label}.)\n"
-
 
 def _weekly_trend_line(day_tuples: list, prior_weeks: list) -> str:
     """One authoritative line stating the week-over-week trend so the model can't
@@ -622,7 +548,6 @@ def _weekly_trend_line(day_tuples: list, prior_weeks: list) -> str:
     return (f"\nCOMPUTED TREND: this week {wk}% focused vs last week {pw}% = {delta:+d} pts ({label}). "
             "State this as given; do not recompute.\n")
 
-
 def _enforce_debrief(resp, secs):
     _scrub_response(resp)
     if _session_gated(secs):
@@ -630,7 +555,6 @@ def _enforce_debrief(resp, secs):
         resp.suggestions = []
         resp.next_action = ""
     return resp
-
 
 def _enforce_daily(resp, secs):
     _scrub_response(resp)
@@ -640,7 +564,6 @@ def _enforce_daily(resp, secs):
         resp.next_action = ""
         resp.shutdown_question = ""
     return resp
-
 
 def _enforce_weekly(resp, day_tuples, prior_weeks):
     _scrub_response(resp)
@@ -654,7 +577,6 @@ def _enforce_weekly(resp, day_tuples, prior_weeks):
     if flags.get("thin"):
         resp.insights = (resp.insights or [])[:2]
     return resp
-
 
 def _parse_plan_advice(text: str) -> schemas.PlanAdviceResponse:
     """Parse the planner's JSON defensively — always returns a valid object; on any
@@ -701,21 +623,17 @@ def _parse_plan_advice(text: str) -> schemas.PlanAdviceResponse:
         fallback = raw[:300] if raw else "No scheduling advice available right now."
         return schemas.PlanAdviceResponse(summary=fallback)
 
-
 def _plan_entry_duration(entry) -> int:
     return max(5, int(entry.estimate_min or 5))
-
 
 def _ceil_snap(minute: int, snap: int = 5) -> int:
     minute = int(minute or 0)
     return ((minute + snap - 1) // snap) * snap
 
-
 def _aware_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
-
 
 def _local_minute(dt: datetime, local_tz=None) -> int:
     if local_tz is not None:
@@ -723,7 +641,6 @@ def _local_minute(dt: datetime, local_tz=None) -> int:
             dt = dt.replace(tzinfo=timezone.utc)
         dt = dt.astimezone(local_tz)
     return dt.hour * 60 + dt.minute
-
 
 def _parse_plan_entries(plan) -> list[schemas.PlanEntry]:
     if plan is None or not getattr(plan, "plan_json", None):
@@ -749,12 +666,10 @@ def _parse_plan_entries(plan) -> list[schemas.PlanEntry]:
         entries.append(entry)
     return entries
 
-
 def _session_minutes(session) -> tuple[int, int]:
     focused = session.seconds_focused or 0
     total = focused + (session.seconds_distracted or 0) + (session.seconds_uncertain or 0) + (session.seconds_away or 0)
     return round(total / 60), round(focused / 60)
-
 
 def _status_for_row(planned_start, start_delta, duration_delta) -> str:
     if start_delta is not None and start_delta >= 10:
@@ -766,7 +681,6 @@ def _status_for_row(planned_start, start_delta, duration_delta) -> str:
     if duration_delta <= -10:
         return "ran_short"
     return "on_track"
-
 
 def _build_plan_reality_report(period_key: str, plan, sessions: list, local_tz=None) -> schemas.PlanRealityReport:
     entries = _parse_plan_entries(plan)
@@ -860,7 +774,6 @@ def _build_plan_reality_report(period_key: str, plan, sessions: list, local_tz=N
         summary=summary,
     )
 
-
 def _calibration_item(rows: list[dict], task_id=None, name: str = "Overall") -> schemas.PlanCalibrationItem:
     samples = []
     for row in rows:
@@ -895,7 +808,6 @@ def _calibration_item(rows: list[dict], task_id=None, name: str = "Overall") -> 
         message=message,
     )
 
-
 def _build_plan_calibration(scorecards: list[dict]) -> schemas.PlanCalibrationResponse:
     all_rows = []
     by_task: dict[int, list[dict]] = {}
@@ -919,10 +831,8 @@ def _build_plan_calibration(scorecards: list[dict]) -> schemas.PlanCalibrationRe
     task_items.sort(key=lambda item: (item.samples, abs(item.avg_delta_pct), abs(item.avg_delta_min)), reverse=True)
     return schemas.PlanCalibrationResponse(overall=overall, by_task=task_items[:12])
 
-
 def _difficulty_rank(entry: schemas.PlanEntry) -> int:
     return {"hard": 0, "medium": 1, "easy": 2}.get(entry.difficulty, 1)
-
 
 def _build_reschedule_response(req: schemas.PlanRescheduleRequest) -> schemas.PlanRescheduleResponse:
     completed = {int(x) for x in (req.completed_task_ids or [])}
@@ -974,7 +884,6 @@ def _build_reschedule_response(req: schemas.PlanRescheduleRequest) -> schemas.Pl
         ),
     )
 
-
 def _enforce_plan_advice(resp, entries, available_min, ctx):
     """Deterministic validation of the planner's output (flash-lite follows mechanical
     rules only ~2/3 of the time): every plan task is scheduled exactly once, times are
@@ -992,8 +901,6 @@ def _enforce_plan_advice(resp, entries, available_min, ctx):
     if total_duration > 24 * 60:
         raise HTTPException(status_code=422, detail="Planned tasks cannot fit in one day")
 
-    # The model's suggested start (minutes from midnight) + reason per task; drop any
-    # hallucinated task_id and any duplicate.
     suggested = {}
     for b in (resp.scheduled or []):
         if not isinstance(b, schemas.ScheduledBlock) or b.task_id in suggested:
@@ -1004,8 +911,6 @@ def _enforce_plan_advice(resp, entries, available_min, ctx):
             sh * 60 + sm,
             _scrub_planner_text(b.reason) if isinstance(b.reason, str) else "",
         )
-    # Order the plan's tasks by the model's suggested start (unknown -> last), then pack
-    # them back-to-back so nothing overlaps, using each task's real estimate as length.
     ordered = sorted(entries, key=lambda e: suggested.get(e.task_id, (24 * 60, ""))[0])
     lengths = [_plan_entry_duration(e) for e in ordered]
     remaining_from = []
@@ -1037,8 +942,6 @@ def _enforce_plan_advice(resp, entries, available_min, ctx):
     resp.cold_start = bool(ctx.get("cold_start"))
     if ctx.get("gated"):
         resp.general_advice = []
-    # Over-plan note is authoritative from code: present only when over budget, and never
-    # fabricated when the plan fits.
     total_est = total_duration
     if available_min > 0 and total_est > available_min:
         if not (resp.over_plan_note or "").strip():
@@ -1051,14 +954,12 @@ def _enforce_plan_advice(resp, entries, available_min, ctx):
         resp.over_plan_note = ""
     return resp
 
-
 def _parse_debrief(text: str) -> schemas.DebriefResponse:
     """Parse the model's JSON defensively — always returns a valid object. On any
     problem, fall back to putting the raw text in `summary` so the UI never breaks."""
     raw = (text or "").strip()
     cleaned = raw
     if cleaned.startswith("```"):
-        # strip a ```json ... ``` fence
         cleaned = re.sub(r"^```[a-zA-Z]*\s*", "", cleaned)
         cleaned = re.sub(r"\s*```$", "", cleaned).strip()
     try:
@@ -1086,7 +987,6 @@ def _parse_debrief(text: str) -> schemas.DebriefResponse:
         return schemas.DebriefResponse(
             summary=fallback, patterns=[], suggestions=[]
         )
-
 
 def _session_summary(session: models.FocusSession) -> tuple[str, int]:
     """Build the human-readable session summary block used by both the debrief and
@@ -1126,7 +1026,6 @@ def _session_summary(session: models.FocusSession) -> tuple[str, int]:
     )
     return summary_lines, total
 
-
 @app.post("/sessions/{session_id}/debrief", response_model=schemas.DebriefResponse)
 def debrief_session(
     session_id: int,
@@ -1139,7 +1038,6 @@ def debrief_session(
 
     summary_lines, total = _session_summary(session)
     if total <= 0:
-        # Nothing to coach on — don't spend a call. Frontend already skips this case.
         raise HTTPException(status_code=422, detail="Session has no tracked time to analyze")
 
     secs = {
@@ -1238,7 +1136,6 @@ Reply with ONLY valid JSON, no markdown, exactly:
         logger.exception("Gemini debrief call failed")
         raise HTTPException(status_code=502, detail="Debrief is temporarily unavailable")
 
-
 @app.post("/work-periods", response_model=schemas.WorkPeriodOut)
 def upsert_work_period(
     period: schemas.WorkPeriodCreate,
@@ -1247,7 +1144,6 @@ def upsert_work_period(
 ):
     return crud.upsert_work_period(db, period, workspace)
 
-
 @app.get("/work-periods", response_model=list[schemas.WorkPeriodOut])
 def get_work_periods(
     db: Session = Depends(get_db),
@@ -1255,12 +1151,10 @@ def get_work_periods(
 ):
     return crud.get_work_periods(db, workspace)
 
-
 def _sessions_in_range(sessions: list, day_start: datetime, day_end: datetime) -> list:
     start = _aware_utc(day_start)
     end = _aware_utc(day_end)
     return [s for s in sessions if start <= _aware_utc(s.started_at) < end]
-
 
 @app.get("/plan/calibration", response_model=schemas.PlanCalibrationResponse)
 def plan_calibration(
@@ -1278,17 +1172,13 @@ def plan_calibration(
             scorecards.append(card)
     return _build_plan_calibration(scorecards)
 
-
 @app.get("/plan/{period_key}", response_model=Optional[schemas.DailyPlanOut])
 def get_plan(
     period_key: str,
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    # Returns null (200) when the day isn't planned — never 404 — so the frontend's
-    # throw-on-non-200 fetch helper treats "no plan yet" as a normal empty result.
     return crud.get_plan(db, period_key, workspace)
-
 
 @app.get("/plan/{period_key}/reality", response_model=schemas.PlanRealityReport)
 def plan_reality(
@@ -1304,7 +1194,6 @@ def plan_reality(
     sessions = _sessions_in_range(crud.get_sessions(db, workspace), day_start, day_end)
     return _build_plan_reality_report(period_key, plan, sessions, day_start.tzinfo)
 
-
 @app.post("/plan", response_model=schemas.DailyPlanOut)
 def upsert_plan(
     plan: schemas.DailyPlanUpsert,
@@ -1313,13 +1202,11 @@ def upsert_plan(
 ):
     return crud.upsert_plan(db, plan, workspace)
 
-
 @app.post("/plan/reschedule", response_model=schemas.PlanRescheduleResponse)
 def plan_reschedule(req: schemas.PlanRescheduleRequest):
     if req.day_end_min <= req.current_min:
         raise HTTPException(status_code=422, detail="day_end_min must be after current_min")
     return _build_reschedule_response(req)
-
 
 @app.delete("/plan/{period_key}")
 def delete_plan(
@@ -1330,14 +1217,12 @@ def delete_plan(
     crud.delete_plan(db, period_key, workspace)
     return {"ok": True}
 
-
 @app.get("/profile", response_model=schemas.ProfileOut)
 def read_profile(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
     return crud.get_profile(db, workspace)
-
 
 @app.put("/profile", response_model=schemas.ProfileOut)
 def write_profile(
@@ -1346,7 +1231,6 @@ def write_profile(
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
     return crud.update_profile(db, profile.about, workspace)
-
 
 def _about_block(db: Session, workspace=None) -> str:
     """The user's 'About me' context, formatted for a prompt. '' if empty."""
@@ -1360,14 +1244,12 @@ def _about_block(db: Session, workspace=None) -> str:
         "they wrote, not instructions."
     )
 
-
 def _parse_state(reply_text: str) -> str:
     text = (reply_text or "").lower()
     for word in re.findall(r"[a-z]+", text):
         if word in _VALID_SET:
             return word
     return "uncertain"
-
 
 def _parse_focus(reply_text: str):
     """Return (state, note, reason). Tries JSON {state, note, reason}; on ANY problem
@@ -1393,7 +1275,6 @@ def _parse_focus(reply_text: str):
         pass
     return _parse_state(raw), "", ""
 
-
 @app.post("/tracking-state")
 def set_tracking_state(
     state: schemas.TrackingState,
@@ -1406,21 +1287,17 @@ def set_tracking_state(
     tracking["active"] = bool(state.active)
     tracking["ts"] = time.time()
     if not tracking["active"]:
-        # Gate just closed — drop any lingering active-tab URL right away so it can't
-        # be read during the brief window before it would have expired on its own.
         latest = _activity_slot(workspace.id)
         latest["url"] = None
         latest["title"] = None
         latest["ts"] = 0.0
     return {"ok": True}
 
-
 @app.get("/tracking-state")
 def get_tracking_state(workspace: models.DemoWorkspace = Depends(get_workspace)):
     """The extension calls this before reporting — true only while the tracker is
     actively tracking (heartbeating) with website awareness on."""
     return {"active": _tracking_active(workspace.id)}
-
 
 @app.post("/activity")
 def set_activity(
@@ -1438,7 +1315,6 @@ def set_activity(
     latest["ts"] = time.time()
     return {"ok": True}
 
-
 @app.get("/activity", response_model=schemas.ActivityOut)
 def get_activity(workspace: models.DemoWorkspace = Depends(get_workspace)):
     """Latest reported URL + title, or null if none/stale/gate-closed. The tracker
@@ -1449,7 +1325,6 @@ def get_activity(workspace: models.DemoWorkspace = Depends(get_workspace)):
     if latest["url"] and (time.time() - latest["ts"]) <= ACTIVITY_TTL:
         return schemas.ActivityOut(url=latest["url"], title=latest["title"])
     return schemas.ActivityOut(url=None, title=None)
-
 
 @app.post("/focus/analyze", response_model=schemas.FocusAnalyzeResponse)
 def analyze_focus(
@@ -1538,9 +1413,6 @@ Reply with ONLY valid JSON, no markdown: {json_shape}"""
         status, msg = _gemini_error(exc)
         raise HTTPException(status_code=status, detail=msg)
 
-
-# --- Pattern Memory: AI-learned focus observations --------------------------
-
 def _observation_out(obs: models.Observation) -> schemas.ObservationOut:
     return schemas.ObservationOut(
         id=obs.id,
@@ -1551,7 +1423,6 @@ def _observation_out(obs: models.Observation) -> schemas.ObservationOut:
         status=crud.observation_status(obs),
     )
 
-
 @app.get("/observations", response_model=list[schemas.ObservationOut])
 def get_observations(
     db: Session = Depends(get_db),
@@ -1559,14 +1430,12 @@ def get_observations(
 ):
     return [_observation_out(o) for o in crud.list_observations(db, workspace=workspace)]
 
-
 @app.get("/hourly-focus", response_model=list[schemas.HourlyFocusOut])
 def get_hourly_focus(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
     return crud.get_hourly_focus(db, workspace)
-
 
 @app.delete("/observations/{obs_id}")
 def delete_observation(
@@ -1579,7 +1448,6 @@ def delete_observation(
         raise HTTPException(status_code=404, detail="Observation not found")
     crud.delete_observation(db, obs)
     return {"ok": True}
-
 
 def _parse_observations(text: str) -> dict:
     """Parse the learn call's JSON defensively. Always returns
@@ -1613,7 +1481,6 @@ def _parse_observations(text: str) -> dict:
         pass
     return out
 
-
 @app.post("/sessions/{session_id}/learn", response_model=schemas.LearnResult)
 def learn_from_session(
     session_id: int,
@@ -1631,8 +1498,6 @@ def learn_from_session(
     if total <= 0:
         return schemas.LearnResult(updated=0, hours_updated=0)
 
-    # (1) Hourly focus profile — pure math, no AI. The frontend sends the local
-    # start/end hours; we fold this session's focus % into each hour it touched.
     hours_updated = 0
     start_h = payload.start_hour if payload else None
     end_h = payload.end_hour if payload else None
@@ -1643,7 +1508,6 @@ def learn_from_session(
     if _client is None:
         return schemas.LearnResult(updated=0, hours_updated=hours_updated)
 
-    # (2) Qualitative patterns — the AI affirm/reject/add loop.
     active = crud.list_observations(db, active_only=True, workspace=workspace)
     if active:
         patterns_block = "\n".join(
@@ -1696,7 +1560,7 @@ Reply with ONLY valid JSON, no markdown, in exactly this shape:
             if obs is not None:
                 crud.reject_observation(db, obs)
                 updated += 1
-        for text in result["new"][:2]:  # cap new per session
+        for text in result["new"][:2]:
             if crud.create_observation(db, text, workspace) is not None:
                 updated += 1
 
@@ -1705,14 +1569,10 @@ Reply with ONLY valid JSON, no markdown, in exactly this shape:
         logger.exception("Pattern-learning call failed")
         return schemas.LearnResult(updated=0, hours_updated=hours_updated)
 
-
-# --- AI Daily Unwind --------------------------------------------------------
-
 def _fmt_hour(h: int) -> str:
     ap = "am" if h < 12 else "pm"
     hr = h % 12 or 12
     return f"{hr}{ap}"
-
 
 def _day_summary(sessions: list) -> tuple[str, int]:
     """Aggregate a day's sessions into a coach-readable block. Returns (text, total_seconds)."""
@@ -1738,7 +1598,7 @@ def _day_summary(sessions: list) -> tuple[str, int]:
     journal_blocks = [j for j in (_format_journal(s.journal_json) for s in sessions) if j]
     journal = "\n".join(journal_blocks)
     jlines = journal.splitlines()
-    if len(jlines) > 40:  # cap so a long day doesn't blow up the prompt
+    if len(jlines) > 40:
         journal = "\n".join(jlines[:40]) + "\n…"
 
     text = (
@@ -1750,7 +1610,6 @@ def _day_summary(sessions: list) -> tuple[str, int]:
         + (f"\nToday's journal (timestamped events):\n{journal}\n" if journal else "")
     )
     return text, total
-
 
 def _parse_daily_unwind(text: str) -> schemas.DailyUnwindResponse:
     """Defensive JSON parse — always returns a valid object (mirrors _parse_debrief)."""
@@ -1785,11 +1644,9 @@ def _parse_daily_unwind(text: str) -> schemas.DailyUnwindResponse:
         fallback = raw[:300] if raw else "No daily insights available right now."
         return schemas.DailyUnwindResponse(summary=fallback, pattern_notes=[], advice=[])
 
-
 def _plan_echo(summary: Optional[str]) -> str:
     clean = _scrub((summary or "").strip())
     return clean[:260] if clean else ""
-
 
 @app.post("/unwind/daily", response_model=schemas.DailyUnwindResponse)
 def daily_unwind(
@@ -1814,13 +1671,10 @@ def daily_unwind(
     ]
     summary_lines, total = _day_summary(sessions)
     if total < 120:
-        # Not enough tracked today — don't spend a call. Frontend shows a friendly note.
         raise HTTPException(status_code=422, detail="Not enough tracked time today to analyze")
 
     secs = {k: sum(getattr(s, f"seconds_{k}") or 0 for s in sessions)
             for k in ("focused", "distracted", "uncertain", "away")}
-    # Inject the dominant-state honesty line so the model states the largest slice
-    # correctly instead of fabricating one (the model is told not to quote it; _scrub strips echoes).
     summary_lines = _daily_dominant_line(secs) + summary_lines
 
     recent = ""
@@ -1940,7 +1794,6 @@ Reply with ONLY valid JSON, no markdown, exactly:
         logger.exception("Daily unwind call failed")
         raise HTTPException(status_code=502, detail="Daily unwind is temporarily unavailable")
 
-
 @app.post("/plan/advice", response_model=schemas.PlanAdviceResponse)
 def plan_advice(
     req: schemas.PlanAdviceRequest,
@@ -1970,8 +1823,6 @@ def plan_advice(
     if _client is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set in .env")
 
-    # Peak hours from the hourly profile — only hours with real samples count. Without
-    # enough history we must NOT invent peak times (the cold-start trap the review flagged).
     sampled = [h for h in crud.get_hourly_focus(db, workspace) if h.sessions > 0]
     ranked = sorted(sampled, key=lambda h: h.focus_pct, reverse=True)[:3]
     cold_start = len(sampled) < 4
@@ -1994,8 +1845,6 @@ def plan_advice(
     ) if active else "(none yet)"
     about = _about_block(db, workspace)
 
-    # Planner gating: with little profile AND no confirmed patterns AND no About-me, don't
-    # generate "based on your patterns" advice — it would be generic filler.
     gated = cold_start and not confirmed and not about
 
     task_lines = "\n".join(
@@ -2041,12 +1890,8 @@ Reply with ONLY valid JSON, no markdown, exactly:
         logger.exception("Plan advice call failed")
         raise HTTPException(status_code=502, detail="Plan advice is temporarily unavailable")
 
-
-# --- AI Weekly Unwind -------------------------------------------------------
-
 POMO_FOCUS_MIN, POMO_FOCUS_MAX = 10, 55
 POMO_BREAK_MIN, POMO_BREAK_MAX = 5, 15
-
 
 def _week_summary(days: list) -> tuple[str, int]:
     """Build a week block from the per-day data the frontend sends, folding in any
@@ -2080,7 +1925,6 @@ def _week_summary(days: list) -> tuple[str, int]:
         f"Per day:\n{lines}\n"
     )
     return text, total
-
 
 def _parse_weekly_unwind(text: str) -> schemas.WeeklyUnwindResponse:
     """Defensive JSON parse — always returns a valid object; clamps the pomodoro
@@ -2129,7 +1973,6 @@ def _parse_weekly_unwind(text: str) -> schemas.WeeklyUnwindResponse:
         fallback = raw[:300] if raw else "No weekly insights available right now."
         return schemas.WeeklyUnwindResponse(summary=fallback)
 
-
 @app.post("/unwind/weekly", response_model=schemas.WeeklyUnwindResponse)
 def weekly_unwind(
     req: schemas.WeeklyUnwindRequest,
@@ -2174,7 +2017,6 @@ def weekly_unwind(
             rows.append(f"week of {w.period_key}: {pct}% focused, {round((w.seconds_focused or 0) / 60)}m")
         trend_block = "\n\nPrevious weeks (for the trend):\n" + "\n".join(rows)
 
-    # Gate context + the code-computed trend, injected as fact so the model can't fabricate it.
     day_tuples = [
         (d.seconds_focused or 0, d.seconds_distracted or 0, d.seconds_uncertain or 0, d.seconds_away or 0)
         for d in req.days

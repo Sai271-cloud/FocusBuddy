@@ -39,7 +39,7 @@
 
 <main class="app-main plan-main max-w-6xl mx-auto px-6 py-8">
   <div class="card plan-wizard" style="position:relative">
-    <!-- Always-available exit: leaves to Today, nothing saved. -->
+    
     <button id="plan-exit" class="btn-ghost" aria-label="Exit planning" title="Exit (Esc)"
             style="position:absolute;top:13px;right:13px;width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -95,12 +95,11 @@
 <script src="js/planning-insights.js"></script>
 <script src="js/plan-calendar.js"></script>
 <script>
-  // ---- The Plan wizard (its own small step controller; not the analytics modal) ----
   const STEP_KEYS = ['pick', 'size', 'schedule', 'confirm'];
   const DIFFICULTIES = ['easy', 'medium', 'hard'];
   const DIFF_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
-  const DEFAULT_ESTIMATE = 30;     // minutes a freshly-picked task starts at
-  const DEFAULT_AVAILABLE = 180;   // minutes the "time available" slider starts at
+  const DEFAULT_ESTIMATE = 30;
+  const DEFAULT_AVAILABLE = 180;
 
   const el = id => document.getElementById(id);
   function escapeHtml(str) {
@@ -108,7 +107,6 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
-  // Local day key (YYYY-MM-DD) — same local-date convention analytics uses, never UTC.
   function currentDate() {
     return window.FocusBuddyDemo && FocusBuddyDemo.now ? FocusBuddyDemo.now() : new Date();
   }
@@ -140,23 +138,23 @@
 
   const periodKey = localDateKey();
   const state = {
-    view: 'wizard',            // 'wizard' while editing, 'current' for the saved-plan dashboard
+    view: 'wizard',
     step: 0,
-    tasks: [],                 // active tasks from the backend
-    entries: new Map(),        // task_id -> { task_id, name, estimate_min, difficulty }
+    tasks: [],
+    entries: new Map(),
     availableMin: DEFAULT_AVAILABLE,
-    existingPlan: false,       // a plan already existed today (we're editing it)
+    existingPlan: false,
     loadError: false,
     planDirty: false,
     hadSavedAdvice: false,
-    advice: null,              // AI scheduling advice; may be stale after edits until regenerated
+    advice: null,
     adviceStale: false,
     adviceGeneratedThisVisit: false,
     adviceLoading: false,
     calibration: null,
     focusWindows: [],
     saveStatus: '',
-    finished: false,           // set once the plan is saved/dashboard-only
+    finished: false,
   };
 
   function todayHref() {
@@ -166,8 +164,6 @@
   el('plan-date').textContent =
     currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
-  // Easy exit: the close button and Escape both return to Today with nothing saved. If a modal
-  // is open, its own Escape handler gets first chance instead of leaving Plan.
   el('plan-exit').addEventListener('click', () => {
     location.href = todayHref();
   });
@@ -260,8 +256,6 @@
       </p>`;
   }
 
-  // The pick list = active tasks, plus any planned entry whose task was since deleted
-  // (shown by its snapshot name so the user can still see / uncheck it).
   function pickList() {
     const ids = new Set(state.tasks.map(t => t.id));
     const ghosts = [...state.entries.values()]
@@ -280,7 +274,6 @@
     });
   }
 
-  // ---------- Phase bodies ----------
   function stepBody() {
     const key = STEP_KEYS[state.step];
     if (key === 'pick') return pickBody();
@@ -508,8 +501,6 @@
       </aside>`;
   }
 
-  // Schedule step (Chunk C): plan-calendar.js owns only the manual task tray + day calendar.
-  // AI suggestions stay in the side panel so saved times come only from the user's placement.
   function scheduleBody() {
     const entries = [...state.entries.values()];
     if (!entries.length) {
@@ -646,7 +637,6 @@
       </div>`;
   }
 
-  // ---------- Render + per-step wiring ----------
   function render() {
     if (state.view === 'current') {
       el('plan-dots').innerHTML = '';
@@ -796,7 +786,6 @@
     }
   }
 
-  // Re-render only the budget meter in place (the slider keeps focus while dragging).
   function refreshBudget() {
     const holder = el('plan-body').querySelector('.budget-meter');
     if (holder && holder.parentElement) holder.parentElement.innerHTML = budgetMeterHtml();
@@ -864,8 +853,6 @@
     scheduleAutoSave();
   }
 
-  // Render the schedule-step calendar + tray (via plan-calendar.js) and re-render on a
-  // placement change. Placement updates plan_json on save; it does NOT mark advice stale.
   function paintCalendar() {
     const root = el('plan-cal-root');
     if (!root || !window.PlanCalendar) return;
@@ -934,8 +921,6 @@
     } catch {
       failed = true;
     }
-    // Ignore a stale completion: superseded by a newer Generate, or the plan was already
-    // saved (don't clobber the success screen).
     if (myReq !== adviceReqId || state.finished) return;
     state.adviceLoading = false;
     if (failed) {
@@ -1017,7 +1002,7 @@
 
   function showCurrentPlan() {
     state.view = 'current';
-    state.finished = true;   // stops any late advice completion from clobbering the saved dashboard
+    state.finished = true;
     render();
   }
 
@@ -1057,13 +1042,13 @@
           }
         });
         state.existingPlan = state.entries.size > 0;
-      } catch { /* ignore a malformed saved plan */ }
+      } catch {  }
       if (Number.isFinite(plan.available_min) && plan.available_min > 0) {
         state.availableMin = plan.available_min;
       }
       if (plan.advice_json) {
         state.hadSavedAdvice = true;
-        try { state.advice = JSON.parse(plan.advice_json); } catch { /* ignore malformed advice */ }
+        try { state.advice = JSON.parse(plan.advice_json); } catch {  }
       }
     }
     if (state.existingPlan) {
