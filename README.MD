@@ -1,4 +1,3 @@
-```
 # Focus Buddy
 
 ## Inspiration
@@ -97,4 +96,3 @@ There are a couple more features I would like to implement for Focus Buddy:
 - In this app, I only used the free model of Gemini for the AI features. Later, I want to test out other models and compare their performances in order to provide the best insight possible.
 - After a couple more tweaks, I want to try and build this idea into a fully functional website where users can sign up.
 - I want to add third-party integrations like Google Calendar to improve the website.
-```
