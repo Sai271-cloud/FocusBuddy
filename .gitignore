@@ -65,17 +65,21 @@ test-results/
 skills-lock.json
 
 # Agent / dev-only tooling - not needed to run the app.
-# tools/ ships only the two human-run serve helpers; everything else stays local.
-tools/*
-!tools/serve.ps1
-!tools/stop-serve.ps1
-tools/.serve/
+tools/
 .claude/
 .agents/
 .codex/
 
-# docs/ holds agent handoff notes. The one handoff already committed stays tracked
-# (git keeps tracked files even when ignored); new handoffs are ignored by default.
+# Agent project-memory + dev-only files - hidden from the public repo because the app
+# does not need them to run. Deploy config (pyproject.toml, vercel.json, vercel_build.py)
+# is intentionally NOT ignored so the hosted Vercel demo keeps working.
+CLAUDE.md
+AGENTS.md
+.gitattributes
+tests/
+extension/README.md
+
+# docs/ holds agent handoff notes - not needed to run the app.
 docs/
 
 # Hosting CLI local state
