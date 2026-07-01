@@ -1,8 +1,11 @@
 import os
+import logging
 from pathlib import Path
 
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker, declarative_base
+
+logger = logging.getLogger("focus_buddy")
 
 DATABASE_PATH = Path(__file__).resolve().with_name("focus_buddy.db")
 DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{DATABASE_PATH.as_posix()}"
@@ -33,8 +36,16 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     if _IS_SQLITE:
         _repair_sqlite_schema()
-    _prune_empty_sessions()
-    _init_pattern_memory()
+        try:
+            _prune_empty_sessions()
+        except Exception:
+            logger.exception("Empty-session prune failed; continuing")
+    else:
+        _repair_added_columns()
+    try:
+        _init_pattern_memory()
+    except Exception:
+        logger.exception("Pattern-memory init failed; continuing")
 
 def _init_pattern_memory():
     """Startup maintenance for the Pattern Memory:
@@ -183,6 +194,30 @@ def _repair_sqlite_schema():
         hour_cols = {c["name"] for c in inspect(engine).get_columns("hourly_focus")}
         if "workspace_id" not in hour_cols:
             _rebuild_hourly_focus_with_workspace()
+
+def _repair_added_columns():
+    """Postgres-safe column repair. create_all makes missing TABLES but never adds
+    missing COLUMNS to existing tables, so a model column added after the DB was first
+    created would break saves on Neon. For every mapped column the DB is missing, add it
+    as a nullable column (safe for existing rows — the app always sets values on write)
+    via ADD COLUMN IF NOT EXISTS (idempotent). Does NOT change types or constraints; a
+    real type migration still needs manual care."""
+    if _IS_SQLITE:
+        return
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        db_cols = {c["name"] for c in inspector.get_columns(table.name)}
+        for col in table.columns:
+            if col.name in db_cols:
+                continue
+            col_type = col.type.compile(dialect=engine.dialect)
+            with engine.begin() as connection:
+                connection.execute(
+                    text(f'ALTER TABLE "{table.name}" ADD COLUMN IF NOT EXISTS "{col.name}" {col_type}')
+                )
 
 def _ensure_default_workspace_row():
     with engine.begin() as connection:
@@ -403,5 +438,8 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

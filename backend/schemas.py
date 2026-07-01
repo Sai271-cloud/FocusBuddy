@@ -43,8 +43,8 @@ class SessionCreate(BaseModel):
     seconds_distracted: int = Field(0, ge=0)
     seconds_uncertain: int = Field(0, ge=0)
     seconds_away: int = Field(0, ge=0)
-    timeline_json: str = "[]"
-    journal_json: str = "[]"
+    timeline_json: str = Field("[]", max_length=200_000)
+    journal_json: str = Field("[]", max_length=200_000)
     intention: str = ''
 
 class SessionStart(BaseModel):
@@ -57,8 +57,8 @@ class SessionUpdate(BaseModel):
     seconds_distracted: int = Field(0, ge=0)
     seconds_uncertain: int = Field(0, ge=0)
     seconds_away: int = Field(0, ge=0)
-    timeline_json: str = "[]"
-    journal_json: str = "[]"
+    timeline_json: str = Field("[]", max_length=200_000)
+    journal_json: str = Field("[]", max_length=200_000)
     intention: Optional[str] = None
 
 class SessionOut(BaseModel):

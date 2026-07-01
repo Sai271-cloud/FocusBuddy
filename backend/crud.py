@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from . import models, schemas
 
 DEFAULT_WORKSPACE_SLUG = "local"
@@ -171,8 +172,12 @@ def ensure_default_workspace(db: Session) -> models.DemoWorkspace:
             seed_version=0,
         )
         db.add(workspace)
-        db.commit()
-        db.refresh(workspace)
+        try:
+            db.commit()
+            db.refresh(workspace)
+        except IntegrityError:
+            db.rollback()
+            workspace = db.get(models.DemoWorkspace, DEFAULT_WORKSPACE_ID)
     return workspace
 
 def _workspace_id(db: Session, workspace=None) -> int:
@@ -211,9 +216,13 @@ def ensure_anonymous_workspace(db: Session, anonymous_id: str) -> models.DemoWor
             seed_version=0,
         )
         db.add(workspace)
-        db.commit()
-        db.refresh(workspace)
-        seed_hourly_focus(db, workspace)
+        try:
+            db.commit()
+            db.refresh(workspace)
+            seed_hourly_focus(db, workspace)
+        except IntegrityError:
+            db.rollback()
+            workspace = get_workspace_by_slug(db, slug)
     return workspace
 
 def resolve_demo_workspace(
@@ -892,7 +901,11 @@ def reset_seeded_workspace(db: Session, slug: str) -> models.DemoWorkspace | Non
             seed_version=CURRENT_DEMO_SEED_VERSION,
         )
         db.add(workspace)
-        db.flush()
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            workspace = get_workspace_by_slug(db, slug)
     workspace.display_name = seed["display_name"]
     workspace.archetype = seed["archetype"]
     workspace.workspace_type = "seeded"

@@ -24,7 +24,10 @@ load_dotenv()
 
 logger = logging.getLogger("focus_buddy")
 
-init_db()
+try:
+    init_db()
+except Exception:
+    logger.exception("init_db failed at startup; continuing so the app can still boot")
 
 _gemini_key = os.getenv("GEMINI_API_KEY")
 _client = None
