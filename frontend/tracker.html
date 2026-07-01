@@ -487,6 +487,20 @@
     return pendingSave;
   }
 
+  async function saveFinalWithRetry(attempts = 3) {
+    let lastErr;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await enqueueSessionSave(true);
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (i < attempts - 1) await new Promise(r => setTimeout(r, 700 * (i + 1)));
+      }
+    }
+    throw lastErr;
+  }
+
   function setSessionControlsDisabled(disabled) {
     ['pause-btn', 'stop-btn'].forEach(id => {
       const btn = document.getElementById(id);
@@ -703,7 +717,7 @@
     stopBtn.disabled = true;
 
     try {
-      await enqueueSessionSave(true);
+      await saveFinalWithRetry();
     } catch (err) {
       console.error('Save failed:', err);
       retryFinalSave = true;
