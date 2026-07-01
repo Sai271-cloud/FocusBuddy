@@ -4,6 +4,9 @@ Focus Buddy is a browser-based productivity and reflection app. You create a tas
 session, and the app tracks time in four states: Focused, Distracted, Uncertain, and Away. Finished
 sessions feed analytics, daily/weekly unwind flows, and pattern memory.
 
+> **Want to run it yourself? See [SETUP.md](SETUP.md)** for precise, copy-paste local setup
+> instructions (no database or deployment needed — it runs on SQLite locally).
+
 ## Current Shape
 
 - `frontend/` is the real app UI: plain HTML, CSS, and JavaScript served over HTTP.
