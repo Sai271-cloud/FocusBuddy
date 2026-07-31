@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
+  <title>Focus Buddy — Plan</title>
+  <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-3xl mx-auto">
+    <a href="index.html" class="logo">
+      <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <circle cx="13" cy="13" r="11.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="6.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="2" fill="var(--accent)"/>
+      </svg>
+      <h1>Focus Buddy</h1>
+    </a>
+    <nav class="page-nav" aria-label="Main navigation">
+      <a href="plan.html" class="active" aria-current="page">Plan</a>
+      <a href="index.html">Today</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="habits.html">Habits</a>
+      <a href="goals.html">Goals</a>
+      <a href="analytics.html?unwind=month&month=last" class="nav-monthly" title="Open last month's Monthly Unwind">Last month</a>
+      <a href="#" id="about-nav" role="button">About me</a>
+      <div class="settings-menu" style="position:relative">
+        <button id="settings-btn" class="settings-trigger" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main class="app-main plan-main max-w-6xl mx-auto px-6 py-8">
+  <div class="card plan-wizard" style="position:relative">
+    
+    <button id="plan-exit" class="btn-ghost" aria-label="Exit planning" title="Exit (Esc)"
+            style="position:absolute;top:13px;right:13px;width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+
+    <p class="section-label" style="margin:0 0 2px">Plan today’s focus — optional</p>
+    <div class="flex items-center justify-between gap-3 mb-4" style="padding-right:34px">
+      <h2 class="serif" id="plan-date" style="font-size:1.2rem;font-weight:600;margin:0"></h2>
+      <div class="step-dots" id="plan-dots"></div>
+    </div>
+
+    <div id="plan-body"></div>
+
+    <div id="plan-footer" class="flex items-center justify-between gap-3 mt-5">
+      <button id="plan-back" class="btn-ghost">Back</button>
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="text-sm" id="plan-skip" style="color:var(--text-faint)">Not today</a>
+        <button id="plan-next" class="btn-primary">Next</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="add-task-modal" class="modal-overlay plan-task-modal-overlay" hidden>
+  <form id="add-task-form" class="modal plan-task-modal" role="dialog" aria-modal="true" aria-labelledby="add-task-title">
+    <div class="plan-modal-head">
+      <div>
+        <p class="section-label">New task</p>
+        <h2 id="add-task-title" class="serif">Add a task to today</h2>
+      </div>
+      <button id="add-task-close" class="icon-btn" type="button" aria-label="Close add task">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <label class="plan-modal-field" for="add-task-name">
+      <span>Task name</span>
+      <input id="add-task-name" class="input" type="text" autocomplete="off" required />
+    </label>
+    <label class="plan-modal-field" for="add-task-description">
+      <span>Description</span>
+      <textarea id="add-task-description" class="input plan-task-description" rows="4" placeholder="Optional context for focus detection"></textarea>
+    </label>
+    <div class="plan-modal-actions">
+      <button id="add-task-cancel" class="btn-ghost" type="button">Cancel</button>
+      <button id="add-task-submit" class="btn-primary" type="submit">Add task</button>
+    </div>
+  </form>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/settings-menu.js"></script>
+<script src="js/planning-insights.js"></script>
+<!-- journey-map: pure landmark detection only on this page (no map rendered) -->
+<script src="js/journey-map.js"></script>
+<script src="js/plan-calendar.js"></script>
+<script>
+  const STEP_KEYS = ['pick', 'size', 'schedule', 'confirm'];
+  const DIFFICULTIES = ['easy', 'medium', 'hard'];
+  const DIFF_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+  const DEFAULT_ESTIMATE = 30;
+  const DEFAULT_AVAILABLE = 180;
+
+  const el = id => document.getElementById(id);
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+  function currentDate() {
+    return window.FocusBuddyDemo && FocusBuddyDemo.now ? FocusBuddyDemo.now() : new Date();
+  }
+  function localDateKey(d = currentDate()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  function fmtMins(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    if (h && m) return `${h}h ${m}m`;
+    if (h) return `${h}h`;
+    return `${m}m`;
+  }
+  function normalizeScheduledMin(entry, min, snap) {
+    if (!Number.isFinite(min) || !window.PlanCalendar || !window.PlanCalendar.normalizeScheduledMin) {
+      return min;
+    }
+    return window.PlanCalendar.normalizeScheduledMin(entry, min, snap);
+  }
+  function entryForSave(entry) {
+    const out = { ...entry };
+    if (Number.isFinite(out.scheduled_min)) {
+      out.scheduled_min = normalizeScheduledMin(out, out.scheduled_min, 5);
+    }
+    return out;
+  }
+
+  const periodKey = localDateKey();
+  const state = {
+    view: 'wizard',
+    step: 0,
+    tasks: [],
+    entries: new Map(),
+    availableMin: DEFAULT_AVAILABLE,
+    existingPlan: false,
+    loadError: false,
+    planDirty: false,
+    hadSavedAdvice: false,
+    advice: null,
+    adviceStale: false,
+    adviceGeneratedThisVisit: false,
+    adviceLoading: false,
+    calibration: null,
+    focusWindows: [],
+    saveStatus: '',
+    finished: false,
+  };
+
+  function todayHref() {
+    return window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html';
+  }
+
+  el('plan-date').textContent =
+    currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+  el('plan-exit').addEventListener('click', () => {
+    location.href = todayHref();
+  });
+  function visibleDialogOpen() {
+    return [...document.querySelectorAll('.modal-overlay, [role="dialog"]')].some(node => {
+      const box = node.classList && node.classList.contains('modal-overlay') ? node : node.closest('.modal-overlay') || node;
+      if (box.hidden) return false;
+      const style = window.getComputedStyle(box);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    });
+  }
+  function typingTarget(target) {
+    return !!(target && target.closest && target.closest('input, textarea, select, [contenteditable="true"]'));
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (visibleDialogOpen() || typingTarget(e.target)) return;
+    location.href = todayHref();
+  });
+
+  let addTaskReturnFocus = null;
+
+  function addTaskModal() {
+    return el('add-task-modal');
+  }
+
+  let releaseAddTaskTrap = null;
+
+  function openAddTaskModal(trigger) {
+    addTaskReturnFocus = trigger || el('open-add-task');
+    const modal = addTaskModal();
+    modal.hidden = false;
+    // Focus return is handled below via addTaskReturnFocus, so the trap gets no opener.
+    releaseAddTaskTrap = trapModalFocus(el('add-task-form'), null);
+    el('add-task-form').reset();
+    setTimeout(() => el('add-task-name').focus(), 0);
+  }
+
+  function closeAddTaskModal({ restoreFocus = true } = {}) {
+    const modal = addTaskModal();
+    modal.hidden = true;
+    if (releaseAddTaskTrap) { releaseAddTaskTrap(); releaseAddTaskTrap = null; }
+    if (restoreFocus && addTaskReturnFocus && document.contains(addTaskReturnFocus)) {
+      addTaskReturnFocus.focus();
+    }
+  }
+
+  function markPlanChanged(opts = {}) {
+    state.planDirty = true;
+    const staleAdvice = opts.adviceStale !== false;
+    if (staleAdvice && (state.advice || state.hadSavedAdvice)) {
+      state.adviceStale = true;
+    }
+  }
+
+  function hasCurrentAdvice() {
+    return !!(state.advice && !state.adviceStale);
+  }
+
+  function totalEstimate() {
+    let sum = 0;
+    state.entries.forEach(e => { sum += e.estimate_min; });
+    return sum;
+  }
+
+  function calibrationFor(entry) {
+    const cal = state.calibration;
+    if (!cal) return null;
+    const task = Array.isArray(cal.by_task)
+      ? cal.by_task.find(item => item.task_id === entry.task_id && item.tendency !== 'unknown')
+      : null;
+    const item = task || (cal.overall && cal.overall.tendency !== 'unknown' ? cal.overall : null);
+    if (!item || !item.message || !['under', 'over'].includes(item.tendency)) return null;
+    return item;
+  }
+
+  function calibrationNoteHtml(entry) {
+    const item = calibrationFor(entry);
+    if (!item) return '';
+    const tone = item.tendency === 'under' ? 'under' : 'over';
+    return `<p class="plan-calibration-note ${tone}">${escapeHtml(item.message)}</p>`;
+  }
+
+  function budgetMeterHtml() {
+    const used = totalEstimate();
+    const avail = state.availableMin;
+    const pct = avail > 0 ? Math.min(100, Math.round(used / avail * 100)) : 0;
+    const over = used > avail;
+    return `
+      <div class="budget-meter" role="img" aria-label="${used} of ${avail} minutes planned">
+        <div class="budget-fill ${over ? 'over' : ''}" style="width:${pct}%"></div>
+      </div>
+      <p class="text-xs mt-1.5" style="color:${over ? 'var(--ochre)' : 'var(--text-faint)'}" aria-live="polite">
+        ${fmtMins(used)} of ${fmtMins(avail)} planned${over ? ' — over your available time' : ''}
+      </p>`;
+  }
+
+  function pickList() {
+    const ids = new Set(state.tasks.map(t => t.id));
+    const ghosts = [...state.entries.values()]
+      .filter(e => !ids.has(e.task_id))
+      .map(e => ({ id: e.task_id, name: e.name }));
+    return [...state.tasks, ...ghosts];
+  }
+
+  function selectTaskForPlan(task) {
+    if (!task || typeof task.id !== 'number') return;
+    state.entries.set(task.id, {
+      task_id: task.id,
+      name: task.name || '',
+      estimate_min: DEFAULT_ESTIMATE,
+      difficulty: 'medium',
+    });
+  }
+
+  function stepBody() {
+    const key = STEP_KEYS[state.step];
+    if (key === 'pick') return pickBody();
+    if (key === 'size') return sizeBody();
+    if (key === 'schedule') return scheduleBody();
+    return confirmBody();
+  }
+
+  function pickBody() {
+    if (state.loadError) {
+      return `
+        <div class="card" style="background:var(--rose-soft);border-color:var(--terracotta)">
+          <p class="serif" style="font-size:1rem;font-weight:600;color:var(--text);margin:0 0 4px">Could not load your tasks.</p>
+          <p class="text-sm" style="color:var(--text-muted);margin:0">Make sure the backend is running.</p>
+        </div>`;
+    }
+    const list = pickList();
+    const available = list.filter(t => !state.entries.has(t.id));
+    const planned = [...state.entries.values()];
+    const taskBlock = (task, side) => `
+      <button type="button" class="plan-pick-block plan-tray-chip" draggable="true"
+              data-task="${task.id}" data-side="${side}"
+              aria-label="${side === 'planned' ? 'Remove' : 'Add'} ${escapeHtml(task.name)} ${side === 'planned' ? 'from' : 'to'} today's plan">
+        <span class="plan-list-name">${escapeHtml(task.name)}</span>
+        <span class="plan-pick-hint">${side === 'planned' ? 'Click to move back' : 'Click or drag into plan'}</span>
+        ${side === 'planned' ? `<span class="plan-pick-remove" data-remove="${task.id}" aria-hidden="true">&times;</span>` : ''}
+      </button>`;
+    const availableRows = available.length
+      ? available.map(t => taskBlock(t, 'available')).join('')
+      : `<p class="plan-pick-empty">${list.length ? "All available tasks are in today's plan." : 'No tasks yet. Add one to start planning.'}</p>`;
+    const plannedRows = planned.length
+      ? planned.map(e => taskBlock({ id: e.task_id, name: e.name }, 'planned')).join('')
+      : `<div class="plan-pick-empty"><strong>Build today's plan</strong><span>Drop tasks here or click a task from Available.</span></div>`;
+    const helper = state.entries.size ? '' :
+      `<p class="text-xs mt-3" style="color:var(--text-faint)">Pick or add at least one task to continue.</p>`;
+    return `
+      <div class="plan-pick-head">
+        <p class="text-sm" style="color:var(--text-muted);margin:0">
+          Choose the tasks you want to focus on today. Totally optional - you can leave anytime.
+        </p>
+        <button id="open-add-task" class="btn-ghost" type="button">Add task</button>
+      </div>
+      <div class="plan-pick-board" aria-label="Pick tasks for today's plan">
+        <section class="plan-pick-zone" id="pick-available" data-drop="available" aria-labelledby="pick-available-title">
+          <div class="plan-pick-zone-head">
+            <p id="pick-available-title" class="section-label" style="margin:0">Available</p>
+            <span>${available.length}</span>
+          </div>
+          <div class="plan-pick-stack">${availableRows}</div>
+        </section>
+        <section class="plan-pick-zone plan-pick-zone-planned" id="pick-plan" data-drop="planned" aria-labelledby="pick-plan-title">
+          <div class="plan-pick-zone-head">
+            <p id="pick-plan-title" class="section-label" style="margin:0">Today's Plan</p>
+            <span>${planned.length}</span>
+          </div>
+          <div class="plan-pick-stack">${plannedRows}</div>
+        </section>
+      </div>
+      ${helper}`;
+  }
+
+  function sizeBody() {
+    const entries = [...state.entries.values()];
+    if (!entries.length) {
+      return `<p class="text-sm" style="color:var(--text-muted)">No tasks picked yet — go back and choose at least one.</p>`;
+    }
+    const taskFields = entries.map(e => `
+      <div class="plan-task">
+        <p class="serif mb-2" style="font-size:0.95rem;font-weight:500;color:var(--text)">${escapeHtml(e.name)}</p>
+        <div class="plan-field-head">
+          <label for="est-${e.task_id}" class="text-xs" style="color:var(--text-muted)">Estimated time</label>
+          <span class="plan-field-val" id="estval-${e.task_id}" aria-live="polite">${fmtMins(e.estimate_min)}</span>
+        </div>
+        <input id="est-${e.task_id}" class="fb-range" type="range" min="10" max="120" step="5"
+               value="${e.estimate_min}" data-est="${e.task_id}" aria-label="Estimated minutes for ${escapeHtml(e.name)}" />
+        ${calibrationNoteHtml(e)}
+        <div class="flex items-center justify-between gap-3 mt-3">
+          <span class="text-xs" style="color:var(--text-muted)">Difficulty</span>
+          <div class="seg" role="group" aria-label="Difficulty for ${escapeHtml(e.name)}" data-diff="${e.task_id}">
+            ${DIFFICULTIES.map(d => `
+              <button type="button" class="seg-btn" data-d="${d}"
+                      aria-pressed="${e.difficulty === d ? 'true' : 'false'}">${DIFF_LABEL[d]}</button>`).join('')}
+          </div>
+        </div>
+      </div>`).join('');
+    return `
+      <div>${taskFields}</div>
+      <div class="plan-field" style="margin-top:1.2rem">
+        <div class="plan-field-head">
+          <label for="avail" class="text-xs" style="color:var(--text-muted)">Time available today</label>
+          <span class="plan-field-val" id="availval" aria-live="polite">${fmtMins(state.availableMin)}</span>
+        </div>
+        <input id="avail" class="fb-range" type="range" min="30" max="600" step="15"
+               value="${state.availableMin}" aria-label="Total time available today, in minutes" />
+      </div>
+      <div class="mt-3">${budgetMeterHtml()}</div>`;
+  }
+
+  function fmtClock(min) {
+    min = ((min % 1440) + 1440) % 1440;
+    const h = Math.floor(min / 60), m = min % 60;
+    const ap = h < 12 ? 'am' : 'pm';
+    let hr = h % 12; if (hr === 0) hr = 12;
+    return `${hr}:${String(m).padStart(2, '0')}${ap}`;
+  }
+
+  function adviceStartMin(block) {
+    if (!block) return null;
+    const hour = Number(block.start_hour);
+    const min = Number(block.start_min);
+    if (!Number.isFinite(hour) || !Number.isFinite(min)) return null;
+    return Math.max(0, Math.min(1439, hour * 60 + min));
+  }
+
+  function adviceWindow(block) {
+    const start = adviceStartMin(block);
+    const length = Math.max(0, Number(block && block.length_min) || 0);
+    if (start === null) return 'Suggested time';
+    return `${fmtClock(start)} - ${fmtClock(start + length)}`;
+  }
+
+  function renderBestFocusWindows() {
+    const ranked = Array.isArray(state.focusWindows)
+      ? state.focusWindows
+          .filter(row => Number(row.sessions) > 0)
+          .sort((a, b) => Number(b.focus_pct || 0) - Number(a.focus_pct || 0))
+          .slice(0, 3)
+      : [];
+    if (!ranked.length) {
+      return `
+        <div class="plan-advice-tips">
+          <p class="section-label">Best focus windows</p>
+          <p>Tracked sessions will reveal which hours are strongest.</p>
+        </div>`;
+    }
+    const windows = ranked
+      .map(row => `${fmtClock(Number(row.hour) * 60)} (${Math.round(Number(row.focus_pct) || 0)}%)`)
+      .join(', ');
+    return `
+      <div class="plan-advice-tips">
+        <p class="section-label">Best focus windows</p>
+        <p>${escapeHtml(windows)} have your strongest focus history.</p>
+        <p>Harder tasks usually fit these windows better than light admin.</p>
+      </div>`;
+  }
+
+  function renderAdvicePanel() {
+    const stale = state.adviceStale && (state.advice || state.hadSavedAdvice);
+    let body = '';
+    if (state.adviceLoading) {
+      body = `
+        <div class="plan-advice-empty">
+          <p>Getting suggestions...</p>
+          <span>Checking your tasks, estimates, and focus patterns.</span>
+        </div>`;
+    } else if (hasCurrentAdvice()) {
+      const advice = state.advice || {};
+      const entryById = new Map([...state.entries.values()].map(e => [e.task_id, e]));
+      const scheduled = Array.isArray(advice.scheduled)
+        ? advice.scheduled
+            .filter(block => entryById.has(Number(block && block.task_id)))
+            .sort((a, b) => (adviceStartMin(a) ?? 1440) - (adviceStartMin(b) ?? 1440))
+        : [];
+      const summary = advice.summary
+        ? `<p class="plan-advice-summary">${escapeHtml(advice.summary)}</p>`
+        : '';
+      const order = scheduled.length
+        ? `<ol class="plan-advice-list">
+            ${scheduled.map((block, index) => {
+              const entry = entryById.get(Number(block.task_id));
+              const reason = typeof block.reason === 'string' && block.reason.trim()
+                ? block.reason.trim()
+                : 'Recommended based on the plan details.';
+              return `
+                <li>
+                  <span class="plan-advice-rank">${index + 1}</span>
+                  <div>
+                    <div class="plan-advice-row-top">
+                      <strong>${escapeHtml(entry.name)}</strong>
+                      <span>${escapeHtml(adviceWindow(block))}</span>
+                    </div>
+                    <p>${escapeHtml(reason)}</p>
+                  </div>
+                </li>`;
+            }).join('')}
+          </ol>`
+        : `<p class="plan-advice-muted">No task-specific timing suggestions came back.</p>`;
+      const over = advice.over_plan_note
+        ? `<p class="plan-advice-alert">${escapeHtml(advice.over_plan_note)}</p>`
+        : '';
+      const tips = Array.isArray(advice.general_advice)
+        ? advice.general_advice.filter(item => typeof item === 'string' && item.trim()).slice(0, 2)
+        : [];
+      const general = tips.length
+        ? `<div class="plan-advice-tips">
+            <p class="section-label">Notes</p>
+            ${tips.map(tip => `<p>${escapeHtml(tip)}</p>`).join('')}
+          </div>`
+        : '';
+      const cold = advice.cold_start
+        ? `<p class="plan-advice-muted">This uses a sensible order while your hour-by-hour history grows.</p>`
+        : '';
+      body = `${summary}${over}<p class="section-label">Suggested order</p>${order}${general}${cold}`;
+    } else if (stale) {
+      body = `
+        <div class="plan-advice-empty">
+          <p>Suggestions need a refresh.</p>
+          <span>Your task details changed since the last AI pass.</span>
+        </div>`;
+    } else {
+      body = `
+        <div class="plan-advice-empty">
+          <p>No suggestions yet.</p>
+          <span>Generate them when you want a second opinion on order and timing.</span>
+        </div>`;
+    }
+    return `
+      <aside class="plan-advice-panel" aria-live="polite">
+        <div class="plan-advice-head">
+          <p class="section-label">AI suggestions</p>
+          <span>${hasCurrentAdvice() ? 'Ready' : state.adviceLoading ? 'Thinking' : 'Optional'}</span>
+        </div>
+        ${renderBestFocusWindows()}
+        ${body}
+      </aside>`;
+  }
+
+  function scheduleBody() {
+    const entries = [...state.entries.values()];
+    if (!entries.length) {
+      return `<p class="text-sm" style="color:var(--text-muted)">No tasks picked yet — go back and choose at least one.</p>`;
+    }
+    const adviceLabel = state.adviceLoading
+      ? 'Getting suggestions...'
+      : (state.advice ? 'Regenerate AI suggestions' : 'Get AI suggestions');
+    const adviceDisabled = state.adviceLoading ? 'disabled' : '';
+    const adviceNote = state.adviceLoading
+      ? 'Getting fresh suggestions.'
+      : hasCurrentAdvice()
+        ? 'AI suggestions are ready.'
+      : state.adviceStale
+        ? 'AI suggestions need regeneration after your edits.'
+        : 'Optional timing help appears beside the calendar.';
+    const saveStatus = state.saveStatus
+      ? `<span id="plan-save-status" class="plan-save-status">${escapeHtml(state.saveStatus)}</span>`
+      : `<span id="plan-save-status" class="plan-save-status" aria-live="polite"></span>`;
+    return `
+      <div class="plan-schedule-intro">
+        <div class="plan-schedule-copy">
+          <p class="section-label">Schedule</p>
+          <h3 class="serif">Arrange your day</h3>
+          <p class="plan-schedule-note">${adviceNote}</p>
+        </div>
+        <div class="plan-schedule-actions">
+          <button id="plan-advice-btn" type="button" class="btn-ghost text-xs" ${adviceDisabled}>${adviceLabel}</button>
+          ${saveStatus}
+        </div>
+      </div>
+      <div class="plan-schedule-layout">
+        <div class="plan-schedule-board">
+          <div id="plan-cal-root"></div>
+          <div class="mt-3">${budgetMeterHtml()}</div>
+        </div>
+        ${renderAdvicePanel()}
+      </div>
+      `;
+  }
+
+  function confirmBody() {
+    const entries = [...state.entries.values()];
+    if (!entries.length) {
+      return `<p class="text-sm" style="color:var(--text-muted)">Pick at least one task before saving.</p>`;
+    }
+    const rows = entries.map(e => {
+      const when = Number.isFinite(e.scheduled_min)
+        ? `<span class="plan-confirm-time">${fmtClock(normalizeScheduledMin(e, e.scheduled_min, 5))}</span>`
+        : '<span class="plan-unscheduled-pill">Unscheduled</span>';
+      return `
+        <div class="plan-task flex items-center justify-between gap-3">
+          <span class="serif" style="font-size:0.95rem;color:var(--text)">${escapeHtml(e.name)}</span>
+          <span class="plan-confirm-meta">
+            ${when}
+            <span>${fmtMins(e.estimate_min)} · ${DIFF_LABEL[e.difficulty]}</span>
+          </span>
+        </div>`;
+    }).join('');
+    const clear = state.existingPlan
+      ? `<button id="plan-clear" class="btn-ghost text-sm" style="color:var(--terracotta)">Clear today’s plan</button>`
+      : '';
+    return `
+      <p class="text-sm mb-3" style="color:var(--text-muted)">
+        ${state.existingPlan ? 'Update today’s plan?' : 'Save this as today’s plan? You can edit or clear it anytime.'}
+      </p>
+      <div>${rows}</div>
+      <div class="mt-3">${budgetMeterHtml()}</div>
+      <div class="mt-4">${clear}</div>`;
+  }
+
+  function currentPlanBody() {
+    const entries = [...state.entries.values()];
+    if (!entries.length) {
+      return `
+        <div class="plan-current-empty">
+          <p class="serif" style="font-size:1.05rem;font-weight:600;color:var(--text);margin:0">No saved plan yet</p>
+          <p class="text-sm" style="color:var(--text-muted);margin:4px 0 0">Pick a few tasks to build today's plan.</p>
+          <button id="current-edit-tasks" class="btn-primary mt-3" type="button">Start planning</button>
+        </div>`;
+    }
+    const scheduledCount = entries.filter(e => Number.isFinite(e.scheduled_min)).length;
+    const rows = entries.map(e => {
+      const scheduled = Number.isFinite(e.scheduled_min);
+      const start = scheduled ? normalizeScheduledMin(e, e.scheduled_min, 5) : null;
+      const when = scheduled
+        ? `${fmtClock(start)} - ${fmtClock(start + e.estimate_min)}`
+        : 'Unscheduled';
+      const status = scheduled ? 'Scheduled' : 'Unscheduled';
+      return `
+        <div class="plan-current-row">
+          <div class="plan-current-task">
+            <p>${escapeHtml(e.name)}</p>
+            <span>${escapeHtml(when)}</span>
+          </div>
+          <span class="plan-current-pill ${scheduled ? 'scheduled' : ''}">${status}</span>
+          <span class="plan-current-meta">${fmtMins(e.estimate_min)}</span>
+          <span class="plan-current-meta">${DIFF_LABEL[e.difficulty] || 'Medium'}</span>
+        </div>`;
+    }).join('');
+    const over = totalEstimate() > state.availableMin;
+    return `
+      <div class="plan-current">
+        <div class="plan-current-top">
+          <div>
+            <p class="section-label">Current plan</p>
+            <h2 class="serif">Today's saved plan</h2>
+            <p class="plan-current-note">Review the plan you saved, then jump back into only the part you want to change.</p>
+          </div>
+          <a href="${window.FocusBuddyDemo ? FocusBuddyDemo.href('index.html') : 'index.html'}" class="btn-primary">Go to Today</a>
+        </div>
+        <div class="plan-current-stats">
+          <div>
+            <span>Total planned</span>
+            <strong>${fmtMins(totalEstimate())}</strong>
+          </div>
+          <div>
+            <span>Budget</span>
+            <strong class="${over ? 'over' : ''}">${fmtMins(state.availableMin)}</strong>
+          </div>
+          <div>
+            <span>Scheduled</span>
+            <strong>${scheduledCount}/${entries.length}</strong>
+          </div>
+        </div>
+        <div class="plan-current-budget">${budgetMeterHtml()}</div>
+        <div class="plan-current-list" aria-label="Saved planned tasks">${rows}</div>
+        <div class="plan-current-actions">
+          <button id="current-edit-tasks" class="btn-ghost" type="button">Edit tasks</button>
+          <button id="current-edit-estimates" class="btn-ghost" type="button">Edit estimates</button>
+          <button id="current-edit-schedule" class="btn-ghost" type="button">Edit schedule</button>
+          <button id="current-clear" class="btn-ghost" type="button">Clear plan</button>
+        </div>
+      </div>`;
+  }
+
+  function render() {
+    if (state.view === 'current') {
+      el('plan-dots').innerHTML = '';
+      el('plan-footer').style.display = 'none';
+      el('plan-body').innerHTML = currentPlanBody();
+      bindCurrentPlan();
+      return;
+    }
+
+    el('plan-footer').style.display = 'flex';
+    el('plan-dots').innerHTML = STEP_KEYS.map((_, i) =>
+      `<span class="step-dot ${i === state.step ? 'active' : ''}"></span>`).join('');
+    el('plan-body').innerHTML = stepBody();
+    el('plan-back').style.visibility = state.step === 0 ? 'hidden' : 'visible';
+
+    const last = state.step === STEP_KEYS.length - 1;
+    const next = el('plan-next');
+    next.textContent = last ? 'Save plan' : 'Next';
+    const blockNext = state.loadError || state.entries.size === 0 || state.adviceLoading;
+    next.disabled = blockNext;
+    next.style.opacity = blockNext ? '0.5' : '1';
+    next.style.cursor = blockNext ? 'not-allowed' : 'pointer';
+
+    bindStep();
+  }
+
+  function editPlanStep(step) {
+    state.view = 'wizard';
+    state.finished = false;
+    state.step = step;
+    render();
+  }
+
+  function bindCurrentPlan() {
+    const editTasks = el('current-edit-tasks');
+    const editEstimates = el('current-edit-estimates');
+    const editSchedule = el('current-edit-schedule');
+    const clear = el('current-clear');
+    if (editTasks) editTasks.addEventListener('click', () => editPlanStep(0));
+    if (editEstimates) editEstimates.addEventListener('click', () => editPlanStep(1));
+    if (editSchedule) editSchedule.addEventListener('click', () => editPlanStep(2));
+    if (clear) clear.addEventListener('click', clearPlan);
+  }
+
+  function bindStep() {
+    const key = STEP_KEYS[state.step];
+    if (key === 'pick') {
+      if (state.loadError) return;
+      const body = el('plan-body');
+      const addBtn = el('open-add-task');
+      if (addBtn) addBtn.addEventListener('click', () => openAddTaskModal(addBtn));
+      if (!body) return;
+
+      function moveTask(id, target) {
+        if (!Number.isInteger(id)) return;
+        if (target === 'planned') {
+          if (state.entries.has(id)) return;
+          selectTaskForPlan(pickList().find(t => t.id === id));
+        } else {
+          if (!state.entries.has(id)) return;
+          state.entries.delete(id);
+        }
+        markPlanChanged();
+        scheduleAutoSave();
+        render();
+      }
+
+      body.querySelectorAll('.plan-pick-block').forEach(block => {
+        block.addEventListener('dragstart', (evt) => {
+          block.classList.add('is-dragging');
+          evt.dataTransfer.effectAllowed = 'move';
+          evt.dataTransfer.setData('text/plain', block.dataset.task || '');
+        });
+        block.addEventListener('dragend', () => {
+          block.classList.remove('is-dragging');
+          body.querySelectorAll('.is-drop-target').forEach(zone => zone.classList.remove('is-drop-target'));
+        });
+        block.addEventListener('click', (evt) => {
+          const remove = evt.target.closest('[data-remove]');
+          const id = parseInt(remove ? remove.dataset.remove : block.dataset.task, 10);
+          const side = block.dataset.side === 'planned' ? 'available' : 'planned';
+          moveTask(id, remove ? 'available' : side);
+        });
+      });
+
+      body.querySelectorAll('[data-drop]').forEach(zone => {
+        zone.addEventListener('dragover', (evt) => {
+          evt.preventDefault();
+          evt.dataTransfer.dropEffect = 'move';
+          zone.classList.add('is-drop-target');
+        });
+        zone.addEventListener('dragenter', (evt) => {
+          evt.preventDefault();
+          zone.classList.add('is-drop-target');
+        });
+        zone.addEventListener('dragleave', (evt) => {
+          if (!zone.contains(evt.relatedTarget)) zone.classList.remove('is-drop-target');
+        });
+        zone.addEventListener('drop', (evt) => {
+          evt.preventDefault();
+          zone.classList.remove('is-drop-target');
+          moveTask(parseInt(evt.dataTransfer.getData('text/plain'), 10), zone.dataset.drop);
+        });
+      });
+    } else if (key === 'size') {
+      el('plan-body').querySelectorAll('input[data-est]').forEach(r => {
+        r.addEventListener('input', () => {
+          const id = parseInt(r.dataset.est, 10);
+          const entry = state.entries.get(id);
+          if (!entry) return;
+          entry.estimate_min = parseInt(r.value, 10);
+          el(`estval-${id}`).textContent = fmtMins(entry.estimate_min);
+          markPlanChanged();
+          refreshBudget();
+          scheduleAutoSave();
+        });
+      });
+      const avail = el('avail');
+      if (avail) avail.addEventListener('input', () => {
+        state.availableMin = parseInt(avail.value, 10);
+        el('availval').textContent = fmtMins(state.availableMin);
+        markPlanChanged();
+        refreshBudget();
+        scheduleAutoSave();
+      });
+      el('plan-body').querySelectorAll('.seg[data-diff]').forEach(group => {
+        const id = parseInt(group.dataset.diff, 10);
+        group.querySelectorAll('.seg-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const entry = state.entries.get(id);
+            if (!entry) return;
+            entry.difficulty = btn.dataset.d;
+            markPlanChanged();
+            group.querySelectorAll('.seg-btn').forEach(b =>
+              b.setAttribute('aria-pressed', String(b === btn)));
+            scheduleAutoSave();
+          });
+        });
+      });
+    } else if (key === 'schedule') {
+      paintCalendar();
+      const adviceBtn = el('plan-advice-btn');
+      if (adviceBtn) adviceBtn.addEventListener('click', generateAdvice);
+    } else if (key === 'confirm') {
+      const clear = el('plan-clear');
+      if (clear) clear.addEventListener('click', clearPlan);
+    }
+  }
+
+  function refreshBudget() {
+    const holder = el('plan-body').querySelector('.budget-meter');
+    if (holder && holder.parentElement) holder.parentElement.innerHTML = budgetMeterHtml();
+  }
+
+  function setSaveStatus(text) {
+    state.saveStatus = text;
+    const node = el('plan-save-status');
+    if (node) node.textContent = text;
+  }
+
+  let autoSaveTimer = null;
+  function scheduleAutoSave() {
+    if (state.finished || !state.entries.size) return;
+    setSaveStatus('Saving...');
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(autoSavePlan, 650);
+  }
+
+  async function autoSavePlan() {
+    const entries = [...state.entries.values()];
+    if (!entries.length || state.finished) return;
+    const payload = {
+      period_key: periodKey,
+      available_min: state.availableMin,
+      plan_json: JSON.stringify(entries.map(entryForSave)),
+    };
+    if (state.planDirty && state.hadSavedAdvice && state.adviceStale) {
+      payload.advice_json = "";
+    }
+    try {
+      await savePlan(payload);
+      state.existingPlan = true;
+      state.planDirty = false;
+      if (payload.advice_json === "") state.hadSavedAdvice = false;
+      setSaveStatus('Saved');
+    } catch {
+      setSaveStatus('Save failed');
+      showToast('Could not auto-save your plan — is the backend running?', { danger: true });
+    }
+  }
+
+  function applySchedulePatch(taskId, patch) {
+    const e = state.entries.get(taskId);
+    if (!e || !patch) return;
+    const touchesTime = Object.prototype.hasOwnProperty.call(patch, 'scheduled_min');
+    const touchesEstimate = Object.prototype.hasOwnProperty.call(patch, 'estimate_min');
+    const snap = Number.isFinite(patch._snap) ? patch._snap : undefined;
+    if (touchesTime) {
+      if (patch.scheduled_min === null) delete e.scheduled_min;
+      else e.scheduled_min = normalizeScheduledMin(e, Number(patch.scheduled_min), snap);
+    }
+    if (touchesEstimate) {
+      const clampEstimate = window.PlanCalendar && window.PlanCalendar._clampEstimate
+        ? window.PlanCalendar._clampEstimate
+        : (v => Math.max(10, Math.min(120, Math.round(Number(v) || 10))));
+      e.estimate_min = clampEstimate(patch.estimate_min);
+      if (Number.isFinite(e.scheduled_min)) {
+        e.scheduled_min = normalizeScheduledMin(e, e.scheduled_min, 5);
+      }
+    }
+    markPlanChanged({ adviceStale: !touchesTime || touchesEstimate });
+    paintCalendar();
+    refreshBudget();
+    scheduleAutoSave();
+  }
+
+  function paintCalendar() {
+    const root = el('plan-cal-root');
+    if (!root || !window.PlanCalendar) return;
+    window.PlanCalendar.render(root, {
+      entries: [...state.entries.values()],
+      onUpdate: applySchedulePatch,
+      onChange: (taskId, scheduledMin) => {
+        applySchedulePatch(taskId, { scheduled_min: scheduledMin });
+      },
+    });
+  }
+
+  el('plan-next').addEventListener('click', () => {
+    if (state.loadError || state.entries.size === 0 || state.adviceLoading) return;
+    if (state.step === STEP_KEYS.length - 1) { savePlanNow(); return; }
+    state.step += 1;
+    render();
+  });
+  el('plan-back').addEventListener('click', () => {
+    if (state.step > 0) { state.step -= 1; render(); }
+  });
+
+  addTaskModal().addEventListener('click', (e) => {
+    if (e.target === addTaskModal()) closeAddTaskModal();
+  });
+  el('add-task-close').addEventListener('click', () => closeAddTaskModal());
+  el('add-task-cancel').addEventListener('click', () => closeAddTaskModal());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !addTaskModal().hidden) {
+      e.preventDefault();
+      closeAddTaskModal();
+    }
+  });
+  el('add-task-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = el('add-task-name').value.trim();
+    const description = el('add-task-description').value.trim();
+    if (!name) return;
+    const submit = el('add-task-submit');
+    submit.disabled = true;
+    try {
+      const task = await createTask(name, description);
+      state.tasks.unshift(task);
+      closeAddTaskModal({ restoreFocus: false });
+      render();
+      setTimeout(() => el('open-add-task')?.focus(), 0);
+    } catch {
+      showToast('Could not add the task - is the backend running?', { danger: true });
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  let adviceReqId = 0;
+  async function generateAdvice() {
+    const myReq = ++adviceReqId;
+    state.adviceLoading = true;
+    render();
+    let result = null, failed = false;
+    try {
+      result = await getPlanAdvice({
+        period_key: periodKey,
+        available_min: state.availableMin,
+        entries: [...state.entries.values()],
+      });
+    } catch {
+      failed = true;
+    }
+    if (myReq !== adviceReqId || state.finished) return;
+    state.adviceLoading = false;
+    if (failed) {
+      showToast('Could not generate advice — the AI may be busy. Try again in a moment.', { danger: true });
+    } else {
+      state.advice = result;
+      state.adviceStale = false;
+      state.adviceGeneratedThisVisit = true;
+      setSaveStatus('Saving...');
+      try {
+        await persistAdviceNow();
+      } catch {
+        setSaveStatus('Save failed');
+        showToast('AI suggestions were generated, but could not be saved yet.', { danger: true });
+      }
+    }
+    render();
+  }
+
+  async function persistAdviceNow() {
+    if (!state.advice || state.adviceStale) return;
+    const entries = [...state.entries.values()];
+    if (!entries.length || state.finished) return;
+    const payload = {
+      period_key: periodKey,
+      available_min: state.availableMin,
+      plan_json: JSON.stringify(entries.map(entryForSave)),
+      advice_json: JSON.stringify(state.advice),
+    };
+    await savePlan(payload);
+    state.planDirty = false;
+    state.existingPlan = true;
+    state.hadSavedAdvice = true;
+    state.adviceGeneratedThisVisit = false;
+    setSaveStatus('Saved');
+  }
+
+  async function savePlanNow() {
+    const entries = [...state.entries.values()];
+    if (state.loadError || !entries.length) return;
+    const entriesForSave = entries.map(entryForSave);
+    const payload = {
+      period_key: periodKey,
+      available_min: state.availableMin,
+      plan_json: JSON.stringify(entriesForSave),
+    };
+    if (state.adviceGeneratedThisVisit && state.advice && !state.adviceStale) {
+      payload.advice_json = JSON.stringify(state.advice);
+    } else if (state.planDirty && state.hadSavedAdvice && state.adviceStale) {
+      payload.advice_json = "";
+    }
+    try {
+      await savePlan(payload);
+      state.planDirty = false;
+      state.existingPlan = true;
+      if (payload.advice_json === "") state.hadSavedAdvice = false;
+      else if (payload.advice_json) {
+        state.hadSavedAdvice = true;
+        state.adviceGeneratedThisVisit = false;
+      }
+      // Trail Chunk 5: a deliberately saved plan can earn the first-plan cairn
+      // (fire-and-forget; session-based landmarks self-heal on the Today page).
+      PlanningInsights.detectAndSyncLandmarks({ todayPlan: { plan_json: payload.plan_json } });
+      showCurrentPlan();
+    } catch {
+      showToast('Could not save your plan — is the backend running?', { danger: true });
+    }
+  }
+
+  async function clearPlan() {
+    const ok = await confirmDialog('Clear today’s plan? This removes the saved plan for today.',
+      { danger: true, confirmText: 'Clear plan' });
+    if (!ok) return;
+    try {
+      await deletePlan(periodKey);
+      showToast('Today’s plan cleared.');
+      location.href = todayHref();
+    } catch {
+      showToast('Could not clear the plan — is the backend running?', { danger: true });
+    }
+  }
+
+  function showCurrentPlan() {
+    state.view = 'current';
+    state.finished = true;
+    render();
+  }
+
+  async function init() {
+    let tasks = [], plan = null;
+    try {
+      [tasks, plan] = await Promise.all([
+        getTasks(),
+        getPlan(periodKey),
+      ]);
+    } catch {
+      state.loadError = true;
+      render();
+      return;
+    }
+    try {
+      state.calibration = await getPlanCalibration(14);
+    } catch { state.calibration = null; }
+    try {
+      state.focusWindows = await getHourlyFocus();
+    } catch { state.focusWindows = []; }
+    state.tasks = (tasks || []).filter(t => !t.completed);
+    if (plan && plan.plan_json) {
+      try {
+        JSON.parse(plan.plan_json).forEach(e => {
+          if (e && typeof e.task_id === 'number') {
+            const entry = {
+              task_id: e.task_id,
+              name: e.name || '',
+              estimate_min: Number.isFinite(e.estimate_min) ? e.estimate_min : DEFAULT_ESTIMATE,
+              difficulty: DIFFICULTIES.includes(e.difficulty) ? e.difficulty : 'medium',
+            };
+            if (Number.isInteger(e.scheduled_min) && e.scheduled_min >= 0 && e.scheduled_min <= 1439) {
+              entry.scheduled_min = normalizeScheduledMin(entry, e.scheduled_min, 5);
+            }
+            state.entries.set(e.task_id, entry);
+          }
+        });
+        state.existingPlan = state.entries.size > 0;
+      } catch {  }
+      if (Number.isFinite(plan.available_min) && plan.available_min > 0) {
+        state.availableMin = plan.available_min;
+      }
+      if (plan.advice_json) {
+        state.hadSavedAdvice = true;
+        try { state.advice = JSON.parse(plan.advice_json); } catch {  }
+      }
+    }
+    if (state.existingPlan) {
+      state.view = 'current';
+      state.finished = true;
+    }
+    render();
+  }
+
+  init();
+</script>
+</body>
+</html>

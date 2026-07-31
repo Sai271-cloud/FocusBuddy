@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
+  <title>Focus Buddy — Habits</title>
+  <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-3xl mx-auto">
+    <a href="index.html" class="logo">
+      <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <circle cx="13" cy="13" r="11.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="6.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="2" fill="var(--accent)"/>
+      </svg>
+      <h1>Focus Buddy</h1>
+    </a>
+    <nav class="page-nav" aria-label="Main navigation">
+      <a href="plan.html">Plan</a>
+      <a href="index.html">Today</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="habits.html" class="active" aria-current="page">Habits</a>
+      <a href="goals.html">Goals</a>
+      <a href="analytics.html?unwind=month&month=last" class="nav-monthly" title="Open last month's Monthly Unwind">Last month</a>
+      <a href="#" id="about-nav" role="button">About me</a>
+      <div class="settings-menu" style="position:relative">
+        <button id="settings-btn" class="settings-trigger" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main class="app-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
+
+  <section>
+    <p class="section-label">Your habits</p>
+    <div id="habit-active-list" class="flex flex-col gap-3">
+      <p class="text-sm" style="color:var(--text-muted)">Loading your habits…</p>
+    </div>
+    <div id="habit-empty" class="card flex flex-col items-center gap-2 text-center py-10" style="display:none">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      <p class="font-medium text-sm" style="color:var(--text)">No habits yet</p>
+      <p class="text-sm" style="color:var(--text-muted);max-width:400px">
+        Adopt one from the starter set below — or run a weekly unwind, and your coach may
+        suggest one grounded in your real week.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <p class="section-label">Starter set</p>
+    <p class="text-xs mb-3" style="color:var(--text-muted)">
+      Habits marked "checks itself" are verified from your sessions automatically — nothing to log.
+    </p>
+    <div id="habit-catalog" class="flex flex-col gap-3"></div>
+  </section>
+
+  <details id="habit-retired-wrap" style="display:none">
+    <summary class="section-label" style="cursor:pointer;list-style-position:inside">Retired</summary>
+    <div id="habit-retired" class="flex flex-col gap-3 mt-2"></div>
+  </details>
+
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/settings-menu.js"></script>
+<script src="js/planning-insights.js"></script>
+<script src="js/journey-map.js"></script>
+<script src="js/habits.js"></script>
+<script>
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  let habits = [];
+  let sessions = [];
+  let workPeriods = [];
+  let todayPlan = null;
+
+  const todayKey = () => PlanningInsights.localDayKey(PlanningInsights.currentDate());
+
+  // The last-7-days density strip. Days before adoption render as blank spacers
+  // (not misses), completed days fill sage, open days stay a neutral outline —
+  // no chains, nothing red (the Trail's anti-shame rules apply here too).
+  function dotsHtml(habit) {
+    const completed = new Set(habit.check_days || []);
+    return '<span class="habit-dots" aria-hidden="true">' +
+      FocusHabits.lastNDayKeys(7, PlanningInsights.currentDate()).map(key => {
+        if (key < habit.created_day_key) return '<span class="habit-dot spacer"></span>';
+        return `<span class="habit-dot${completed.has(key) ? ' on' : ''}"></span>`;
+      }).join('') + '</span>';
+  }
+
+  function activeRow(habit) {
+    const completedToday = (habit.check_days || []).includes(todayKey());
+    const doneCount = habit.done_count || 0;
+    const row = document.createElement('div');
+    row.className = 'card habit-row';
+    const control = habit.kind === 'manual'
+      ? `<button class="check habit-tick${completedToday ? ' done' : ''}" data-tick="${habit.id}"
+                 aria-pressed="${completedToday}"
+                 aria-label="Mark '${escapeHtml(habit.title)}' done today"
+                 title="${completedToday ? 'Done today' : 'Mark done today'}"></button>`
+      : `<span class="check habit-auto${completedToday ? ' done' : ''}" aria-hidden="true" title="${completedToday ? 'Done today (checked automatically)' : 'Checks itself from your sessions'}"></span>`;
+    row.innerHTML = `
+      ${control}
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <p class="serif" style="font-size:0.95rem;font-weight:500;color:var(--text);margin:0">${escapeHtml(habit.title)}</p>
+          ${habit.kind === 'auto' ? '<span class="habit-mode-chip">checks itself</span>' : ''}
+          ${habit.source === 'coach' ? '<span class="habit-mode-chip coach">from your coach</span>' : ''}
+        </div>
+        ${habit.why ? `<p class="text-xs mt-0.5 leading-relaxed" style="color:var(--text-muted)">${escapeHtml(habit.why)}</p>` : ''}
+        <div class="flex items-center gap-3 mt-1.5 flex-wrap">
+          ${dotsHtml(habit)}
+          <span class="text-xs" style="color:var(--text-muted);font-variant-numeric:tabular-nums">${FocusHabits.densityLabel(new Set(habit.check_days || []), PlanningInsights.currentDate())}</span>
+          <span class="text-xs" style="color:var(--text-muted);font-variant-numeric:tabular-nums">· done ${doneCount} time${doneCount === 1 ? '' : 's'}</span>
+        </div>
+      </div>
+      <button class="btn-ghost habit-retire" data-retire="${habit.id}"
+              style="padding:0.3rem 0.7rem;font-size:0.75rem;min-height:34px">Retire</button>`;
+    return row;
+  }
+
+  function retiredRow(habit) {
+    const doneCount = habit.done_count || 0;
+    const row = document.createElement('div');
+    row.className = 'card habit-row';
+    row.style.opacity = '0.75';
+    row.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <p class="serif" style="font-size:0.9rem;color:var(--text);margin:0">${escapeHtml(habit.title)}</p>
+        <p class="text-xs mt-0.5" style="color:var(--text-muted)">Done ${doneCount} time${doneCount === 1 ? '' : 's'} — its history is kept.</p>
+      </div>
+      <button class="btn-ghost" data-readopt="${habit.id}"
+              style="padding:0.3rem 0.7rem;font-size:0.75rem;min-height:34px">Re-adopt</button>`;
+    return row;
+  }
+
+  function catalogCard(entry) {
+    const existing = habits.find(h => h.code === entry.code);
+    const card = document.createElement('div');
+    card.className = 'card habit-row';
+    let action;
+    if (existing && existing.status === 'active') {
+      action = '<span class="text-xs" style="color:var(--text-muted)">Adopted ✓</span>';
+    } else if (existing) {
+      action = `<button class="btn-ghost" data-adopt="${entry.code}" style="padding:0.35rem 0.9rem;font-size:0.8rem">Re-adopt</button>`;
+    } else {
+      action = `<button class="btn-primary" data-adopt="${entry.code}" style="padding:0.35rem 0.9rem;font-size:0.8rem;min-height:36px">Adopt</button>`;
+    }
+    card.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <p class="serif" style="font-size:0.9rem;font-weight:500;color:var(--text);margin:0">${escapeHtml(entry.title)}</p>
+          ${entry.kind === 'auto' ? '<span class="habit-mode-chip">checks itself</span>' : ''}
+        </div>
+        <p class="text-xs mt-0.5 leading-relaxed" style="color:var(--text-muted)">${escapeHtml(entry.why)}</p>
+      </div>
+      ${action}`;
+    return card;
+  }
+
+  function render() {
+    const list = document.getElementById('habit-active-list');
+    const empty = document.getElementById('habit-empty');
+    const active = habits.filter(h => h.status === 'active');
+    const retired = habits.filter(h => h.status === 'retired');
+
+    list.innerHTML = '';
+    active.forEach(h => list.appendChild(activeRow(h)));
+    empty.style.display = active.length ? 'none' : 'flex';
+
+    const catalog = document.getElementById('habit-catalog');
+    catalog.innerHTML = '';
+    FocusHabits.CATALOG.forEach(entry => catalog.appendChild(catalogCard(entry)));
+
+    const retiredWrap = document.getElementById('habit-retired-wrap');
+    const retiredList = document.getElementById('habit-retired');
+    retiredList.innerHTML = '';
+    retired.forEach(h => retiredList.appendChild(retiredRow(h)));
+    retiredWrap.style.display = retired.length ? 'block' : 'none';
+  }
+
+  async function refreshHabits() {
+    habits = await getHabits();
+    render();
+  }
+
+  async function loadAll() {
+    const [sessionsR, periodsR, planR, habitsR] = await Promise.allSettled([
+      getSessions(), getWorkPeriods(), getPlan(todayKey()), getHabits(),
+    ]);
+    if (habitsR.status !== 'fulfilled') {
+      document.getElementById('habit-active-list').innerHTML = `
+        <div class="card text-center py-6" style="border-color:var(--terracotta-soft)">
+          <p class="text-sm font-medium" style="color:var(--terracotta)">Backend not running</p>
+          <p class="text-xs mt-1" style="color:var(--text-muted)">
+            Start it with: <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px">uvicorn backend.main:app --reload</code>
+          </p>
+        </div>`;
+      return;
+    }
+    sessions = sessionsR.status === 'fulfilled' ? (sessionsR.value || []) : [];
+    workPeriods = periodsR.status === 'fulfilled' ? (periodsR.value || []) : [];
+    todayPlan = planR.status === 'fulfilled' ? planR.value : null;
+    habits = habitsR.value || [];
+    render();
+    // Auto habits self-verify quietly, then the counts refresh in place.
+    await FocusHabits.detectAndSyncHabitChecks({ sessions, workPeriods, todayPlan, habits });
+    try { await refreshHabits(); } catch {}
+  }
+
+  document.addEventListener('click', async (e) => {
+    const tick = e.target.closest('[data-tick]');
+    if (tick) {
+      if (tick.getAttribute('aria-pressed') === 'true') return; // already done today
+      try {
+        const updated = await tickHabit(parseInt(tick.dataset.tick, 10), todayKey());
+        habits = habits.map(h => (h.id === updated.id ? updated : h));
+        render();
+        showToast('Done — quietly counted.');
+      } catch {
+        showToast('Could not save the tick — is the backend running?', { danger: true });
+      }
+      return;
+    }
+
+    const retire = e.target.closest('[data-retire]');
+    if (retire) {
+      const habit = habits.find(h => h.id === parseInt(retire.dataset.retire, 10));
+      if (!habit) return;
+      const ok = await confirmDialog(
+        `Retire "${habit.title}"? Its history is kept and you can re-adopt it anytime.`,
+        { confirmText: 'Retire' });
+      if (!ok) return;
+      try {
+        const updated = await retireHabit(habit.id);
+        habits = habits.map(h => (h.id === updated.id ? updated : h));
+        render();
+      } catch {
+        showToast('Could not retire the habit — is the backend running?', { danger: true });
+      }
+      return;
+    }
+
+    const readopt = e.target.closest('[data-readopt]');
+    if (readopt) {
+      const habit = habits.find(h => h.id === parseInt(readopt.dataset.readopt, 10));
+      if (!habit) return;
+      try {
+        await adoptHabit({
+          code: habit.code, title: habit.title, why: habit.why, kind: habit.kind,
+          check_json: habit.check_json, source: habit.source, created_day_key: todayKey(),
+        });
+        await refreshHabits();
+        await FocusHabits.detectAndSyncHabitChecks({ sessions, workPeriods, todayPlan, habits });
+        try { await refreshHabits(); } catch {}
+      } catch {
+        showToast('Could not re-adopt the habit — is the backend running?', { danger: true });
+      }
+      return;
+    }
+
+    const adopt = e.target.closest('[data-adopt]');
+    if (adopt) {
+      const entry = FocusHabits.CATALOG.find(c => c.code === adopt.dataset.adopt);
+      if (!entry) return;
+      try {
+        await adoptHabit({
+          code: entry.code, title: entry.title, why: entry.why, kind: entry.kind,
+          check_json: entry.check ? JSON.stringify(entry.check) : null,
+          source: 'catalog', created_day_key: todayKey(),
+        });
+        await refreshHabits();
+        await FocusHabits.detectAndSyncHabitChecks({ sessions, workPeriods, todayPlan, habits });
+        try { await refreshHabits(); } catch {}
+        showToast(`Adopted — ${entry.title}.`);
+      } catch {
+        showToast('Could not adopt the habit — is the backend running?', { danger: true });
+      }
+    }
+  });
+
+  loadAll();
+</script>
+</body>
+</html>

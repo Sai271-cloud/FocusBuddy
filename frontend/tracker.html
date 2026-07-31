@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
+  <title>Focus Buddy — Session</title>
+  <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 min-w-0">
+      <a href="index.html" class="btn-ghost" style="padding:0.4rem 0.8rem;font-size:0.8rem;min-height:40px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Tasks
+      </a>
+      <span style="color:var(--border)">|</span>
+      <div class="min-w-0">
+        <h1 id="task-name" class="serif text-[15px] font-medium leading-tight truncate" style="letter-spacing:0;margin:0;max-width:320px">
+          Loading…
+        </h1>
+        <p id="task-desc-header" class="text-xs leading-tight truncate hidden" style="color:var(--text-muted);max-width:320px;margin-top:1px"></p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-1.5 text-xs" style="color:var(--text-muted)">
+        <span id="status-dot" class="live-dot" aria-hidden="true"></span>
+        <span id="status-text">Live</span>
+      </div>
+      <a href="#" id="about-nav" role="button" class="btn-ghost" style="padding:0.4rem 0.8rem;font-size:0.8rem;min-height:40px">About me</a>
+      <div class="settings-menu" style="position:relative">
+        <button id="settings-btn" class="settings-trigger" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="app-main app-main-wide tracker-main max-w-4xl mx-auto px-6 py-8">
+  <div class="tracker-grid grid gap-5 md:grid-cols-[1.5fr_1fr] items-start">
+
+    
+    <div class="tracker-workflow flex flex-col gap-5">
+
+      <div class="card tracker-hero" style="background:var(--hero-bg);border-color:transparent;box-shadow:var(--shadow-lg);position:relative;overflow:hidden">
+        <div id="state-tint" aria-hidden="true"></div>
+        <div id="state-accent" aria-hidden="true"></div>
+        <div style="position:relative;z-index:1">
+          <p class="section-label" style="color:var(--hero-label)">Session time</p>
+          <p class="timer-display" id="timer" style="color:var(--hero-on);margin:2px 0 18px">00:00:00</p>
+          <p class="section-label" style="color:var(--hero-label);margin-bottom:8px">Right now</p>
+          <span id="state-badge" class="badge badge-neutral badge-pulse state-badge-lg" role="status" aria-live="polite">
+            Analyzing…
+          </span>
+          <span id="paused-chip" class="paused-chip hidden" role="status" aria-live="polite">Paused</span>
+          <label class="flex items-center gap-2" style="margin-top:18px;cursor:pointer;width:max-content">
+            <span class="section-label" style="color:var(--hero-label);margin:0">Pomodoro</span>
+            <span class="switch"><input type="checkbox" id="pomo-toggle" /><span class="slider"></span></span>
+          </label>
+
+          
+          <div id="pomo-row" class="hidden" style="margin-top:10px">
+            <div class="flex items-center gap-3" style="flex-wrap:wrap;color:var(--hero-label);font-size:0.8rem">
+              <label class="flex items-center gap-1.5">Focus
+                <input id="pomo-focus" type="number" min="10" max="55" aria-label="Focus minutes"
+                       style="width:48px;background:rgba(255,255,255,0.08);color:var(--hero-on);border:1px solid rgba(255,255,255,0.18);border-radius:var(--radius-sm);padding:0.2rem 0.35rem;font-family:var(--font-sans);font-size:0.8rem" /> min</label>
+              <label class="flex items-center gap-1.5">Break
+                <input id="pomo-break" type="number" min="5" max="15" aria-label="Break minutes"
+                       style="width:48px;background:rgba(255,255,255,0.08);color:var(--hero-on);border:1px solid rgba(255,255,255,0.18);border-radius:var(--radius-sm);padding:0.2rem 0.35rem;font-family:var(--font-sans);font-size:0.8rem" /> min</label>
+            </div>
+            <div id="pomo-phase" class="flex items-center gap-2" style="margin-top:10px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card focus-summary-card">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="text-sm" style="color:var(--text-muted)">Focus this session</span>
+          <span class="text-sm font-semibold" id="focus-pct" style="color:var(--sage);font-variant-numeric:tabular-nums">0%</span>
+        </div>
+        <div class="focus-bar-track"><div class="focus-bar-fill" id="focus-bar"></div></div>
+        <div class="flex justify-between mt-2 text-xs" style="color:var(--text-faint);font-variant-numeric:tabular-nums">
+          <span id="focus-summary">0m 0s focused</span>
+          <span id="other-summary">of 0m 0s tracked</span>
+        </div>
+      </div>
+
+      <div class="tracker-actions flex gap-3">
+        <button id="pause-btn" class="btn-ghost flex-1" style="min-height:48px">
+          <span id="pause-ico" style="display:inline-flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></span>
+          <span id="pause-lbl">Pause</span>
+        </button>
+        <button id="stop-btn" class="btn-danger flex-1" style="min-height:48px">
+          <span style="display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></span>
+          <span id="stop-lbl">Stop &amp; Save</span>
+        </button>
+      </div>
+
+      <div id="startup-error-card" class="card tracker-error-card hidden" role="alert">
+        <p class="section-label" style="margin-bottom:6px">Session unavailable</p>
+        <p id="startup-error-copy" class="text-sm" style="color:var(--text-muted);line-height:1.55;margin:0 0 12px"></p>
+        <a href="index.html" class="btn-primary">Back to Today</a>
+      </div>
+
+      
+      <div id="ai-reason" class="card hidden">
+        <p class="section-label" style="margin-bottom:6px">AI reasoning <span style="color:var(--text-faint);font-weight:400">· dev</span></p>
+        <p id="ai-reason-text" class="text-xs" style="color:var(--text-muted);line-height:1.55">Waiting for the next analysis…</p>
+        <p id="ai-sensors-text" class="text-xs" style="color:var(--text-faint);line-height:1.5;margin-top:6px"></p>
+      </div>
+
+    </div>
+
+    
+    <div class="card tracker-rail flex flex-col gap-4">
+      <div>
+        <p class="section-label" style="margin-bottom:8px">Camera</p>
+        <div id="webcam-row">
+          <div style="position:relative;border-radius:var(--radius-sm);overflow:hidden;background:#1a1614;border:1px solid var(--border)">
+            <video id="webcam-video" autoplay muted playsinline
+              style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block"></video>
+          </div>
+          <p id="site-caption" class="text-xs hidden" style="color:var(--text-muted);margin-top:6px;word-break:break-all"></p>
+        </div>
+        <div id="webcam-error" class="hidden text-sm" style="color:var(--terracotta)">
+          <div class="flex items-start gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px" aria-hidden="true"><path d="m2 2 20 20"/><path d="M7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h13"/><path d="M9.5 4h5L17 7h3a2 2 0 0 1 2 2v7.5"/><path d="M14.121 15.121A3 3 0 1 1 9.88 10.88"/></svg>
+            <span><strong>Camera access denied.</strong> Focus detection paused — timer still running.</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:1rem">
+        <p class="section-label" style="margin-bottom:10px">Breakdown</p>
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center justify-between text-sm">
+            <span class="flex items-center"><span class="dot dot-focused" aria-hidden="true"></span>Focused</span>
+            <span id="stat-focused" style="color:var(--text-muted);font-variant-numeric:tabular-nums">0m 0s · 0%</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="flex items-center"><span class="dot dot-distracted" aria-hidden="true"></span>Distracted</span>
+            <span id="stat-distracted" style="color:var(--text-muted);font-variant-numeric:tabular-nums">0m 0s · 0%</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="flex items-center"><span class="dot dot-uncertain" aria-hidden="true"></span>Uncertain</span>
+            <span id="stat-uncertain" style="color:var(--text-muted);font-variant-numeric:tabular-nums">0m 0s · 0%</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="flex items-center"><span class="dot dot-away" aria-hidden="true"></span>Away</span>
+            <span id="stat-away" style="color:var(--text-muted);font-variant-numeric:tabular-nums">0m 0s · 0%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+
+<div id="confirm-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" style="max-width:380px">
+    <h2 id="confirm-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0 0 6px">End this session?</h2>
+    <p class="text-sm" style="color:var(--text-muted);margin:0 0 18px;line-height:1.5">Your focus data will be saved and you'll head back to your tasks.</p>
+    <div class="flex gap-3 justify-end">
+      <button id="confirm-cancel" class="btn-ghost" style="min-height:44px">Keep going</button>
+      <button id="confirm-end" class="btn-danger" style="min-height:44px">End &amp; Save</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="debrief-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="debrief-title" style="max-width:480px">
+    <h2 id="debrief-title" class="serif" style="font-size:1.2rem;font-weight:600;margin:0 0 12px">Session debrief</h2>
+    <div id="debrief-body">
+      <p class="text-sm" style="color:var(--text-muted);animation:pulse 1.4s ease-in-out infinite">Analyzing your session…</p>
+    </div>
+    <!-- League note lives OUTSIDE #debrief-body so debrief re-renders can't wipe it -->
+    <p id="debrief-league-note" class="text-sm" style="display:none;margin:14px 0 0;padding:8px 10px;border-radius:8px;background:rgba(94,138,101,0.12);color:var(--text)"></p>
+    <div class="flex justify-end" style="margin-top:18px">
+      <button id="debrief-done" class="btn-primary" style="min-height:44px">Done</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/notify.js"></script>
+<!-- planning-insights + journey-map: pure helpers only here (landmark detection after the save) -->
+<script src="js/planning-insights.js"></script>
+<script src="js/journey-map.js"></script>
+<script src="js/session-replay.js"></script>
+<script src="js/settings-menu.js"></script>
+<script src="js/face-metrics.js"></script>
+<script src="js/focus-engine.js"></script>
+<script src="js/focus-detector.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const taskId = Number.parseInt(params.get('taskId'), 10);
+  const validTaskId = Number.isInteger(taskId) && taskId > 0;
+  if (!validTaskId) {
+    location.href = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html';
+  }
+
+  const totals = { focused: 0, distracted: 0, uncertain: 0, away: 0 };
+  const validStates = new Set(['focused', 'distracted', 'uncertain', 'away']);
+  let currentState = 'uncertain';
+  let sessionStart = null;
+  let sessionRecordStart = null;
+  let sessionId = null;
+  let taskName = 'Loading task...';
+  let taskDescription = '';
+  let elapsedSeconds = 0;
+  let timerInterval = null;
+  let autosaveInterval = null;
+  let trackingHeartbeat = null;
+  let pendingSave = Promise.resolve();
+  let lastSavedPayload = null;
+  let autosaveErrorShown = false;
+  let isPaused = false;
+  let timeline = [];
+  let journal = [];
+  let lastSite = null;
+  let lastNote = null;
+  let lastRecordedMinute = -1;
+  let lastTickMs = null;
+  let pausedMs = 0;
+  let pauseStartedAt = null;
+  let driftMs = 0;
+  let driftNotified = false;
+  let aiEverLive = false;
+  let lastAiErrorKey = null;
+  let cameraDown = false;
+  let pomoEnabled = false;
+  let pomoFocusSec = 25 * 60;
+  let pomoBreakSec = 5 * 60;
+  let onBreak = false;
+  let phaseStartElapsed = 0;
+  let breakEndsAt = 0;
+  const NUDGE_AFTER_MS = 120000;
+
+  const COLORS = {
+    focused: '#5e8a65', distracted: '#b35c3a',
+    uncertain: '#b08a38', away: '#8a7a6c',
+  };
+
+  function formatSeconds(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}m ${sec}s`;
+  }
+
+  function websiteTrackingOn() {
+    try { return localStorage.getItem('fb-website-tracking') === 'on'; } catch (e) { return false; }
+  }
+  function trackingGateOn() {
+    return sessionId !== null && !isPaused && !onBreak && websiteTrackingOn();
+  }
+  function syncTrackingGate(extra) {
+    try { if (window.setTrackingState) setTrackingState(trackingGateOn(), extra || {}).catch(() => {}); } catch (e) {}
+  }
+
+  function formatTimer(s) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return [h, m, sec].map(n => String(n).padStart(2, '0')).join(':');
+  }
+
+  function updateLive() {
+    const total = Object.values(totals).reduce((a, b) => a + b, 0);
+    const pct = total > 0 ? Math.round(totals.focused / total * 100) : 0;
+    document.getElementById('focus-pct').textContent = pct + '%';
+    document.getElementById('focus-bar').style.width = pct + '%';
+    document.getElementById('focus-summary').textContent = `${formatSeconds(totals.focused)} focused`;
+    document.getElementById('other-summary').textContent = `of ${formatSeconds(total)} tracked`;
+    ['focused', 'distracted', 'uncertain', 'away'].forEach(s => {
+      const el = document.getElementById('stat-' + s);
+      if (el) el.textContent = `${formatSeconds(totals[s])} · ${total > 0 ? Math.round(totals[s] / total * 100) : 0}%`;
+    });
+  }
+
+  function setState(state, note, reason) {
+    if (!validStates.has(state)) state = 'uncertain';
+    if (note && note !== lastNote) {
+      journal.push({ t: elapsedSeconds, type: 'note', note: String(note).slice(0, 120) });
+      lastNote = note;
+    }
+    if (state !== currentState) {
+      journal.push({ t: elapsedSeconds, type: 'state', state });
+    }
+    currentState = state;
+    const badge = document.getElementById('state-badge');
+    badge.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+    badge.className = `badge badge-${state} state-badge-lg`;
+    document.getElementById('state-accent').style.background = COLORS[state];
+    document.getElementById('state-tint').style.background = COLORS[state];
+    if (reason) {
+      document.getElementById('ai-reason').classList.remove('hidden');
+      const rt = document.getElementById('ai-reason-text');
+      if (rt) rt.textContent = reason;
+    }
+  }
+
+  function tick() {
+    if (isPaused || sessionStart === null) return;
+
+    const now = Date.now();
+    if (lastTickMs === null) lastTickMs = now;
+    const deltaSec = (now - lastTickMs) / 1000;
+    lastTickMs = now;
+
+    if (pomoEnabled && onBreak) {
+      pausedMs += deltaSec * 1000;
+      const remaining = Math.max(0, Math.round((breakEndsAt - now) / 1000));
+      if (remaining <= 0) endBreak();
+      else updatePomoPhase('break', remaining);
+      document.getElementById('timer').textContent = formatTimer(elapsedSeconds);
+      return;
+    }
+
+    totals[currentState] += deltaSec;
+
+    if (currentState === 'distracted' || currentState === 'away') {
+      driftMs += deltaSec * 1000;
+      if (driftMs >= NUDGE_AFTER_MS && !driftNotified && localStorage.getItem('fb-nudges') !== 'off') {
+        driftNotified = true;
+        fireNudge();
+      }
+    } else {
+      driftMs = 0;
+      driftNotified = false;
+    }
+
+    elapsedSeconds = Math.max(0, Math.floor((now - sessionStart.getTime() - pausedMs) / 1000));
+
+    const minute = Math.floor(elapsedSeconds / 60);
+    if (minute > lastRecordedMinute) {
+      lastRecordedMinute = minute;
+      timeline.push({ minute, state: currentState });
+    }
+
+    document.getElementById('timer').textContent = formatTimer(elapsedSeconds);
+    updateLive();
+
+    if (pomoEnabled && !onBreak) {
+      const left = pomoFocusSec - (elapsedSeconds - phaseStartElapsed);
+      if (left <= 0) startBreak();
+      else updatePomoPhase('focus', left);
+    }
+  }
+
+  function aiErrorInfo(err) {
+    if (!err || err.status === undefined) {
+      return {
+        key: 'backend',
+        short: 'Backend offline',
+        message: 'Can’t reach the backend — is it running? Your timer is still going.',
+      };
+    }
+    const shorts = { 429: 'Rate-limited', 401: 'Key problem', 403: 'Key problem',
+                     404: 'Model problem', 503: 'AI overloaded', 504: 'AI slow' };
+    return {
+      key: 'http-' + err.status,
+      short: shorts[err.status] || 'AI unavailable',
+      message: err.detail || err.message || 'Focus detection is temporarily unavailable.',
+    };
+  }
+
+  function setStatus(ok, err) {
+    const dot = document.getElementById('status-dot');
+    const txt = document.getElementById('status-text');
+    // While the camera is down the pill must keep saying so — "Live" would
+    // contradict the "Camera off" state badge (detection isn't running).
+    if (cameraDown) return;
+    if (ok) {
+      aiEverLive = true;
+      dot.style.background = '';
+      txt.textContent = 'Live';
+      if (lastAiErrorKey) {
+        lastAiErrorKey = null;
+        if (window.showToast) showToast('Focus detection reconnected.');
+      }
+      return;
+    }
+    const info = aiErrorInfo(err);
+    dot.style.background = 'var(--ochre)';
+    txt.textContent = info.short;
+    if (!aiEverLive) {
+      const badge = document.getElementById('state-badge');
+      badge.className = 'badge badge-neutral state-badge-lg';
+      badge.textContent = 'AI unavailable';
+    }
+    if (info.key !== lastAiErrorKey) {
+      lastAiErrorKey = info.key;
+      if (window.showToast) showToast(info.message, { danger: true });
+    }
+  }
+
+  function setActivity(activity) {
+    const el = document.getElementById('site-caption');
+    if (!el) return;
+    if (activity && activity.url) {
+      let domain = activity.url;
+      try { domain = new URL(activity.url).hostname.replace(/^www\./, ''); } catch (e) {}
+      if (domain && domain !== lastSite) {
+        journal.push({ t: elapsedSeconds, type: 'site', site: domain, title: activity.title || '' });
+        lastSite = domain;
+      }
+      let label = activity.title ? `${activity.title} — ${domain}` : domain;
+      if (label.length > 60) label = label.slice(0, 59) + '…';
+      el.textContent = 'Seeing: ' + label;
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+
+  function fireNudge() {
+    const msg = `Drifting from "${taskName}" — come back?`;
+    if (window.showToast) showToast(msg);
+    if (window.playChime) playChime();
+    if (window.notifyUser) notifyUser('Focus Buddy', msg);
+  }
+
+  function formatMMSS(s) {
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  }
+
+  const ICON_CUP = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline-block;vertical-align:-2px;margin-right:4px"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/></svg>';
+  const ICON_TIMER = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline-block;vertical-align:-2px;margin-right:4px"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M9 2h6"/></svg>';
+
+  function updatePomoPhase(phase, remainingSec) {
+    const el = document.getElementById('pomo-phase');
+    if (!el) return;
+    if (phase === 'break') {
+      el.innerHTML = `<span class="badge badge-away">${ICON_CUP}Break</span>` +
+        `<span class="text-xs" style="color:var(--hero-label);font-variant-numeric:tabular-nums">${formatMMSS(remainingSec)} left</span>`;
+    } else {
+      el.innerHTML = `<span class="badge badge-focused">${ICON_TIMER}Focus</span>` +
+        `<span class="text-xs" style="color:var(--hero-label);font-variant-numeric:tabular-nums">${formatMMSS(remainingSec)} until break</span>`;
+    }
+  }
+
+  function startBreak() {
+    onBreak = true;
+    pauseDetection();
+    breakEndsAt = Date.now() + pomoBreakSec * 1000;
+    const mins = Math.round(pomoBreakSec / 60);
+    const msg = `Focus block done — take a ${mins}-min break`;
+    if (window.showToast) showToast(msg, { icon: ICON_CUP });
+    if (window.playChime) playChime();
+    if (window.notifyUser) notifyUser('Focus Buddy', msg);
+    updatePomoPhase('break', pomoBreakSec);
+    syncTrackingGate();
+  }
+
+  function endBreak() {
+    onBreak = false;
+    phaseStartElapsed = elapsedSeconds;
+    lastTickMs = Date.now();
+    resumeDetection();
+    const msg = 'Break over — back to focus';
+    if (window.showToast) showToast(msg, { icon: ICON_TIMER });
+    if (window.playChime) playChime();
+    if (window.notifyUser) notifyUser('Focus Buddy', msg);
+    updatePomoPhase('focus', pomoFocusSec);
+    syncTrackingGate();
+  }
+
+  function sessionPayload() {
+    return {
+      ended_at: window.FocusBuddyDemo && FocusBuddyDemo.active
+        ? FocusBuddyDemo.sessionEndIso(sessionRecordStart ? sessionRecordStart.toISOString() : null, elapsedSeconds)
+        : new Date().toISOString(),
+      seconds_focused: Math.round(totals.focused),
+      seconds_distracted: Math.round(totals.distracted),
+      seconds_uncertain: Math.round(totals.uncertain),
+      seconds_away: Math.round(totals.away),
+      timeline_json: JSON.stringify(timeline),
+      journal_json: JSON.stringify(journal),
+    };
+  }
+
+  function enqueueSessionSave(finish = false) {
+    if (!sessionId) return Promise.resolve();
+    const payload = sessionPayload();
+    lastSavedPayload = payload;
+    pendingSave = pendingSave
+      .catch(() => {})
+      .then(() => finish ? finishSession(sessionId, payload) : updateSession(sessionId, payload));
+    return pendingSave;
+  }
+
+  async function saveFinalWithRetry(attempts = 3) {
+    let lastErr;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await enqueueSessionSave(true);
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (i < attempts - 1) await new Promise(r => setTimeout(r, 700 * (i + 1)));
+      }
+    }
+    throw lastErr;
+  }
+
+  function setSessionControlsDisabled(disabled) {
+    ['pause-btn', 'stop-btn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = disabled;
+    });
+    const actions = document.querySelector('.tracker-actions');
+    if (actions) actions.classList.toggle('hidden', disabled);
+  }
+
+  function showStartupError(message) {
+    setSessionControlsDisabled(true);
+    document.getElementById('webcam-row').classList.add('hidden');
+    const errorEl = document.getElementById('webcam-error');
+    errorEl.textContent = '';
+    const strong = document.createElement('strong');
+    strong.textContent = 'Session could not start.';
+    errorEl.append(strong, ' ' + message);
+    errorEl.classList.remove('hidden');
+    const card = document.getElementById('startup-error-card');
+    document.getElementById('startup-error-copy').textContent = message;
+    card.classList.remove('hidden');
+    card.querySelector('a').focus();
+    if (window.showToast) showToast('Session could not start.', { danger: true });
+  }
+
+  async function init() {
+    const videoEl = document.getElementById('webcam-video');
+
+    try {
+      const task = await getTask(taskId);
+      taskName = task.name;
+      taskDescription = task.description || '';
+
+      document.getElementById('task-name').textContent = taskName;
+      document.title = `Focus Buddy — ${taskName}`;
+
+      if (taskDescription) {
+        const descEl = document.getElementById('task-desc-header');
+        descEl.textContent = taskDescription;
+        descEl.classList.remove('hidden');
+      }
+
+      const demoStart = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.sessionStartIso() : null;
+      const session = await startSession(taskId, demoStart);
+      sessionId = session.id;
+      sessionRecordStart = new Date(session.started_at);
+      sessionStart = window.FocusBuddyDemo && FocusBuddyDemo.active ? new Date() : sessionRecordStart;
+      timerInterval = setInterval(tick, 1000);
+      autosaveInterval = setInterval(() => {
+        enqueueSessionSave(false)
+          .then(() => { autosaveErrorShown = false; })
+          .catch(() => {
+            if (!autosaveErrorShown) {
+              autosaveErrorShown = true;
+              if (window.showToast) showToast('Couldn’t save progress — check the backend. Your session is still running.', { danger: true });
+            }
+          });
+      }, 5000);
+
+      await startDetection(videoEl, taskName, taskDescription, setState, setStatus, setActivity);
+
+      syncTrackingGate();
+      trackingHeartbeat = setInterval(syncTrackingGate, 20000);
+    } catch (err) {
+      console.warn('Session startup issue:', err);
+      if (!sessionId) {
+        showStartupError('Check that the backend is running and the task still exists.');
+        return;
+      }
+      showCameraError(err);
+    }
+  }
+
+  function showCameraError(err) {
+    const name = err && err.name ? err.name : '';
+    let msg;
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      msg = '<strong>Camera access is blocked.</strong> Allow the camera in your browser’s site settings, then reload. Your timer is still running.';
+    } else if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError') {
+      msg = '<strong>No camera found.</strong> Connect a webcam and reload to enable focus detection. Your timer is still running.';
+    } else if (name === 'NotReadableError') {
+      msg = '<strong>Camera is in use by another app.</strong> Close other apps using it and reload. Your timer is still running.';
+    } else {
+      msg = '<strong>Couldn’t start the camera.</strong> Reload to try again. Your timer is still running.';
+    }
+    document.getElementById('webcam-row').classList.add('hidden');
+    const errEl = document.getElementById('webcam-error');
+    errEl.querySelector('span').innerHTML = msg;
+    errEl.classList.remove('hidden');
+    const badge = document.getElementById('state-badge');
+    badge.className = 'badge badge-neutral state-badge-lg';
+    badge.textContent = 'Camera off';
+    cameraDown = true;
+    document.getElementById('status-dot').style.background = 'var(--ochre)';
+    document.getElementById('status-text').textContent = 'Camera off';
+    if (window.showToast) showToast('Focus detection is off — ' + (name === 'NotFoundError' ? 'no camera found.' : 'camera unavailable.'), { danger: true });
+  }
+
+  const pauseBtn = document.getElementById('pause-btn');
+  const ICON_PAUSE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+  const ICON_PLAY  = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>';
+  pauseBtn.addEventListener('click', () => {
+    isPaused = !isPaused;
+    if (isPaused) {
+      pauseStartedAt = Date.now();
+      pauseDetection();
+      document.getElementById('pause-ico').innerHTML = ICON_PLAY;
+      document.getElementById('pause-lbl').textContent = 'Resume';
+      document.getElementById('paused-chip').classList.remove('hidden');
+      pauseBtn.className = 'btn-primary flex-1';
+      pauseBtn.style.minHeight = '48px';
+    } else {
+      if (pauseStartedAt !== null) {
+        pausedMs += Date.now() - pauseStartedAt;
+        pauseStartedAt = null;
+      }
+      lastTickMs = Date.now();
+      if (!onBreak) resumeDetection();
+      document.getElementById('pause-ico').innerHTML = ICON_PAUSE;
+      document.getElementById('pause-lbl').textContent = 'Pause';
+      document.getElementById('paused-chip').classList.add('hidden');
+      pauseBtn.className = 'btn-ghost flex-1';
+      pauseBtn.style.minHeight = '48px';
+    }
+    syncTrackingGate();
+  });
+
+  const confirmOverlay = document.getElementById('confirm-overlay');
+  const stopBtn = document.getElementById('stop-btn');
+  const stopLabel = document.getElementById('stop-lbl');
+  let retryFinalSave = false;
+  let releaseConfirmTrap = null;
+  function openConfirm() {
+    confirmOverlay.style.display = 'flex';
+    releaseConfirmTrap = trapModalFocus(confirmOverlay.querySelector('.modal'), document.activeElement);
+    document.getElementById('confirm-cancel').focus();
+  }
+  function closeConfirm() {
+    confirmOverlay.style.display = 'none';
+    if (releaseConfirmTrap) { releaseConfirmTrap(); releaseConfirmTrap = null; }
+  }
+
+  stopBtn.addEventListener('click', () => {
+    if (retryFinalSave) {
+      endAndSaveSession();
+      return;
+    }
+    openConfirm();
+  });
+  document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
+  confirmOverlay.addEventListener('click', e => { if (e.target.id === 'confirm-overlay') closeConfirm(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && confirmOverlay.style.display === 'flex') closeConfirm(); });
+
+  const debriefOverlay = document.getElementById('debrief-overlay');
+  let debriefReplayHtml = '';
+  function goHome() { location.href = window.FocusBuddyDemo && FocusBuddyDemo.active ? FocusBuddyDemo.href('index.html') : 'index.html'; }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function replaySessionFromPayload(payload) {
+    return {
+      id: sessionId,
+      task_id: taskId,
+      task_name: taskName,
+      started_at: sessionRecordStart instanceof Date && !isNaN(sessionRecordStart) ? sessionRecordStart.toISOString() : new Date().toISOString(),
+      ...payload,
+    };
+  }
+  function renderReplayFromSavedPayload() {
+    if (!window.FocusSessionReplay) return '';
+    return FocusSessionReplay.render(replaySessionFromPayload(lastSavedPayload || sessionPayload()));
+  }
+  function debriefBodyPrefix() {
+    const replay = debriefReplayHtml
+      ? debriefReplayHtml
+      : '';
+    return replay
+      ? replay + '<div style="height:1px;background:var(--border);margin:16px 0"></div>'
+      : '';
+  }
+  function openDebriefLoading(replayHtml = '') {
+    debriefReplayHtml = replayHtml;
+    document.getElementById('debrief-body').innerHTML =
+      debriefBodyPrefix() +
+      '<p class="section-label" style="margin:0 0 6px">AI debrief</p>' +
+      '<p class="text-sm" style="color:var(--text-muted);animation:pulse 1.4s ease-in-out infinite">Analyzing your session...</p>';
+    debriefOverlay.style.display = 'flex';
+    // No release needed: every exit from the debrief navigates to index.html.
+    trapModalFocus(debriefOverlay.querySelector('.modal'), null);
+    document.getElementById('debrief-done').focus();
+  }
+  function renderDebrief(d) {
+    const list = arr => (arr && arr.length)
+      ? '<ul style="margin:6px 0 0;padding-left:18px">' + arr.map(i => '<li style="margin:4px 0;line-height:1.45">' + escapeHtml(i) + '</li>').join('') + '</ul>'
+      : '';
+    let html = '';
+    if (d.summary) html += '<p class="text-sm" style="color:var(--text);line-height:1.55;margin:0 0 12px">' + escapeHtml(d.summary) + '</p>';
+    if (d.win) html += '<p class="text-sm" style="color:var(--text);line-height:1.45;margin:0 0 14px;background:rgba(94,138,101,0.12);border-radius:8px;padding:8px 10px"><strong>Win:</strong> ' + escapeHtml(d.win) + '</p>';
+    if (d.patterns && d.patterns.length) html += '<p class="section-label" style="margin:0 0 2px">What happened</p>' + list(d.patterns);
+    if (d.suggestions && d.suggestions.length) html += '<p class="section-label" style="margin:14px 0 2px">Try next time</p>' + list(d.suggestions);
+    if (d.next_action) html += '<p class="text-sm" style="color:var(--text);line-height:1.45;margin:14px 0 0;border-left:3px solid var(--sage);padding-left:10px"><strong>Your one next step:</strong> ' + escapeHtml(d.next_action) + '</p>';
+    const debriefHtml = html
+      ? '<p class="section-label" style="margin:0 0 6px">AI debrief</p>' + html
+      : '<p class="text-sm" style="color:var(--text-muted)">Your session is saved.</p>';
+    document.getElementById('debrief-body').innerHTML = debriefBodyPrefix() + debriefHtml;
+  }
+  function renderDebriefError() {
+    document.getElementById('debrief-body').innerHTML =
+      debriefBodyPrefix() +
+      '<p class="section-label" style="margin:0 0 6px">AI debrief</p>' +
+      '<p class="text-sm" style="color:var(--text-muted);line-height:1.55">Could not generate your debrief right now, but your session is saved. Head back to your tasks whenever you are ready.</p>';
+  }
+  document.getElementById('debrief-done').addEventListener('click', goHome);
+  debriefOverlay.addEventListener('click', e => { if (e.target.id === 'debrief-overlay') goHome(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && debriefOverlay.style.display === 'flex') goHome(); });
+
+  async function endAndSaveSession() {
+    retryFinalSave = false;
+    closeConfirm();
+    clearInterval(timerInterval);
+    clearInterval(autosaveInterval);
+    clearInterval(trackingHeartbeat);
+    stopDetection();
+    try { if (window.setTrackingState) setTrackingState(false).catch(() => {}); } catch (e) {}
+
+    stopLabel.textContent = 'Saving…';
+    stopBtn.disabled = true;
+
+    try {
+      await saveFinalWithRetry();
+    } catch (err) {
+      console.error('Save failed:', err);
+      retryFinalSave = true;
+      stopLabel.textContent = 'Retry Save';
+      stopBtn.disabled = false;
+      stopBtn.focus();
+      if (window.showToast) showToast('Could not save this session. Check the backend, then retry.', { danger: true });
+      return;
+    }
+
+    const tracked = totals.focused + totals.distracted + totals.uncertain + totals.away;
+    if (tracked < 1 || !sessionId) { goHome(); return; }
+
+    openDebriefLoading(renderReplayFromSavedPayload());
+
+    try {
+      const payload = lastSavedPayload || sessionPayload();
+      const endDate = new Date(payload.ended_at);
+      const startH = (sessionRecordStart instanceof Date && !isNaN(sessionRecordStart)) ? sessionRecordStart.getHours() : endDate.getHours();
+      const endH = endDate.getHours();
+      learnFromSession(sessionId, startH, endH).catch(() => {});
+    } catch (e) {}
+
+    // League sync — fire-and-forget like /learn; a failure changes nothing.
+    // A rank promotion sets the marker the Today page uses to play the badge slam.
+    try {
+      syncLeague().then(league => {
+        if (!league) return;
+        const note = document.getElementById('debrief-league-note');
+        if (league.promoted) {
+          try { localStorage.setItem('fb-pending-promotion', league.rank_name); } catch (e) {}
+          if (note) {
+            note.textContent = 'You’ve become a ' + league.rank_name + ' — see your badge on Today.';
+            note.style.display = 'block';
+          }
+        } else if (league.leveled_up) {
+          try { localStorage.setItem('fb-pending-levelup', league.rank_name + ' ' + league.level); } catch (e) {}
+          if (note) {
+            note.textContent = league.rank_name + ' ' + league.level + ' now — another step on the trail.';
+            note.style.display = 'block';
+          }
+        }
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Landmark sync — fire-and-forget; a new one shows a soft toast (Chunk 5).
+    try {
+      const todayKey = PlanningInsights.localDayKey();
+      Promise.all([getSessions(), getWorkPeriods(), getPlan(todayKey).catch(() => null)])
+        .then(([sessions, workPeriods, todayPlan]) =>
+          PlanningInsights.detectAndSyncLandmarks({ sessions, workPeriods, todayPlan }))
+        .catch(() => {});
+    } catch (e) {}
+
+    try {
+      renderDebrief(await getDebrief(sessionId));
+    } catch (err) {
+      console.warn('Debrief failed:', err);
+      renderDebriefError();
+    }
+  }
+
+  document.getElementById('confirm-end').addEventListener('click', endAndSaveSession);
+
+  const pomoToggle = document.getElementById('pomo-toggle');
+  const pomoFocusInput = document.getElementById('pomo-focus');
+  const pomoBreakInput = document.getElementById('pomo-break');
+  const pomoRow = document.getElementById('pomo-row');
+
+  function clampInt(v, lo, hi, dflt) {
+    const n = parseInt(v, 10);
+    if (!Number.isFinite(n)) return dflt;
+    return Math.min(hi, Math.max(lo, n));
+  }
+  function applyPomoVisibility() {
+    pomoRow.classList.toggle('hidden', !pomoEnabled);
+  }
+
+  pomoEnabled = localStorage.getItem('fb-pomo-enabled') === 'on';
+  const _pf = clampInt(localStorage.getItem('fb-pomo-focus'), 10, 55, 25);
+  const _pb = clampInt(localStorage.getItem('fb-pomo-break'), 5, 15, 5);
+  pomoFocusSec = _pf * 60;
+  pomoBreakSec = _pb * 60;
+  pomoToggle.checked = pomoEnabled;
+  pomoFocusInput.value = _pf;
+  pomoBreakInput.value = _pb;
+  applyPomoVisibility();
+  if (pomoEnabled) updatePomoPhase('focus', pomoFocusSec);
+
+  pomoToggle.addEventListener('change', () => {
+    pomoEnabled = pomoToggle.checked;
+    try { localStorage.setItem('fb-pomo-enabled', pomoEnabled ? 'on' : 'off'); } catch (e) {}
+    applyPomoVisibility();
+    if (pomoEnabled) {
+      onBreak = false;
+      phaseStartElapsed = elapsedSeconds;
+      updatePomoPhase('focus', pomoFocusSec);
+    } else if (onBreak) {
+      onBreak = false;
+      resumeDetection();
+    }
+    syncTrackingGate();
+  });
+
+  pomoFocusInput.addEventListener('change', () => {
+    const f = clampInt(pomoFocusInput.value, 10, 55, 25);
+    pomoFocusInput.value = f;
+    pomoFocusSec = f * 60;
+    try { localStorage.setItem('fb-pomo-focus', String(f)); } catch (e) {}
+  });
+  pomoBreakInput.addEventListener('change', () => {
+    const b = clampInt(pomoBreakInput.value, 5, 15, 5);
+    pomoBreakInput.value = b;
+    pomoBreakSec = b * 60;
+    try { localStorage.setItem('fb-pomo-break', String(b)); } catch (e) {}
+  });
+
+  if (localStorage.getItem('fb-show-reasoning') === 'on') {
+    document.getElementById('ai-reason').classList.remove('hidden');
+  }
+  setInterval(function () {
+    const panel = document.getElementById('ai-reason');
+    if (!panel || panel.classList.contains('hidden')) return;
+    const el = document.getElementById('ai-sensors-text');
+    if (!el) return;
+    const labels = window.faceMetrics ? window.faceMetrics.getSensorLabels() : null;
+    el.textContent = labels ? ('sensors: ' + labels) : 'sensors: (loading / unavailable)';
+  }, 1000);
+
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Space') return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') return;
+    if (confirmOverlay.style.display === 'flex') return;
+    if (debriefOverlay.style.display === 'flex') return;
+    e.preventDefault();
+    pauseBtn.click();
+  });
+
+  function flushFinalSave() {
+    if (!sessionId) return;
+    try { updateSession(sessionId, sessionPayload(), { keepalive: true }); } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushFinalSave();
+  });
+  window.addEventListener('pagehide', () => {
+    flushFinalSave();
+    if (sessionId) {
+      try { if (window.setTrackingState) setTrackingState(false, { keepalive: true }).catch(() => {}); } catch (e) {}
+    }
+  });
+
+  if (validTaskId) init();
+</script>
+</body>
+</html>

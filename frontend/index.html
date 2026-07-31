@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
+  <title>Focus Buddy — Today</title>
+  <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-5xl mx-auto">
+    <a href="index.html" class="logo">
+      <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <circle cx="13" cy="13" r="11.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="6.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="2" fill="var(--accent)"/>
+      </svg>
+      <h1>Focus Buddy</h1>
+    </a>
+    <nav class="page-nav" aria-label="Main navigation">
+      <a href="plan.html">Plan</a>
+      <a href="index.html" class="active" aria-current="page">Today</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="habits.html">Habits</a>
+      <a href="goals.html">Goals</a>
+      <a href="analytics.html?unwind=month&month=last" class="nav-monthly" title="Open last month's Monthly Unwind">Last month</a>
+      <a href="#" id="about-nav" role="button">About me</a>
+      <div class="settings-menu" style="position:relative">
+        <button id="settings-btn" class="settings-trigger" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main class="app-main app-main-wide today-main max-w-5xl mx-auto px-6 py-8">
+  <section id="trail-card" class="trail-card card" style="display:none" aria-label="Your trail">
+    <button id="trail-month-label" class="trail-month-label" aria-haspopup="dialog" title="Open the Atlas">
+      <span id="trail-month-name"></span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
+    <div class="trail-browse">
+      <button id="trail-prev" class="trail-arrow" aria-label="Previous month">‹</button>
+      <div id="trail-map"></div>
+      <button id="trail-next" class="trail-arrow" aria-label="Next month">›</button>
+    </div>
+    <div id="trail-browse-foot"></div>
+  </section>
+  <!-- Active goals at a glance; hidden until goals load (and on any load failure —
+       this strip must never break the Today page). Whole card opens the Goals page. -->
+  <a id="goal-strip" class="card card-hover goal-strip" href="goals.html" style="display:none" aria-label="Your goals">
+    <div id="goal-strip-rows" class="flex flex-col gap-1 min-w-0 flex-1"></div>
+    <span class="text-xs shrink-0" style="color:var(--text-muted)">Goals →</span>
+  </a>
+  <div class="today-grid">
+
+    <section class="today-primary flex flex-col gap-5">
+      <div class="card task-composer">
+        <p class="section-label">New task</p>
+        <form id="add-form" class="flex flex-col gap-3">
+          <div>
+            <label for="task-input" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">Task name</label>
+            <input id="task-input" class="input" type="text" placeholder="What do you want to focus on?"
+                   autocomplete="off" required aria-label="Task name" />
+          </div>
+          <div>
+            <label for="task-desc" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
+              Description <span class="font-normal" style="color:var(--text-faint)"> — Add needed websites, tools, or context for focus analysis</span>
+            </label>
+            <textarea id="task-desc" class="input" rows="3"
+                      placeholder="Please add context or details about this task."
+                      style="resize:vertical;min-height:58px;line-height:1.5" aria-label="Task description"></textarea>
+          </div>
+          <!-- Hidden until at least one active goal exists — no empty dropdown for
+               people who don't use goals (progressive disclosure). -->
+          <div id="task-goal-wrap" style="display:none">
+            <label for="task-goal" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
+              Goal <span class="font-normal" style="color:var(--text-faint)"> — optional; focused time on this task counts toward it</span>
+            </label>
+            <select id="task-goal" class="input" aria-label="Link this task to a goal">
+              <option value="">No goal</option>
+            </select>
+          </div>
+          <div class="flex justify-end">
+            <button id="add-btn" type="submit" class="btn-primary" disabled
+                    style="opacity:0.5;cursor:not-allowed">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Add Task
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="task-stack">
+        <p class="section-label">Tasks</p>
+        <div id="task-list" class="flex flex-col gap-3"></div>
+        <!-- Hidden until the first load resolves so a slow backend never flashes a false "No active tasks". -->
+        <div id="active-empty" class="flex flex-col items-center gap-2 text-center py-10" style="display:none">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8M13 12h8M13 18h8"/></svg>
+          <p class="font-medium text-sm" style="color:var(--text)">No active tasks</p>
+          <p id="active-empty-sub" class="text-sm" style="color:var(--text-muted)">Add a task above to start your first focus session.</p>
+        </div>
+
+        <button id="completed-header" class="completed-header collapsed" style="display:none" aria-expanded="false">
+          <span class="chev" style="display:inline-flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 9l6 6 6-6"/></svg></span> <span id="completed-label">Completed (0)</span>
+        </button>
+        <div id="completed-list" class="flex flex-col gap-3" style="display:none"></div>
+      </div>
+    </section>
+
+    <section class="today-rail">
+      <div class="flex items-center justify-between mb-2">
+        <p class="section-label" style="margin:0">Today</p>
+        <p id="cal-date" class="text-xs" style="color:var(--text-faint)"></p>
+      </div>
+      <div class="calendar" id="calendar">
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <div id="cal-empty" class="flex flex-col items-center gap-2 text-center mt-3" style="display:none">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+        <p class="text-xs" style="color:var(--text-muted)">No sessions today yet — start one from a task.</p>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+
+<div id="edit-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title" style="max-width:420px">
+    <h2 id="edit-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0 0 14px">Edit task</h2>
+    <label for="edit-name" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">Task name</label>
+    <input id="edit-name" class="input" type="text" autocomplete="off" aria-label="Task name" />
+    <label for="edit-desc" class="block text-xs font-medium mb-1.5 mt-3" style="color:var(--text-muted)">Description</label>
+    <textarea id="edit-desc" class="input" rows="3" style="resize:vertical" aria-label="Task description"></textarea>
+    <div id="edit-goal-wrap" style="display:none">
+      <label for="edit-goal" class="block text-xs font-medium mb-1.5 mt-3" style="color:var(--text-muted)">Goal</label>
+      <select id="edit-goal" class="input" aria-label="Link this task to a goal">
+        <option value="">No goal</option>
+      </select>
+    </div>
+    <div class="flex gap-3 justify-end mt-4">
+      <button id="edit-cancel" class="btn-ghost">Cancel</button>
+      <button id="edit-save" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/settings-menu.js"></script>
+<script src="js/planning-insights.js"></script>
+<script src="js/journey-map.js"></script>
+<script src="js/goals.js"></script>
+<script>
+  const HOUR_HEIGHT = 52;
+  const MIN_BLOCK = 18;
+
+  const taskListEl     = document.getElementById('task-list');
+  const completedListEl = document.getElementById('completed-list');
+  const completedHeader = document.getElementById('completed-header');
+  const completedLabel  = document.getElementById('completed-label');
+  const activeEmpty     = document.getElementById('active-empty');
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+  function formatSeconds(s) {
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}m ${sec}s`;
+  }
+
+  const ICON_PENCIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const ICON_TRASH  = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
+  let _todayPlan = null;
+  let _todayReality = null;
+  let _recommendedEntry = null;
+  let _allSessions = [];
+
+  function currentDate() {
+    return window.PlanningInsights && PlanningInsights.currentDate
+      ? PlanningInsights.currentDate()
+      : new Date();
+  }
+
+  function planEntryForTask(taskId) {
+    return (window.PlanningInsights ? PlanningInsights.parsePlanEntries(_todayPlan) : [])
+      .find(e => e.task_id === Number(taskId)) || null;
+  }
+
+  function trackerHref(task) {
+    const entry = planEntryForTask(task.id);
+    const params = new URLSearchParams({ taskId: String(task.id) });
+    if (entry) {
+      params.set('planDate', PlanningInsights.localDayKey());
+      params.set('plannedEstimate', String(entry.estimate_min || 0));
+      if (Number.isInteger(entry.scheduled_min)) params.set('plannedStart', String(entry.scheduled_min));
+      if (_recommendedEntry && _recommendedEntry.task_id === entry.task_id) params.set('recommended', '1');
+    }
+    if (window.FocusBuddyDemo && FocusBuddyDemo.active) {
+      const obj = {};
+      params.forEach((value, key) => { obj[key] = value; });
+      return FocusBuddyDemo.href('tracker.html', obj);
+    }
+    return `tracker.html?${params.toString()}`;
+  }
+
+  function fmtClock(min) {
+    min = ((Number(min) % 1440) + 1440) % 1440;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    const ap = h < 12 ? 'am' : 'pm';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')}${ap}`;
+  }
+
+  function renderTaskCard(task) {
+    if (task.completed) {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-3';
+      row.style.cssText = 'padding:0.45rem 0.5rem';
+      row.innerHTML = `
+        <button class="check done" data-id="${task.id}" data-completed="true" data-action="toggle"
+                aria-label="Mark &quot;${escapeHtml(task.name)}&quot; as not done"
+                title="Mark incomplete"></button>
+        <span class="serif task-title-done flex-1 min-w-0 truncate" style="font-size:0.95rem">${escapeHtml(task.name)}</span>
+        <button class="icon-btn danger" data-id="${task.id}" data-action="delete"
+                aria-label="Delete &quot;${escapeHtml(task.name)}&quot;" title="Delete">${ICON_TRASH}</button>
+      `;
+      return row;
+    }
+
+    const card = document.createElement('div');
+    const entry = planEntryForTask(task.id);
+    const suggested = _recommendedEntry && _recommendedEntry.task_id === Number(task.id);
+    card.className = `card card-hover flex items-center gap-3 ${suggested ? 'is-plan-suggested' : ''}`;
+    card.style.cssText = 'position:relative;overflow:hidden;padding-left:1.25rem';
+    const planChip = entry
+      ? `<span class="plan-handoff-chip ${suggested ? 'suggested' : ''}">${suggested ? 'Next up' : 'Today plan'}${Number.isInteger(entry.scheduled_min) ? ` - ${fmtClock(entry.scheduled_min)}` : ''}</span>`
+      : '';
+    const linkedGoal = task.goal_id ? _goals.find(g => g.id === task.goal_id) : null;
+    const goalChip = linkedGoal
+      ? `<span class="goal-link-chip" title="Focused time on this task counts toward this goal">
+           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>
+           ${escapeHtml(linkedGoal.title)}</span>`
+      : '';
+    card.innerHTML = `
+      <span aria-hidden="true" style="position:absolute;left:0;top:0;height:100%;width:4px;background:var(--accent)"></span>
+      <button class="check" data-id="${task.id}" data-completed="false" data-action="toggle"
+              aria-label="Mark &quot;${escapeHtml(task.name)}&quot; as done"
+              title="Mark complete"></button>
+      <div class="min-w-0 flex-1">
+        <p class="serif" style="font-size:0.95rem;font-weight:500;color:var(--text);line-height:1.35">${escapeHtml(task.name)}</p>
+        ${planChip}${goalChip}
+        ${task.description
+          ? `<p class="text-xs mt-0.5 leading-relaxed" style="color:var(--text-muted)">${escapeHtml(task.description)}</p>`
+          : ''}
+      </div>
+      <button class="icon-btn" data-id="${task.id}" data-action="edit"
+              aria-label="Edit &quot;${escapeHtml(task.name)}&quot;" title="Edit">${ICON_PENCIL}</button>
+      <button class="icon-btn danger" data-id="${task.id}" data-action="delete"
+              aria-label="Delete &quot;${escapeHtml(task.name)}&quot;" title="Delete">${ICON_TRASH}</button>
+      <a href="${trackerHref(task)}"
+         class="btn-primary text-sm flex-shrink-0"
+         aria-label="Start session for ${escapeHtml(task.name)}">
+        ${suggested ? 'Start next' : 'Start'}
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    `;
+    return card;
+  }
+
+  let _tasks = [];
+  let editId = null;
+
+  // Active goals, loaded ONCE up front (never throws — [] on failure). Awaited by
+  // loadTasks so goal chips and the composer's goal dropdown are ready on first
+  // render; the goal strip reuses the same list.
+  let _goals = [];
+  const _goalsReady = (async () => {
+    try { _goals = (await getGoals()).filter(g => g.status === 'active'); } catch { _goals = []; }
+    syncGoalSelects();
+  })();
+
+  function syncGoalSelects() {
+    [['task-goal', 'task-goal-wrap'], ['edit-goal', 'edit-goal-wrap']].forEach(([selId, wrapId]) => {
+      const sel = document.getElementById(selId);
+      const wrap = document.getElementById(wrapId);
+      if (!sel || !wrap) return;
+      const kept = sel.value;
+      sel.innerHTML = '<option value="">No goal</option>' + _goals.map(g =>
+        `<option value="${g.id}">${escapeHtml(g.title)}</option>`).join('');
+      sel.value = kept && _goals.some(g => String(g.id) === kept) ? kept : '';
+      wrap.style.display = _goals.length ? 'block' : 'none';
+    });
+  }
+
+  async function toggleComplete(id, currentlyCompleted) {
+    try {
+      await updateTask(id, { completed: !currentlyCompleted });
+      await loadTasks();
+    } catch {
+      showToast('Could not update the task — is the backend running?', { danger: true });
+    }
+  }
+
+  async function deleteTaskFlow(id) {
+    const t = _tasks.find(x => x.id === id);
+    const name = t ? t.name : 'this task';
+    const ok = await confirmDialog(
+      `Delete "${name}" and its sessions? This can't be undone.`,
+      { danger: true, confirmText: 'Delete' });
+    if (!ok) return;
+    try {
+      await deleteTask(id);
+      await loadTasks();
+      await loadCalendar();
+      refreshTrail();
+    } catch {
+      showToast('Could not delete the task — is the backend running?', { danger: true });
+    }
+  }
+
+  let releaseEditTrap = null;
+  function openEdit(id) {
+    const t = _tasks.find(x => x.id === id);
+    if (!t) return;
+    editId = id;
+    document.getElementById('edit-name').value = t.name;
+    document.getElementById('edit-desc').value = t.description || '';
+    syncGoalSelects();
+    document.getElementById('edit-goal').value = t.goal_id ? String(t.goal_id) : '';
+    document.getElementById('edit-overlay').style.display = 'flex';
+    releaseEditTrap = trapModalFocus(document.querySelector('#edit-overlay .modal'), document.activeElement);
+    document.getElementById('edit-name').focus();
+  }
+
+  function onListClick(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const id = parseInt(el.dataset.id, 10);
+    const action = el.dataset.action;
+    if (action === 'toggle') toggleComplete(id, el.dataset.completed === 'true');
+    else if (action === 'delete') deleteTaskFlow(id);
+    else if (action === 'edit') openEdit(id);
+  }
+  taskListEl.addEventListener('click', onListClick);
+  completedListEl.addEventListener('click', onListClick);
+
+  completedHeader.addEventListener('click', () => {
+    const collapsed = completedHeader.classList.toggle('collapsed');
+    completedHeader.setAttribute('aria-expanded', String(!collapsed));
+    completedListEl.style.display = collapsed ? 'none' : 'flex';
+  });
+
+  async function loadTasks() {
+    try {
+      await _goalsReady; // goal chips + dropdowns need the goal titles on first render
+      const tasks = await getTasks();
+      _tasks = tasks;
+      const todayKey = window.PlanningInsights ? PlanningInsights.localDayKey() : null;
+      _todayPlan = null;
+      _todayReality = null;
+      _recommendedEntry = null;
+      if (todayKey && window.getPlan) {
+        try {
+          _todayPlan = await getPlan(todayKey);
+          if (_todayPlan && window.getPlanReality) {
+            _todayReality = await getPlanReality(todayKey, PlanningInsights.dayBounds(todayKey));
+          }
+          _recommendedEntry = PlanningInsights.recommendedPlanEntry(_todayPlan, tasks, _todayReality);
+        } catch {
+          _todayPlan = null;
+          _todayReality = null;
+          _recommendedEntry = null;
+        }
+      }
+      const active = tasks.filter(t => !t.completed);
+      const done   = tasks.filter(t => t.completed && t.completed_at && isToday(new Date(t.completed_at)));
+
+      taskListEl.innerHTML = '';
+      completedListEl.innerHTML = '';
+      activeEmpty.style.display = active.length ? 'none' : 'flex';
+      document.getElementById('active-empty-sub').textContent = done.length
+        ? 'All tasks completed — add another above to keep going.'
+        : 'Add a task above to start your first focus session.';
+
+      active.forEach(t => taskListEl.appendChild(renderTaskCard(t)));
+      done.forEach(t => completedListEl.appendChild(renderTaskCard(t)));
+
+      if (done.length) {
+        completedHeader.style.display = 'flex';
+        completedLabel.textContent = `Completed (${done.length})`;
+      } else {
+        completedHeader.style.display = 'none';
+        completedListEl.style.display = 'none';
+        completedHeader.classList.add('collapsed');
+      }
+    } catch {
+      activeEmpty.style.display = 'none';
+      taskListEl.innerHTML = `
+        <div class="card text-center py-6" style="border-color: var(--terracotta-soft)">
+          <p class="text-sm font-medium" style="color:var(--terracotta)">Backend not running</p>
+          <p class="text-xs mt-1" style="color:var(--text-muted)">
+            Start it with: <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px">uvicorn backend.main:app --reload</code>
+          </p>
+        </div>`;
+    }
+  }
+
+  function isToday(d) {
+    const n = currentDate();
+    return d.getFullYear() === n.getFullYear()
+        && d.getMonth() === n.getMonth()
+        && d.getDate() === n.getDate();
+  }
+  function hourLabel(h) {
+    const ampm = h < 12 ? 'AM' : 'PM';
+    let hr = h % 12; if (hr === 0) hr = 12;
+    return `${hr} ${ampm}`;
+  }
+  function dominantState(s) {
+    const states = ['focused', 'distracted', 'uncertain', 'away'];
+    const vals = [s.seconds_focused, s.seconds_distracted, s.seconds_uncertain, s.seconds_away];
+    let max = -1, idx = 2;
+    vals.forEach((v, i) => { if (v > max) { max = v; idx = i; } });
+    return max <= 0 ? 'uncertain' : states[idx];
+  }
+
+  function placeNowLine(grid) {
+    let line = grid.querySelector('.cal-now-line');
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'cal-now-line';
+      grid.appendChild(line);
+    }
+    const now = currentDate();
+    line.style.top = ((now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT) + 'px';
+    return parseFloat(line.style.top);
+  }
+
+  async function loadCalendar() {
+    const grid = document.getElementById('cal-grid');
+    grid.style.height = (24 * HOUR_HEIGHT) + 'px';
+    grid.innerHTML = '';
+
+    for (let h = 0; h < 24; h++) {
+      const row = document.createElement('div');
+      row.className = 'cal-hour-row';
+      row.style.top = (h * HOUR_HEIGHT) + 'px';
+      row.innerHTML = `<span class="cal-hour-label">${hourLabel(h)}</span>`;
+      grid.appendChild(row);
+    }
+
+    let count = 0;
+    let loadFailed = false;
+    try {
+      const sessions = await getSessions();
+      _allSessions = sessions || [];
+      sessions.forEach(s => {
+        const start = new Date(s.started_at);
+        if (!isToday(start)) return;
+        let end = new Date(s.ended_at);
+        if (!(end > start)) end = new Date(start.getTime() + 60000);
+
+        const startMin = start.getHours() * 60 + start.getMinutes() + start.getSeconds() / 60;
+        const top = startMin / 60 * HOUR_HEIGHT;
+        const durMin = (end - start) / 60000;
+        let height = Math.max(MIN_BLOCK, durMin / 60 * HOUR_HEIGHT);
+        if (top + height > 24 * HOUR_HEIGHT) height = 24 * HOUR_HEIGHT - top;
+
+        const total = s.seconds_focused + s.seconds_distracted + s.seconds_uncertain + s.seconds_away;
+        const pct = total > 0 ? Math.round(s.seconds_focused / total * 100) : 0;
+
+        const block = document.createElement('div');
+        block.className = `cal-block ${dominantState(s)}`;
+        block.style.top = top + 'px';
+        block.style.height = height + 'px';
+        block.title = `${s.task_name} · ${pct}% focused · ${formatSeconds(total)}`;
+        block.setAttribute('role', 'link');
+        block.setAttribute('tabindex', '0');
+        block.setAttribute('aria-label', `${s.task_name}, ${pct}% focused, ${formatSeconds(total)} — open Analytics`);
+        block.innerHTML = `<span class="font-medium">${escapeHtml(s.task_name)}</span> <span class="cal-block-pct">${pct}%</span>`;
+        const openAnalytics = () => {
+          location.href = window.FocusBuddyDemo && FocusBuddyDemo.active
+            ? FocusBuddyDemo.href('analytics.html')
+            : 'analytics.html';
+        };
+        block.addEventListener('click', openAnalytics);
+        block.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAnalytics(); }
+        });
+        grid.appendChild(block);
+        count++;
+      });
+    } catch {
+      loadFailed = true;
+    }
+
+    const nowTop = placeNowLine(grid);
+    const emptyEl = document.getElementById('cal-empty');
+    const emptyMsg = emptyEl.querySelector('p');
+    if (emptyMsg) {
+      emptyMsg.textContent = loadFailed
+        ? "Couldn't load today's sessions — is the backend running?"
+        : 'No sessions today yet — start one from a task.';
+    }
+    emptyEl.style.display = count ? 'none' : 'flex';
+
+    const cal = document.getElementById('calendar');
+    cal.scrollTop = Math.max(0, nowTop - 140);
+  }
+
+  document.getElementById('cal-date').textContent =
+    currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+
+  const addBtn   = document.getElementById('add-btn');
+  const nameInput = document.getElementById('task-input');
+  const ADD_LABEL = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Add Task`;
+
+  function setAddEnabled(enabled) {
+    addBtn.disabled = !enabled;
+    addBtn.style.opacity = enabled ? '1' : '0.5';
+    addBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  }
+  nameInput.addEventListener('input', () => setAddEnabled(nameInput.value.trim().length > 0));
+
+  document.getElementById('add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const desc = document.getElementById('task-desc').value.trim();
+    setAddEnabled(false);
+    addBtn.textContent = 'Adding…';
+    try {
+      const created = await createTask(name, desc);
+      const goalId = parseInt(document.getElementById('task-goal').value, 10);
+      if (goalId && created && created.id) {
+        try {
+          await attachGoalTask(goalId, created.id);
+        } catch {
+          showToast('Task created, but linking it to the goal failed — you can attach it on the Goals page.', { danger: true });
+        }
+      }
+      nameInput.value = '';
+      document.getElementById('task-desc').value = '';
+      document.getElementById('task-goal').value = '';
+      await loadTasks();
+    } catch {
+      showToast('Failed to create task — make sure the backend is running.', { danger: true });
+    } finally {
+      addBtn.innerHTML = ADD_LABEL;
+      setAddEnabled(nameInput.value.trim().length > 0);
+    }
+  });
+
+  const editOverlay = document.getElementById('edit-overlay');
+  function closeEdit() {
+    editOverlay.style.display = 'none';
+    editId = null;
+    if (releaseEditTrap) { releaseEditTrap(); releaseEditTrap = null; }
+  }
+  document.getElementById('edit-cancel').addEventListener('click', closeEdit);
+  editOverlay.addEventListener('click', e => { if (e.target === editOverlay) closeEdit(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && editOverlay.style.display === 'flex') closeEdit(); });
+  document.getElementById('edit-save').addEventListener('click', async () => {
+    const name = document.getElementById('edit-name').value.trim();
+    if (!name) { document.getElementById('edit-name').focus(); return; }
+    const description = document.getElementById('edit-desc').value.trim();
+    const task = _tasks.find(x => x.id === editId);
+    const newGoalId = parseInt(document.getElementById('edit-goal').value, 10) || null;
+    try {
+      await updateTask(editId, { name, description });
+      // Goal link changes ride the goal routes (goal_id isn't a task-PATCH field).
+      if (task && newGoalId !== (task.goal_id || null)) {
+        if (newGoalId) await attachGoalTask(newGoalId, editId);
+        else if (task.goal_id) await detachGoalTask(task.goal_id, editId);
+      }
+      closeEdit();
+      await loadTasks();
+    } catch {
+      showToast('Could not save the task — is the backend running?', { danger: true });
+    }
+  });
+
+  document.getElementById('task-desc').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      document.getElementById('add-form').requestSubmit();
+    }
+  });
+
+  const trailCard = document.getElementById('trail-card');
+  const trailMap = document.getElementById('trail-map');
+  let _trailModel = null;
+  let _browseKey = null;      // YYYY-MM being browsed; null = the live current month
+  let _trailNav = null;       // the current buildTrailNav result (drives the arrows)
+  let _workPeriods = [];
+  let _league = null;
+  let _todayWorkPeriod = null;
+  let _landmarks = [];
+
+  function buildLiveTrailModel(levelPulse) {
+    const todayKey = PlanningInsights.localDayKey();
+    const monthKey = todayKey.slice(0, 7);
+    return JourneyMap.buildTrailModel({
+      sessions: _allSessions,
+      todayPlan: _todayPlan,
+      todayWorkPeriod: _todayWorkPeriod,
+      now: currentDate(),
+      noteDismissed: localStorage.getItem(`fb-trail-note-${monthKey}`) === 'dismissed',
+      league: _league,
+      landmarks: _landmarks,
+      levelPulse,
+    });
+  }
+
+  // Sync the static chrome (month label, arrow states, unwind foot link) to a nav result.
+  function updateTrailChrome(nav) {
+    _trailNav = nav;
+    document.getElementById('trail-month-name').textContent = nav.label;
+    document.getElementById('trail-prev').disabled = !nav.prevKey;
+    document.getElementById('trail-next').disabled = !nav.nextKey;
+    const foot = document.getElementById('trail-browse-foot');
+    foot.innerHTML = (!nav.isCurrent && nav.hasData)
+      ? `<a class="trail-note-unwind" href="analytics.html?unwind=month&month=${nav.monthKey}">Unwind this month →</a>`
+      : '';
+  }
+
+  // Browse the card to any month (arrows + atlas tiles land here). The browsed
+  // model is stored in _trailModel so a resize re-render stays on this month.
+  // Never consumes promotion/level-up markers — those belong to refreshTrail only.
+  function showTrailMonth(monthKey) {
+    if (!window.JourneyMap) return;
+    const nav = JourneyMap.buildTrailNav(_allSessions, monthKey, currentDate());
+    _browseKey = nav.isCurrent ? null : nav.monthKey;
+    const nextModel = nav.isCurrent
+      ? buildLiveTrailModel(false)
+      : JourneyMap.buildTrailModel({
+          sessions: _allSessions,
+          now: new Date(Number(nav.monthKey.slice(0, 4)), Number(nav.monthKey.slice(5, 7)) - 1, 1),
+          completed: true,
+          league: _league, // the badge is "you, now" — visible on every month
+          landmarks: _landmarks,
+        });
+    trailMap.style.opacity = '0';
+    setTimeout(() => {
+      _trailModel = nextModel;
+      JourneyMap.render(trailMap, _trailModel);
+      if (_trailModel.badge) _trailModel.badge.pulse = false;
+      updateTrailChrome(nav);
+      trailMap.style.opacity = '1';
+    }, 120);
+  }
+
+  document.getElementById('trail-prev').addEventListener('click', () => {
+    if (_trailNav && _trailNav.prevKey) showTrailMonth(_trailNav.prevKey);
+  });
+  document.getElementById('trail-next').addEventListener('click', () => {
+    if (_trailNav && _trailNav.nextKey) showTrailMonth(_trailNav.nextKey);
+  });
+  document.getElementById('trail-month-label').addEventListener('click', function () {
+    if (!window.JourneyMap) return;
+    JourneyMap.openAtlasModal(
+      JourneyMap.buildAtlasModel({ sessions: _allSessions, workPeriods: _workPeriods, now: currentDate() }),
+      this,
+      showTrailMonth
+    );
+  });
+
+  async function refreshTrail() {
+    if (!trailCard || !window.JourneyMap || !window.PlanningInsights) return;
+    if (localStorage.getItem('fb-trail-hidden') === 'on') {
+      trailCard.style.display = 'none';
+      return;
+    }
+    const todayKey = PlanningInsights.localDayKey();
+    // The trail still renders if any call fails (no unwind signal / badge / cairns).
+    const [periodsResult, leagueResult, landmarksResult] = await Promise.allSettled([
+      getWorkPeriods(), getLeague(), getLandmarks(),
+    ]);
+    _workPeriods = periodsResult.status === 'fulfilled' ? (periodsResult.value || []) : [];
+    _todayWorkPeriod = _workPeriods.find(p => p.kind === 'day' && p.period_key === todayKey) || null;
+    _league = leagueResult.status === 'fulfilled' ? leagueResult.value : null;
+    _landmarks = landmarksResult.status === 'fulfilled' ? (landmarksResult.value || []) : [];
+    const pendingPromotion = localStorage.getItem('fb-pending-promotion');
+    const pendingLevelUp = localStorage.getItem('fb-pending-levelup');
+    _browseKey = null; // a refresh always returns to the live current month
+    _trailModel = buildLiveTrailModel(!!pendingLevelUp && !pendingPromotion);
+    trailCard.style.display = 'block';
+    JourneyMap.render(trailMap, _trailModel);
+    updateTrailChrome(JourneyMap.buildTrailNav(_allSessions, null, currentDate()));
+    if (_trailModel.badge) _trailModel.badge.pulse = false; // don't replay on resize re-renders
+    if (pendingLevelUp) { try { localStorage.removeItem('fb-pending-levelup'); } catch {} }
+    if (pendingPromotion && _trailModel.badge) {
+      try { localStorage.removeItem('fb-pending-promotion'); } catch {}
+      JourneyMap.playPromotion(trailCard, _trailModel.badge.rankName, {
+        onImpact: () => { try { if (window.playChime) playChime(); } catch {} },
+      });
+    }
+    // Landmarks self-heal/backfill (fire-and-forget): anything history has earned
+    // but the store lacks gets synced; a first-ever fill stays silent (backend rule).
+    PlanningInsights.detectAndSyncLandmarks({
+      sessions: _allSessions,
+      workPeriods: _workPeriods,
+      todayPlan: _todayPlan,
+    });
+  }
+  window.refreshTrail = refreshTrail;
+
+  let _trailResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_trailResizeTimer);
+    _trailResizeTimer = setTimeout(() => {
+      if (_trailModel && trailCard.style.display !== 'none') JourneyMap.render(trailMap, _trailModel);
+    }, 150);
+  });
+
+  // The goal strip loads OUTSIDE the fail-fast Promise.all and hides itself on
+  // any failure — it must never break the Today page. It reuses the tasks and
+  // sessions the page already fetched (_tasks/_allSessions), adding only getGoals().
+  async function loadGoalStrip() {
+    const strip = document.getElementById('goal-strip');
+    if (!strip) return;
+    try {
+      await _goalsReady;
+      const goals = _goals;
+      if (!goals.length) { strip.style.display = 'none'; return; }
+      if (window.FocusBuddyDemo && FocusBuddyDemo.active) {
+        strip.setAttribute('href', FocusBuddyDemo.href('goals.html'));
+      }
+      const todayKey = PlanningInsights.localDayKey(PlanningInsights.currentDate());
+      document.getElementById('goal-strip-rows').innerHTML = goals.map(g => {
+        const focus = FocusGoals.goalFocusSeconds(_allSessions, _tasks, g.id);
+        const time = focus > 0 ? `${FocusGoals.formatHM(focus)} in` : 'no time in yet';
+        return `<div class="goal-strip-row">
+          <span class="goal-strip-title">${escapeHtml(g.title)}</span>
+          <span class="goal-strip-meta">${escapeHtml(FocusGoals.daysLeftLabel(g, todayKey))} · ${time}</span>
+        </div>`;
+      }).join('');
+      strip.style.display = 'flex';
+    } catch {
+      strip.style.display = 'none';
+    }
+  }
+
+  Promise.all([loadTasks(), loadCalendar()]).then(refreshTrail).finally(loadGoalStrip);
+  setInterval(() => {
+    const grid = document.getElementById('cal-grid');
+    if (grid) placeNowLine(grid);
+  }, 60000);
+</script>
+</body>
+</html>

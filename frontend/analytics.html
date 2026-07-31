@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
+  <title>Focus Buddy — Analytics</title>
+  <script src="js/theme.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-context.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-row max-w-3xl mx-auto">
+    <a href="index.html" class="logo">
+      <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <circle cx="13" cy="13" r="11.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="6.5" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="13" cy="13" r="2" fill="var(--accent)"/>
+      </svg>
+      <h1>Focus Buddy</h1>
+    </a>
+    <nav class="page-nav" aria-label="Main navigation">
+      <a href="plan.html">Plan</a>
+      <a href="index.html">Today</a>
+      <a href="analytics.html" class="active" aria-current="page">Analytics</a>
+      <a href="habits.html">Habits</a>
+      <a href="goals.html">Goals</a>
+      <a href="analytics.html?unwind=month&month=last" class="nav-monthly" title="Open last month's Monthly Unwind">Last month</a>
+      <a href="#" id="about-nav" role="button">About me</a>
+      <div class="settings-menu" style="position:relative">
+        <button id="settings-btn" class="settings-trigger" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main id="analytics-main" class="app-main analytics-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
+  <!-- Placeholder is replaced by loadAll() on success or error — avoids a blank pop-in. -->
+  <div id="tiles" class="analytics-tiles grid grid-cols-2 md:grid-cols-3 gap-3"><p class="text-sm" style="color:var(--text-muted);grid-column:1/-1">Loading your sessions…</p></div>
+  <section id="today-card" class="card"></section>
+  <section id="week-card" class="card"></section>
+  <section id="month-card" class="card"></section>
+  <div class="history-panel">
+    <p class="section-label">Session history</p>
+    <div id="history-list" class="flex flex-col gap-3"></div>
+  </div>
+</main>
+
+
+<div id="replay-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="replay-title" style="max-width:620px">
+    <div class="flex items-start justify-between gap-3 mb-1">
+      <div>
+        <h2 id="replay-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0">Session replay</h2>
+        <p id="replay-subtitle" class="text-xs" style="color:var(--text-faint);margin:3px 0 0"></p>
+      </div>
+      <button id="replay-close" aria-label="Close replay" class="btn-ghost" style="padding:2px 9px;border:none;font-size:1rem;color:var(--text-muted)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="replay-body" style="margin-top:12px"></div>
+  </div>
+</div>
+
+
+<div id="unwind-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="unwind-title">
+    <div class="flex items-start justify-between gap-3 mb-1">
+      <h2 id="unwind-title" class="serif" style="font-size:1.15rem;font-weight:600;margin:0">Daily Unwind</h2>
+      <button id="unwind-close" aria-label="Close" class="btn-ghost" style="padding:2px 9px;border:none;font-size:1rem;color:var(--text-muted)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <p id="unwind-subtitle" class="text-xs" style="color:var(--text-faint);margin:0"></p>
+      <div class="step-dots" id="unwind-dots"></div>
+    </div>
+    <div id="unwind-body"></div>
+    <div class="flex items-center justify-between gap-3 mt-5">
+      <button id="unwind-back" class="btn-ghost">Back</button>
+      <button id="unwind-next" class="btn-primary">Next</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/session-replay.js"></script>
+<script src="js/settings-menu.js"></script>
+<script src="js/planning-insights.js"></script>
+<script src="js/journey-map.js"></script>
+<script src="js/habits.js"></script>
+<script>
+  const ICON_TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
+  const ICON_REPLAY = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4V8z"/></svg>';
+
+  const COLORS = {
+    focused: '#5e8a65', distracted: '#b35c3a',
+    uncertain: '#b08a38', away: '#8a7a6c',
+  };
+
+  function formatSeconds(s) {
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}m ${sec}s`;
+  }
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  }
+  function formatTime(iso) {
+    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  function buildChart(session) {
+    const ctx   = document.getElementById(`chart-${session.id}`).getContext('2d');
+    const existing = Chart.getChart(ctx.canvas);
+    if (existing) existing.destroy();
+    const total = session.seconds_focused + session.seconds_distracted +
+                  session.seconds_uncertain + session.seconds_away;
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Focused', 'Distracted', 'Uncertain', 'Away'],
+        datasets: [{
+          data: total === 0 ? [0, 0, 1, 0]
+            : [session.seconds_focused, session.seconds_distracted,
+               session.seconds_uncertain, session.seconds_away],
+          backgroundColor: [COLORS.focused, COLORS.distracted, COLORS.uncertain, COLORS.away],
+          borderWidth: 0, hoverOffset: 4,
+        }],
+      },
+      options: {
+        cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => `${c.label}: ${formatSeconds(c.raw)}` } },
+        },
+        animation: { duration: 0 },
+      },
+    });
+  }
+
+  let allSessions = [];
+  let workPeriods = [];
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function localDayKey(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+  function currentDate() {
+    return window.FocusBuddyDemo && FocusBuddyDemo.now ? FocusBuddyDemo.now() : new Date();
+  }
+  function endedAtIso() {
+    return window.FocusBuddyDemo && FocusBuddyDemo.active
+      ? FocusBuddyDemo.isoWithLocalOffset(currentDate())
+      : new Date().toISOString();
+  }
+  function parseDayKey(key) { const [y, m, dd] = key.split('-').map(Number); return new Date(y, m - 1, dd); }
+  function mondayOf(d) {
+    const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dow = (date.getDay() + 6) % 7;
+    date.setDate(date.getDate() - dow);
+    return date;
+  }
+  function weekKeyOf(d) { return localDayKey(mondayOf(d)); }
+  function monthKeyOf(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; }
+  function parseMonthKey(key) { const [y, m] = key.split('-').map(Number); return new Date(y, m - 1, 1); }
+  function monthLabel(key) { return parseMonthKey(key).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); }
+  function formatHM(s) {
+    s = Math.round(s);
+    const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+  function sumStates(list) {
+    const r = { focused: 0, distracted: 0, uncertain: 0, away: 0 };
+    list.forEach(s => {
+      r.focused += s.seconds_focused; r.distracted += s.seconds_distracted;
+      r.uncertain += s.seconds_uncertain; r.away += s.seconds_away;
+    });
+    r.total = r.focused + r.distracted + r.uncertain + r.away;
+    return r;
+  }
+  function focusPct(sum) { return sum.total > 0 ? Math.round(sum.focused / sum.total * 100) : 0; }
+  function findPeriod(kind, key) { return workPeriods.find(p => p.kind === kind && p.period_key === key) || null; }
+
+  // Trail Chunk 5: after an unwind save, sync any newly earned landmarks
+  // (fire-and-forget; one soft toast when something new is earned).
+  function syncLandmarksNow() {
+    PlanningInsights.detectAndSyncLandmarks({ sessions: allSessions, workPeriods });
+  }
+
+  // Habit auto-checks piggyback the same save moments (fire-and-forget, quiet).
+  function syncHabitChecksNow() {
+    if (!window.FocusHabits) return;
+    FocusHabits.detectAndSyncHabitChecks({ sessions: allSessions, workPeriods });
+  }
+
+  function legendRows(sum) {
+    const row = (cls, label, val) =>
+      `<div class="flex items-center justify-between"><span class="flex items-center"><span class="dot dot-${cls}"></span>${label}</span>` +
+      `<span style="color:var(--text-muted);font-variant-numeric:tabular-nums">${formatSeconds(val)} · ${sum.total > 0 ? Math.round(val / sum.total * 100) : 0}%</span></div>`;
+    return row('focused', 'Focused', sum.focused) + row('distracted', 'Distracted', sum.distracted) +
+           row('uncertain', 'Uncertain', sum.uncertain) + row('away', 'Away', sum.away);
+  }
+  const WK_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const WK_LONG  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  function weekDays() {
+    const monday = mondayOf(currentDate());
+    const todayKey = localDayKey(currentDate());
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const key = localDayKey(d);
+      const focused = allSessions
+        .filter(s => localDayKey(new Date(s.started_at)) === key)
+        .reduce((a, s) => a + s.seconds_focused, 0);
+      days.push({ key, focused, isToday: key === todayKey, isFuture: parseDayKey(key) > parseDayKey(todayKey), ended: !!findPeriod('day', key) });
+    }
+    return days;
+  }
+  function weekBarsHtml(days) {
+    const maxF = Math.max(1, ...days.map(x => x.focused));
+    return `<div class="week-bars">${days.map((x, i) => {
+      const h = x.focused > 0 ? Math.max(4, Math.round(x.focused / maxF * 100)) : 0;
+      return `<div class="week-bar ${x.isToday ? 'today' : ''} ${x.isFuture ? 'future' : ''}">
+        <div class="week-bar-track"><div class="week-bar-fill" style="height:${h}%"></div></div>
+        <span class="week-bar-label">${WK_SHORT[i]}${x.ended ? ' ✓' : ''}</span>
+        <span class="week-bar-val">${x.focused > 0 ? formatHM(x.focused) : '—'}</span>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  function personalBest() {
+    const byDay = {};
+    allSessions.forEach(s => {
+      const k = localDayKey(new Date(s.started_at));
+      byDay[k] = (byDay[k] || 0) + s.seconds_focused;
+    });
+    return Object.values(byDay).reduce((m, v) => Math.max(m, v), 0);
+  }
+
+  function renderTiles() {
+    const todayKey = localDayKey(currentDate());
+    const today = allSessions.filter(s => localDayKey(new Date(s.started_at)) === todayKey);
+    const tSum = sumStates(today);
+    const weekKey = weekKeyOf(currentDate());
+    const week = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey);
+    const wSum = sumStates(week);
+    const best = personalBest();
+
+    const tile = (label, value, sub) => `
+      <div class="card" style="padding:1rem 1.1rem">
+        <p class="section-label" style="margin:0 0 6px">${label}</p>
+        <p class="serif" style="font-size:1.5rem;font-weight:700;color:var(--text);line-height:1;margin:0">${value}</p>
+        <p class="text-xs" style="color:var(--text-faint);margin:4px 0 0">${sub}</p>
+      </div>`;
+
+    document.getElementById('tiles').innerHTML =
+      tile('Today', focusPct(tSum) + '%', formatHM(tSum.focused) + ' focused') +
+      tile('This week', focusPct(wSum) + '%', formatHM(wSum.focused) + ' focused') +
+      tile('Personal best', best > 0 ? formatHM(best) : '0m', best > 0 ? 'focused in a day' : 'No focus yet');
+  }
+
+  function renderToday() {
+    const el = document.getElementById('today-card');
+    const todayKey = localDayKey(currentDate());
+    const today = allSessions.filter(s => localDayKey(new Date(s.started_at)) === todayKey);
+    const sum = sumStates(today);
+    const period = findPeriod('day', todayKey);
+    const has = today.length > 0;
+    const dateStr = currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    let savedReality = null;
+    if (period && period.plan_reality_json) {
+      try { savedReality = JSON.parse(period.plan_reality_json); } catch (e) { savedReality = null; }
+    }
+    if (savedReality && !savedReality.has_plan) savedReality = null;
+
+    el.innerHTML = `
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p class="section-label" style="margin:0 0 2px">Daily unwind · ${dateStr}</p>
+          <p class="text-sm" style="color:var(--text-muted);margin:0">
+            ${has ? `${formatHM(sum.focused)} focused across ${today.length} session${today.length !== 1 ? 's' : ''}` : 'No focus sessions yet today.'}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          ${period ? '<span class="badge badge-focused">Unwound</span>' : ''}
+          <button id="end-day-btn" class="btn-primary" ${has ? '' : 'disabled style="opacity:0.5;cursor:not-allowed"'}>${period ? 'Re-open unwind' : 'End day · Daily Unwind'} →</button>
+        </div>
+      </div>
+      ${savedReality && savedReality.summary ? `<p class="text-xs mt-3 plan-reality-echo"><strong>Plan vs reality:</strong> ${escapeHtml(savedReality.summary)}</p>` : ''}
+      ${period && period.reflection ? `<p class="text-xs mt-3" style="color:var(--text-muted);border-left:3px solid var(--sage);padding-left:0.6rem;line-height:1.5">${escapeHtml(period.reflection)}</p>` : ''}`;
+
+    if (has) document.getElementById('end-day-btn').addEventListener('click', () => openUnwind('day'));
+  }
+
+  function renderWeek() {
+    const el = document.getElementById('week-card');
+    const monday = mondayOf(currentDate());
+    const weekKey = localDayKey(monday);
+    const days = weekDays();
+    const week = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey);
+    const sum = sumStates(week);
+    const period = findPeriod('week', weekKey);
+    const end = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+    const rangeStr = `${monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+    const disabled = sum.total === 0;
+
+    el.innerHTML = `
+      <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <p class="section-label" style="margin:0">Focus by day · ${rangeStr}</p>
+        ${period ? '<span class="badge badge-focused">Week unwound</span>' : ''}
+      </div>
+      ${weekBarsHtml(days)}
+      <div class="flex justify-end mt-4">
+        <button id="end-week-btn" class="btn-ghost btn-ghost-accent" ${disabled ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>${period ? 'Re-open weekly unwind' : 'End week · Weekly Unwind'} →</button>
+      </div>
+      ${period && period.reflection ? `<p class="text-xs mt-3" style="color:var(--text-muted);border-left:3px solid var(--sage);padding-left:0.6rem;line-height:1.5">${escapeHtml(period.reflection)}</p>` : ''}`;
+
+    if (!disabled) document.getElementById('end-week-btn').addEventListener('click', () => openUnwind('week'));
+  }
+
+  function renderMonth() {
+    const el = document.getElementById('month-card');
+    const monthKey = monthKeyOf(currentDate());
+    const month = allSessions.filter(s => monthKeyOf(new Date(s.started_at)) === monthKey);
+    const sum = sumStates(month);
+    const period = findPeriod('month', monthKey);
+    const disabled = sum.total === 0;
+
+    el.innerHTML = `
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p class="section-label" style="margin:0 0 2px">Monthly unwind · ${monthLabel(monthKey)}</p>
+          <p class="text-sm" style="color:var(--text-muted);margin:0">
+            ${disabled ? 'No focus sessions yet this month.' : `${formatHM(sum.focused)} focused so far this month`}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          ${period ? '<span class="badge badge-focused">Region unwound</span>' : ''}
+          <button id="end-month-btn" class="btn-ghost btn-ghost-accent" ${disabled ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>${period ? 'Re-open monthly unwind' : 'End month · Monthly Unwind'} →</button>
+        </div>
+      </div>
+      ${period && period.reflection ? `<p class="text-xs mt-3" style="color:var(--text-muted);border-left:3px solid var(--sage);padding-left:0.6rem;line-height:1.5">${escapeHtml(period.reflection)}</p>` : ''}`;
+
+    if (!disabled) document.getElementById('end-month-btn').addEventListener('click', () => openUnwind('month', monthKey));
+  }
+
+  function compactRow(session, isFirst) {
+    const total = session.seconds_focused + session.seconds_distracted +
+                  session.seconds_uncertain + session.seconds_away;
+    const pct = total > 0 ? Math.round(session.seconds_focused / total * 100) : 0;
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between gap-3 text-sm';
+    row.style.cssText = 'padding:0.6rem 0;' + (isFirst ? '' : 'border-top:1px solid var(--border)');
+    row.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <p class="truncate" style="color:var(--text);margin:0">${escapeHtml(session.task_name || 'Untitled')}</p>
+        <p style="color:var(--text-faint);font-variant-numeric:tabular-nums;margin:1px 0 0;font-size:0.72rem">${formatTime(session.started_at)}</p>
+      </div>
+      <div class="flex items-center gap-2.5 flex-shrink-0">
+        <div style="width:72px;height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden" title="${pct}% focused">
+          <div style="height:100%;width:${pct}%;background:var(--sage)"></div>
+        </div>
+        <span style="width:36px;text-align:right;color:var(--text);font-variant-numeric:tabular-nums">${pct}%</span>
+        <span style="width:54px;text-align:right;color:var(--text-faint);font-variant-numeric:tabular-nums">${formatSeconds(total)}</span>
+        <button class="icon-btn" data-replay-session="${session.id}" aria-label="View session replay" title="View replay">${ICON_REPLAY}</button>
+        <button class="icon-btn danger" data-del-session="${session.id}" aria-label="Delete this session" title="Delete session">${ICON_TRASH}</button>
+      </div>`;
+    return row;
+  }
+
+  function renderHistory() {
+    const wrap = document.getElementById('history-list');
+    wrap.innerHTML = '';
+
+    if (allSessions.length === 0) {
+      wrap.innerHTML = `
+        <div class="card flex flex-col items-center gap-2 text-center py-12">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+          <p class="font-medium text-sm" style="color:var(--text)">No sessions yet</p>
+          <p class="text-xs" style="color:var(--text-faint)">Complete a session on the <a href="${window.FocusBuddyDemo ? FocusBuddyDemo.href('index.html') : 'index.html'}" style="color:var(--accent)">Today</a> page.</p>
+        </div>`;
+      return;
+    }
+
+    const byDay = new Map();
+    allSessions.forEach(s => {
+      const k = localDayKey(new Date(s.started_at));
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(s);
+    });
+    const keys = [...byDay.keys()].sort().reverse();
+
+    let lastMonthKey = null;
+    keys.forEach(key => {
+      // A small month label whenever the month changes keeps the long list scannable.
+      const mk = key.slice(0, 7);
+      if (mk !== lastMonthKey) {
+        lastMonthKey = mk;
+        const sep = document.createElement('p');
+        sep.className = 'section-label';
+        sep.style.cssText = 'margin:0.6rem 0 0.1rem';
+        sep.textContent = parseDayKey(`${mk}-01`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        wrap.appendChild(sep);
+      }
+      const sessions = byDay.get(key).slice().sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+      const focused  = sessions.reduce((a, s) => a + s.seconds_focused, 0);
+      const dayDate  = parseDayKey(key);
+      const label = `${dayDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${sessions.length} session${sessions.length !== 1 ? 's' : ''} · ${formatHM(focused)} focused`;
+
+      const group = document.createElement('div');
+      group.className = 'card';
+      group.style.padding = '0';
+
+      const btn = document.createElement('button');
+      btn.className = 'completed-header collapsed';
+      btn.style.cssText = 'width:100%;justify-content:flex-start;padding:0.9rem 1.25rem;font-size:0.85rem;color:var(--text)';
+      btn.setAttribute('aria-expanded', 'false');
+      btn.innerHTML = `<span class="chev" style="display:inline-flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 9l6 6 6-6"/></svg></span> <span>${label}</span>`;
+
+      const body = document.createElement('div');
+      body.style.cssText = 'padding:0 1.25rem 0.5rem;display:none';
+      sessions.forEach((s, i) => body.appendChild(compactRow(s, i === 0)));
+
+      btn.addEventListener('click', () => {
+        const collapsed = btn.classList.toggle('collapsed');
+        btn.setAttribute('aria-expanded', String(!collapsed));
+        body.style.display = collapsed ? 'none' : 'block';
+      });
+
+      group.appendChild(btn);
+      group.appendChild(body);
+      wrap.appendChild(group);
+    });
+  }
+
+  function renderAll() {
+    renderTiles();
+    renderToday();
+    renderWeek();
+    renderMonth();
+    renderHistory();
+  }
+
+  let unwind = { kind: null, step: 0, reflection: '', snapshot: null, finished: false };
+
+  async function openUnwind(kind, explicitKey) {
+    const todayKey = localDayKey(currentDate());
+    const weekKey  = weekKeyOf(currentDate());
+    let sessions, periodKey;
+    if (kind === 'day') { sessions = allSessions.filter(s => localDayKey(new Date(s.started_at)) === todayKey); periodKey = todayKey; }
+    else if (kind === 'month') {
+      periodKey = explicitKey || monthKeyOf(currentDate());
+      sessions = allSessions.filter(s => monthKeyOf(new Date(s.started_at)) === periodKey);
+    }
+    else                { sessions = allSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey); periodKey = weekKey; }
+    const sum = sumStates(sessions);
+    const existing = findPeriod(kind, periodKey);
+    let aiRecap = null;
+    if (existing && existing.ai_recap) { try { aiRecap = JSON.parse(existing.ai_recap); } catch (e) { aiRecap = null; } }
+    unwind = { kind, step: 0, reflection: existing && existing.reflection ? existing.reflection : '', snapshot: { sessions, periodKey, sum, planReality: null }, finished: false, aiRecap, aiState: 'idle' };
+    const myUnwind = unwind;
+
+    document.getElementById('unwind-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    releaseUnwindTrap = trapModalFocus(document.querySelector('#unwind-overlay .modal'), document.activeElement);
+    renderUnwindStep();
+    document.getElementById('unwind-next').focus();
+
+    if (kind === 'day') {
+      const planReality = await loadPlanReality(periodKey, existing);
+      if (unwind !== myUnwind) return;
+      myUnwind.snapshot.planReality = planReality;
+      if (document.getElementById('unwind-overlay').style.display === 'flex'
+          && unwindStepKeys(myUnwind.kind)[myUnwind.step] === 'ai') {
+        renderUnwindStep();
+      }
+    }
+  }
+
+  let releaseUnwindTrap = null;
+  function closeUnwind() {
+    syncReflection();
+    document.getElementById('unwind-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    if (releaseUnwindTrap) { releaseUnwindTrap(); releaseUnwindTrap = null; }
+    closePomoSuggest();
+  }
+
+  function syncReflection() {
+    const ta = document.getElementById('unwind-reflection');
+    if (ta) unwind.reflection = ta.value;
+  }
+
+  async function loadPlanReality(periodKey, existingPeriod = null) {
+    let saved = null;
+    if (existingPeriod && existingPeriod.plan_reality_json) {
+      try { saved = JSON.parse(existingPeriod.plan_reality_json); } catch (e) { saved = null; }
+    }
+    if (saved && !saved.has_plan) saved = null;
+    if (!window.PlanningInsights || !window.getPlanReality) return saved;
+    try {
+      const report = await getPlanReality(periodKey, PlanningInsights.dayBounds(periodKey));
+      return report && report.has_plan ? report : null;
+    } catch {
+      return saved;
+    }
+  }
+
+  function unwindStepKeys(kind) {
+    if (kind === 'day') return ['overview', 'tasks', 'ai', 'reflect'];
+    if (kind === 'month') return ['region', 'monthbreak', 'ai', 'reflect'];
+    return ['overview', 'weekbreak', 'ai', 'reflect'];
+  }
+
+  function dayTotalSecs() {
+    const s = unwind.snapshot.sum;
+    return (s.focused || 0) + (s.distracted || 0) + (s.uncertain || 0) + (s.away || 0);
+  }
+
+  function recentAvgFocusPct(excludeKey) {
+    const cutoff = currentDate(); cutoff.setDate(cutoff.getDate() - 14);
+    const byDay = {};
+    allSessions.forEach(s => {
+      const d = new Date(s.started_at); if (d < cutoff) return;
+      const k = localDayKey(d); if (k === excludeKey) return;
+      const o = byDay[k] || (byDay[k] = { f: 0, t: 0 });
+      o.f += s.seconds_focused || 0;
+      o.t += (s.seconds_focused || 0) + (s.seconds_distracted || 0) + (s.seconds_uncertain || 0) + (s.seconds_away || 0);
+    });
+    const pcts = Object.values(byDay).filter(o => o.t > 0).map(o => 100 * o.f / o.t);
+    return pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
+  }
+
+  function aiRecapHtml(r) {
+    const section = (title, items) => (items && items.length)
+      ? `<p class="section-label" style="margin:12px 0 4px">${title}</p>` +
+        `<ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:5px">` +
+        items.map(x => `<li class="text-sm" style="color:var(--text);line-height:1.45">${escapeHtml(x)}</li>`).join('') + `</ul>`
+      : '';
+    const win = r.win ? `<p class="text-sm" style="color:var(--text);line-height:1.45;margin:10px 0 0;background:rgba(94,138,101,0.12);border-radius:8px;padding:8px 10px"><strong>Win:</strong> ${escapeHtml(r.win)}</p>` : '';
+    const plan = r.plan_echo ? `<p class="text-sm plan-reality-echo"><strong>Plan vs reality:</strong> ${escapeHtml(r.plan_echo)}</p>` : '';
+    const next = r.next_action ? `<p class="text-sm" style="color:var(--text);line-height:1.45;margin:12px 0 0;border-left:3px solid var(--sage);padding-left:10px"><strong>Tomorrow:</strong> ${escapeHtml(r.next_action)}</p>` : '';
+    const shutdown = r.shutdown_question ? `<p class="text-sm" style="color:var(--text-muted);font-style:italic;line-height:1.5;margin:14px 0 0">${escapeHtml(r.shutdown_question)}</p>` : '';
+    return `${r.summary ? `<p class="text-sm" style="color:var(--text);line-height:1.55;margin:0">${escapeHtml(r.summary)}</p>` : ''}
+      ${plan}
+      ${win}
+      ${section('Today vs your patterns', r.pattern_notes)}
+      ${section('Advice', r.advice)}
+      ${next}
+      ${shutdown}`;
+  }
+
+  function aiStatsHtml() {
+    const sum = unwind.snapshot.sum;
+    return `<div style="padding:12px;background:var(--surface-2);border-radius:10px;margin-bottom:14px">
+        <div class="flex items-center justify-between" style="margin-bottom:8px">
+          <span class="serif" style="font-size:1.5rem;font-weight:700;color:var(--text);line-height:1">${focusPct(sum)}% <span class="text-xs" style="font-weight:400;color:var(--text-muted)">focused</span></span>
+          <span class="text-xs" style="color:var(--text-faint);font-variant-numeric:tabular-nums">${formatHM(sum.focused)} focused · ${formatHM(sum.total)} tracked</span>
+        </div>
+        <div class="flex flex-col gap-1.5 text-xs">${legendRows(sum)}</div>
+      </div>`;
+  }
+
+  function fmtMinuteOfDay(min) {
+    if (!Number.isFinite(min)) return 'unscheduled';
+    min = ((min % 1440) + 1440) % 1440;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    const ap = h < 12 ? 'am' : 'pm';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')}${ap}`;
+  }
+
+  function statusLabel(status) {
+    return {
+      not_started: 'Not started',
+      on_track: 'Close to plan',
+      started_late: 'Started late',
+      started_early: 'Started early',
+      ran_short: 'Ran short',
+      ran_long: 'Ran long',
+      unscheduled_work: 'Unplanned work',
+    }[status] || 'Logged';
+  }
+
+  function planRealityHtml(report) {
+    if (!report || !report.has_plan) return '';
+    const rows = (report.rows || []).map(row => {
+      const planned = row.status === 'unscheduled_work'
+        ? 'Unplanned'
+        : `${fmtMinuteOfDay(row.planned_start_min)} / ${row.planned_estimate_min || 0}m`;
+      const actual = row.actual_total_min > 0
+        ? `${fmtMinuteOfDay(row.actual_start_min)} / ${row.actual_total_min}m`
+        : 'No session';
+      const statusClass = String(row.status || 'logged').replace(/[^a-z0-9_-]/gi, '-');
+      return `<div class="plan-reality-row">
+        <span data-label="Task">${escapeHtml(row.name || 'Untitled')}</span>
+        <span data-label="Planned">${escapeHtml(planned)}</span>
+        <span data-label="Actual">${escapeHtml(actual)}</span>
+        <span data-label="Status"><span class="plan-reality-status ${statusClass}">${escapeHtml(statusLabel(row.status))}</span></span>
+      </div>`;
+    }).join('');
+    return `<div class="plan-reality-card">
+      <div class="flex items-center justify-between gap-3">
+        <p class="section-label" style="margin:0">Plan vs reality</p>
+        <p class="text-xs" style="color:var(--text-faint);margin:0">${report.planned_total_min || 0}m planned - ${report.actual_total_min || 0}m tracked</p>
+      </div>
+      <p class="text-xs" style="color:var(--text-muted);margin:6px 0 10px">${escapeHtml(report.summary || '')}</p>
+      <div class="plan-reality-head"><span>Task</span><span>Planned</span><span>Actual</span><span>Status</span></div>
+      ${rows}
+    </div>`;
+  }
+
+  function aiStepBody() {
+    if (dayTotalSecs() < 120) {
+      return '<p class="text-sm" style="color:var(--text-muted);line-height:1.55">Not enough tracked time today yet for AI insights — do a session and check back.</p>';
+    }
+    const stats = aiStatsHtml() + planRealityHtml(unwind.snapshot.planReality);
+    if (unwind.aiState === 'loading') {
+      return stats + '<p class="text-sm" style="color:var(--text-muted)">Thinking about your day…</p>';
+    }
+    if (unwind.aiState === 'error') {
+      return stats + `<p class="text-sm" style="color:var(--terracotta);line-height:1.5">Couldn't generate insights — is the backend running?</p>
+        <button id="unwind-generate" class="btn-ghost" style="margin-top:10px">Try again</button>`;
+    }
+    if (unwind.aiRecap) {
+      return stats + `${aiRecapHtml(unwind.aiRecap)}
+        <button id="unwind-regenerate" class="btn-ghost" style="margin-top:14px;font-size:0.85rem">↻ Regenerate</button>`;
+    }
+    return stats + `<p class="text-sm mb-3" style="color:var(--text-muted);line-height:1.55">Let the AI review today against your learned patterns, recent days, and your most-focused hours.</p>
+      <button id="unwind-generate" class="btn-primary">Generate daily insights</button>`;
+  }
+
+  function generateUnwindAi() {
+    if (unwind.kind === 'day') return generateDailyAi();
+    if (unwind.kind === 'month') return generateMonthlyAi();
+    return generateWeeklyAi();
+  }
+
+  function wireAiStep() {
+    const g = document.getElementById('unwind-generate');
+    if (g) g.addEventListener('click', generateUnwindAi);
+    const rg = document.getElementById('unwind-regenerate');
+    if (rg) rg.addEventListener('click', generateUnwindAi);
+    const op = document.getElementById('open-pomo-suggest');
+    if (op) op.addEventListener('click', () => { if (unwind.aiRecap && unwind.aiRecap.pomodoro) openPomoSuggest(unwind.aiRecap.pomodoro); });
+    const ha = document.getElementById('habit-adopt');
+    if (ha) ha.addEventListener('click', adoptProposedHabit);
+    const hd = document.getElementById('habit-dismiss');
+    if (hd) hd.addEventListener('click', dismissProposedHabit);
+  }
+
+  // Re-save the weekly recap after the proposal's state changes (adopted /
+  // dismissed), so reopening the unwind never shows a stale Adopt button. The
+  // coach-<week_key> habit code makes a stray double-adopt harmless anyway.
+  async function saveWeeklyRecapQuiet() {
+    const sum = unwind.snapshot.sum;
+    try {
+      await createWorkPeriod({
+        kind: 'week', period_key: unwind.snapshot.periodKey, ended_at: endedAtIso(),
+        seconds_focused: sum.focused, seconds_distracted: sum.distracted,
+        seconds_uncertain: sum.uncertain, seconds_away: sum.away,
+        ai_recap: JSON.stringify(unwind.aiRecap),
+      });
+      workPeriods = await getWorkPeriods();
+    } catch (e) {  }
+  }
+
+  async function adoptProposedHabit() {
+    const h = unwind.aiRecap && unwind.aiRecap.habit;
+    if (!h || !h.title) return;
+    try {
+      await adoptHabit({
+        code: 'coach-' + unwind.snapshot.periodKey,
+        title: h.title,
+        why: h.why || '',
+        kind: h.check ? 'auto' : 'manual',
+        check_json: h.check ? JSON.stringify(h.check) : null,
+        source: 'coach',
+        created_day_key: localDayKey(currentDate()),
+      });
+      h.adopted = true;
+      await saveWeeklyRecapQuiet();
+      renderUnwindStep();
+      syncHabitChecksNow();
+      showToast('Adopted — it’s on your Habits page.');
+    } catch (e) {
+      showToast('Could not adopt the habit — is the backend running?', { danger: true });
+    }
+  }
+
+  function dismissProposedHabit() {
+    const h = unwind.aiRecap && unwind.aiRecap.habit;
+    if (!h) return;
+    h.dismissed = true;
+    saveWeeklyRecapQuiet();
+    renderUnwindStep();
+  }
+
+  function buildWeekDays() {
+    const monday = mondayOf(currentDate());
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const key = localDayKey(d);
+      const sess = allSessions.filter(s => localDayKey(new Date(s.started_at)) === key);
+      const agg = sumStates(sess);
+      const byTask = {};
+      sess.forEach(s => { const k = (s.task_name || '').trim() || 'Untitled'; byTask[k] = (byTask[k] || 0) + s.seconds_focused; });
+      let top = null, mx = 0;
+      for (const k in byTask) { if (byTask[k] > mx) { mx = byTask[k]; top = k; } }
+      const dp = findPeriod('day', key);
+      out.push({
+        label: WK_LONG[i], date: key,
+        seconds_focused: agg.focused, seconds_distracted: agg.distracted,
+        seconds_uncertain: agg.uncertain, seconds_away: agg.away,
+        top_task: mx > 0 ? top : null,
+        daily_recap: (dp && dp.ai_recap) ? dp.ai_recap : null,
+      });
+    }
+    return out;
+  }
+
+  function campCount(sessions) {
+    const byDay = {};
+    sessions.forEach(s => { const k = localDayKey(new Date(s.started_at)); byDay[k] = (byDay[k] || 0) + s.seconds_focused; });
+    return Object.values(byDay).filter(v => v >= 60).length;
+  }
+
+  function buildMonthWeeks(monthKey) {
+    const first = parseMonthKey(monthKey);
+    const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+    // Sessions are bucketed into the month FIRST, then by week, so a session on the
+    // other side of a month border never leaks into this month's edge weeks.
+    const monthSessions = allSessions.filter(s => monthKeyOf(new Date(s.started_at)) === monthKey);
+    const weeks = [];
+    for (let m = mondayOf(first); m <= last; m = new Date(m.getFullYear(), m.getMonth(), m.getDate() + 7)) {
+      const weekKey = localDayKey(m);
+      const sess = monthSessions.filter(s => weekKeyOf(new Date(s.started_at)) === weekKey);
+      const agg = sumStates(sess);
+      const byDay = {};
+      sess.forEach(s => { const k = localDayKey(new Date(s.started_at)); byDay[k] = (byDay[k] || 0) + s.seconds_focused; });
+      const campDays = Object.values(byDay).filter(v => v >= 60).length;
+      const wp = findPeriod('week', weekKey);
+      const start = m < first ? first : m; // edge week labels show the month's own start
+      weeks.push({
+        label: 'Week of ' + start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        week_key: weekKey,
+        seconds_focused: agg.focused, seconds_distracted: agg.distracted,
+        seconds_uncertain: agg.uncertain, seconds_away: agg.away,
+        weekly_recap: (wp && wp.ai_recap) ? wp.ai_recap : null,
+        camp_days: campDays,
+      });
+    }
+    return weeks;
+  }
+
+  function pomoSettings() {
+    const fi = parseInt(localStorage.getItem('fb-pomo-focus'), 10);
+    const bi = parseInt(localStorage.getItem('fb-pomo-break'), 10);
+    return {
+      pomo_focus_min: Number.isFinite(fi) ? fi : 25,
+      pomo_break_min: Number.isFinite(bi) ? bi : 5,
+      pomo_enabled: localStorage.getItem('fb-pomo-enabled') === 'on',
+    };
+  }
+
+  // The coach's proposed habit inside the weekly recap. Old saved recaps have
+  // no `habit` field and render unchanged; an adopted or dismissed proposal is
+  // remembered in the saved recap so reopening never shows a stale live button.
+  function habitProposalHtml(r) {
+    const h = r.habit;
+    if (!h || !h.title) return '';
+    const habitsHref = window.FocusBuddyDemo && FocusBuddyDemo.active
+      ? FocusBuddyDemo.href('habits.html') : 'habits.html';
+    if (h.adopted) {
+      return `<p class="text-sm" style="margin:14px 0 0;padding:8px 10px;border-radius:8px;background:var(--sage-soft);color:var(--text)">
+        Adopted — "${escapeHtml(h.title)}" is on your <a href="${habitsHref}" style="color:var(--accent-hover);font-weight:600">Habits page</a>.</p>`;
+    }
+    if (!h.propose || h.dismissed) return '';
+    const mode = h.check
+      ? 'Focus Buddy can check this one from your sessions — nothing to log.'
+      : 'You would tick this one yourself each day.';
+    return `<div style="margin:14px 0 0;border:1px solid var(--border);border-left:3px solid var(--sage);border-radius:8px;padding:10px 12px">
+      <p class="section-label" style="margin:0 0 4px">A habit worth trying</p>
+      <p class="text-sm" style="font-weight:600;color:var(--text);margin:0">${escapeHtml(h.title)}</p>
+      ${h.why ? `<p class="text-xs" style="color:var(--text-muted);margin:3px 0 0;line-height:1.45">${escapeHtml(h.why)}</p>` : ''}
+      <p class="text-xs" style="color:var(--text-muted);margin:6px 0 0">${mode}</p>
+      <div class="flex gap-2" style="margin-top:10px">
+        <button id="habit-adopt" class="btn-ghost" style="font-size:0.8rem;padding:0.3rem 0.9rem;min-height:34px">Adopt</button>
+        <button id="habit-dismiss" class="btn-ghost" style="font-size:0.8rem;padding:0.3rem 0.9rem;min-height:34px;border-color:transparent;color:var(--text-muted)">Not now</button>
+      </div>
+    </div>`;
+  }
+
+  function aiWeekRecapHtml(r) {
+    const list = (title, items) => (items && items.length)
+      ? `<p class="section-label" style="margin:12px 0 4px">${title}</p>` +
+        `<ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:5px">` +
+        items.map(x => `<li class="text-sm" style="color:var(--text);line-height:1.45">${escapeHtml(x)}</li>`).join('') + `</ul>`
+      : '';
+    const theme = r.theme ? `<p class="serif" style="font-size:1.1rem;font-weight:700;color:var(--text);margin:0 0 6px">${escapeHtml(r.theme)}</p>` : '';
+    const summary = r.summary ? `<p class="text-sm" style="color:var(--text);line-height:1.55;margin:0">${escapeHtml(r.summary)}</p>` : '';
+    const pomoBtn = (r.pomodoro && r.pomodoro.recommend)
+      ? `<button id="open-pomo-suggest" class="btn-ghost" style="margin-top:14px;font-size:0.85rem">Tune my Pomodoro →</button>` : '';
+    const nextWeek = r.next_week_focus
+      ? `<p class="text-sm" style="color:var(--text);line-height:1.45;margin:12px 0 0;border-left:3px solid var(--sage);padding-left:10px"><strong>Focus for next week:</strong> ${escapeHtml(r.next_week_focus)}</p>` : '';
+    return theme + summary + list('Insights', r.insights) + list('Areas to improve', r.improvements) +
+      nextWeek + habitProposalHtml(r) + `<div style="margin-top:14px">${pomoBtn}</div>`;
+  }
+
+  function aiWeekStepBody() {
+    if ((unwind.snapshot.sum.total || 0) < 300) {
+      return '<p class="text-sm" style="color:var(--text-muted);line-height:1.55">Not enough tracked time this week yet for AI insights — check back after a few sessions.</p>';
+    }
+    if (unwind.aiState === 'loading') return '<p class="text-sm" style="color:var(--text-muted)">Reviewing your week…</p>';
+    if (unwind.aiState === 'error') {
+      return `<p class="text-sm" style="color:var(--terracotta);line-height:1.5">Couldn't generate insights — is the backend running?</p>
+        <button id="unwind-generate" class="btn-ghost" style="margin-top:10px">Try again</button>`;
+    }
+    if (unwind.aiRecap) {
+      return aiWeekRecapHtml(unwind.aiRecap) +
+        `<button id="unwind-regenerate" class="btn-ghost" style="margin-top:6px;font-size:0.85rem">↻ Regenerate</button>`;
+    }
+    return `<p class="text-sm mb-3" style="color:var(--text-muted);line-height:1.55">Let the AI review your whole week — your best day, trends, distraction patterns, and (if useful) better Pomodoro timings.</p>
+      <button id="unwind-generate" class="btn-primary">Generate weekly insights</button>`;
+  }
+
+  function aiMonthRecapHtml(r) {
+    const list = (title, items) => (items && items.length)
+      ? `<p class="section-label" style="margin:12px 0 4px">${title}</p>` +
+        `<ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:5px">` +
+        items.map(x => `<li class="text-sm" style="color:var(--text);line-height:1.45">${escapeHtml(x)}</li>`).join('') + `</ul>`
+      : '';
+    const theme = r.theme ? `<p class="serif" style="font-size:1.1rem;font-weight:700;color:var(--text);margin:0 0 6px">${escapeHtml(r.theme)}</p>` : '';
+    const summary = r.summary ? `<p class="text-sm" style="color:var(--text);line-height:1.55;margin:0">${escapeHtml(r.summary)}</p>` : '';
+    const carry = r.carry_forward
+      ? `<p class="text-sm" style="color:var(--text);line-height:1.45;margin:12px 0 0;border-left:3px solid var(--sage);padding-left:10px"><strong>Carry forward:</strong> ${escapeHtml(r.carry_forward)}</p>` : '';
+    return theme + summary + list('Insights', r.insights) + list('Areas to improve', r.improvements) + carry;
+  }
+
+  function aiMonthStepBody() {
+    if ((unwind.snapshot.sum.total || 0) < 300) {
+      return '<p class="text-sm" style="color:var(--text-muted);line-height:1.55">Not enough tracked time this month yet for AI insights — check back after a few sessions.</p>';
+    }
+    if (unwind.aiState === 'loading') return '<p class="text-sm" style="color:var(--text-muted)">Reading back through your month…</p>';
+    if (unwind.aiState === 'error') {
+      return `<p class="text-sm" style="color:var(--terracotta);line-height:1.5">Couldn't generate insights — is the backend running?</p>
+        <button id="unwind-generate" class="btn-ghost" style="margin-top:10px">Try again</button>`;
+    }
+    if (unwind.aiRecap) {
+      return aiMonthRecapHtml(unwind.aiRecap) +
+        `<button id="unwind-regenerate" class="btn-ghost" style="margin-top:14px;font-size:0.85rem">↻ Regenerate</button>`;
+    }
+    return `<p class="text-sm mb-3" style="color:var(--text-muted);line-height:1.55">Let the AI look back over your whole month — its theme, the patterns that defined it, and one thing worth carrying into next month.</p>
+      <button id="unwind-generate" class="btn-primary">Generate monthly insights</button>`;
+  }
+
+  async function generateMonthlyAi() {
+    unwind.aiState = 'loading'; renderUnwindStep();
+    try {
+      const r = await getMonthlyUnwind({ month_key: unwind.snapshot.periodKey, weeks: buildMonthWeeks(unwind.snapshot.periodKey) });
+      unwind.aiRecap = {
+        summary: r.summary || '', theme: r.theme || '', insights: r.insights || [],
+        improvements: r.improvements || [], carry_forward: r.carry_forward || '',
+      };
+      unwind.aiState = 'done';
+      const sum = unwind.snapshot.sum;
+      try {
+        await createWorkPeriod({
+          kind: 'month', period_key: unwind.snapshot.periodKey, ended_at: endedAtIso(),
+          seconds_focused: sum.focused, seconds_distracted: sum.distracted,
+          seconds_uncertain: sum.uncertain, seconds_away: sum.away,
+          ai_recap: JSON.stringify(unwind.aiRecap),
+        });
+        workPeriods = await getWorkPeriods();
+        syncLandmarksNow();
+        syncHabitChecksNow();
+      } catch (e) {  }
+      renderUnwindStep();
+    } catch (e) {
+      unwind.aiState = 'error'; renderUnwindStep();
+    }
+  }
+
+  async function generateWeeklyAi() {
+    unwind.aiState = 'loading'; renderUnwindStep();
+    try {
+      const r = await getWeeklyUnwind({
+        week_key: unwind.snapshot.periodKey,
+        days: buildWeekDays(),
+        // The week's session ids so the backend's goal fact block can state
+        // this week's focused time per goal (it never buckets by local day itself).
+        session_ids: unwind.snapshot.sessions.map(s => s.id).slice(0, 500),
+        ...pomoSettings(),
+      });
+      unwind.aiRecap = {
+        summary: r.summary || '', theme: r.theme || '', insights: r.insights || [],
+        improvements: r.improvements || [], next_week_focus: r.next_week_focus || '',
+        pomodoro: r.pomodoro || { recommend: false },
+        habit: r.habit || { propose: false },
+      };
+      unwind.aiState = 'done';
+      const sum = unwind.snapshot.sum;
+      try {
+        await createWorkPeriod({
+          kind: 'week', period_key: unwind.snapshot.periodKey, ended_at: endedAtIso(),
+          seconds_focused: sum.focused, seconds_distracted: sum.distracted,
+          seconds_uncertain: sum.uncertain, seconds_away: sum.away,
+          ai_recap: JSON.stringify(unwind.aiRecap),
+        });
+        workPeriods = await getWorkPeriods();
+        syncLandmarksNow();
+        syncHabitChecksNow();
+      } catch (e) {  }
+      renderUnwindStep();
+      if (unwind.aiRecap.pomodoro && unwind.aiRecap.pomodoro.recommend) openPomoSuggest(unwind.aiRecap.pomodoro);
+    } catch (e) {
+      unwind.aiState = 'error'; renderUnwindStep();
+    }
+  }
+
+  function pomoEsc(e) { if (e.key === 'Escape') closePomoSuggest(); }
+  function closePomoSuggest() {
+    const el = document.getElementById('pomo-suggest');
+    if (el) el.remove();
+    document.removeEventListener('keydown', pomoEsc);
+  }
+  function clampStep(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function openPomoSuggest(pomo) {
+    closePomoSuggest();
+    let focus = clampStep(pomo.focus_min || 25, 10, 55);
+    let brk = clampStep(pomo.break_min || 5, 5, 15);
+    const el = document.createElement('div');
+    el.id = 'pomo-suggest';
+    el.style.cssText = 'position:fixed;right:24px;top:50%;transform:translateY(-50%);width:320px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border,#00000014);border-radius:16px;box-shadow:0 14px 44px rgba(0,0,0,0.2);padding:20px;z-index:1000';
+    function stepper(label, val, which, unit) {
+      return `<div class="flex items-center justify-between" style="margin-top:12px">
+        <span class="text-sm" style="color:var(--text)">${label}</span>
+        <span class="flex items-center" style="gap:10px">
+          <button data-step="${which}:down" class="btn-ghost" style="width:34px;height:34px;padding:0;border-radius:9px;font-size:1.2rem;line-height:1">−</button>
+          <span class="serif" style="font-weight:700;min-width:66px;text-align:center;color:var(--text);font-variant-numeric:tabular-nums">${val} ${unit}</span>
+          <button data-step="${which}:up" class="btn-ghost" style="width:34px;height:34px;padding:0;border-radius:9px;font-size:1.2rem;line-height:1">+</button>
+        </span></div>`;
+    }
+    function render() {
+      el.innerHTML = `
+        <div class="flex items-center justify-between" style="margin-bottom:6px">
+          <h3 class="serif" style="font-size:1.1rem;font-weight:700;margin:0;color:var(--text)">Suggested Pomodoro</h3>
+          <button id="pomo-x" aria-label="Close" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:1.1rem">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <p class="text-xs" style="color:var(--text-muted);line-height:1.55;margin:0 0 8px">A Pomodoro alternates a focus block with a short break. Based on your week, the AI suggests these timings${pomo.why ? ':' : '.'}</p>
+        ${pomo.why ? `<p class="text-xs" style="color:var(--text);line-height:1.5;margin:0 0 6px;border-left:3px solid var(--sage);padding-left:8px">${escapeHtml(pomo.why)}</p>` : ''}
+        ${stepper('Focus', focus, 'focus', 'min')}
+        ${stepper('Break', brk, 'break', 'min')}
+        <button id="pomo-apply" class="btn-primary" style="width:100%;margin-top:18px">Apply &amp; turn on</button>
+        <p class="text-xs" style="color:var(--text-faint);text-align:center;margin:8px 0 0">Focus 10–55 · Break 5–15 min</p>`;
+      el.querySelector('#pomo-x').addEventListener('click', closePomoSuggest);
+      el.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
+        const [which, dir] = b.dataset.step.split(':');
+        if (which === 'focus') focus = clampStep(focus + (dir === 'up' ? 5 : -5), 10, 55);
+        else brk = clampStep(brk + (dir === 'up' ? 5 : -5), 5, 15);
+        render();
+      }));
+      el.querySelector('#pomo-apply').addEventListener('click', () => {
+        try {
+          localStorage.setItem('fb-pomo-focus', String(focus));
+          localStorage.setItem('fb-pomo-break', String(brk));
+          localStorage.setItem('fb-pomo-enabled', 'on');
+        } catch (e) {}
+        const btn = el.querySelector('#pomo-apply');
+        btn.textContent = 'Applied ✓'; btn.disabled = true;
+        setTimeout(closePomoSuggest, 900);
+      });
+    }
+    document.body.appendChild(el);
+    render();
+    document.addEventListener('keydown', pomoEsc);
+  }
+
+  async function generateDailyAi() {
+    unwind.aiState = 'loading'; renderUnwindStep();
+    try {
+      const r = await getDailyUnwind({
+        session_ids: unwind.snapshot.sessions.map(s => s.id),
+        recent_avg_focus_pct: recentAvgFocusPct(unwind.snapshot.periodKey),
+        period_key: unwind.snapshot.periodKey,
+        plan_reality_summary: unwind.snapshot.planReality && unwind.snapshot.planReality.has_plan ? unwind.snapshot.planReality.summary : null,
+      });
+      unwind.aiRecap = {
+        summary: r.summary || '', plan_echo: r.plan_echo || '', win: r.win || '', pattern_notes: r.pattern_notes || [],
+        advice: r.advice || [], next_action: r.next_action || '', shutdown_question: r.shutdown_question || '',
+      };
+      unwind.aiState = 'done';
+      const sum = unwind.snapshot.sum;
+      try {
+        await createWorkPeriod({
+          kind: 'day', period_key: unwind.snapshot.periodKey, ended_at: endedAtIso(),
+          seconds_focused: sum.focused, seconds_distracted: sum.distracted,
+          seconds_uncertain: sum.uncertain, seconds_away: sum.away,
+          ai_recap: JSON.stringify(unwind.aiRecap),
+          plan_reality_json: unwind.snapshot.planReality && unwind.snapshot.planReality.has_plan ? JSON.stringify(unwind.snapshot.planReality) : null,
+        });
+        workPeriods = await getWorkPeriods();
+        syncLandmarksNow();
+        syncHabitChecksNow();
+      } catch (e) {  }
+    } catch (e) {
+      unwind.aiState = 'error';
+    }
+    renderUnwindStep();
+  }
+
+  function stepBody(kind, step) {
+    const key = unwindStepKeys(kind)[step];
+    const { sum, sessions } = unwind.snapshot;
+    if (key === 'reflect') {
+      const prompt = kind === 'day'
+        ? 'What went well today? What pulled your focus?'
+        : kind === 'month'
+          ? 'What defined this month? What do you want more — or less — of next month?'
+          : 'Big wins this week? What pulled your focus away? What did you learn?';
+      return `<p class="text-sm mb-2" style="color:var(--text-muted)">${prompt}</p>
+        <textarea id="unwind-reflection" class="input" rows="4" style="resize:vertical" placeholder="Optional — a sentence or two."></textarea>`;
+    }
+    if (key === 'ai') {
+      if (kind === 'day') return aiStepBody();
+      if (kind === 'month') return aiMonthStepBody();
+      return aiWeekStepBody();
+    }
+    if (key === 'region') {
+      const mk = unwind.snapshot.periodKey;
+      const isCurrent = mk === monthKeyOf(currentDate());
+      const camps = campCount(sessions);
+      const stat = (val, label) => `<div class="mu-stat"><span class="mu-stat-val serif">${val}</span><span class="mu-stat-label">${label}</span></div>`;
+      return `<p class="serif" style="font-size:1.2rem;font-weight:700;margin:0 0 10px;line-height:1.25">${isCurrent ? 'The region so far' : 'The completed region'}</p>
+        <div id="unwind-region-map"></div>
+        <div class="mu-stats">
+          ${stat(focusPct(sum) + '%', 'focus rate')}
+          ${stat(formatHM(sum.focused), 'focused')}
+          ${stat(String(camps), camps === 1 ? 'camp' : 'camps')}
+        </div>`;
+    }
+    if (key === 'monthbreak') {
+      // Only weeks with tracked time are real "weeks of the month" — a trailing
+      // empty week (mostly the next month) shouldn't dilute the bars or the count.
+      const weeks = buildMonthWeeks(unwind.snapshot.periodKey)
+        .filter(w => (w.seconds_focused + w.seconds_distracted + w.seconds_uncertain + w.seconds_away) > 0);
+      const best = weeks.reduce((b, w) => w.seconds_focused > b.seconds_focused ? w : b, { seconds_focused: -1 });
+      const maxV = Math.max(1, ...weeks.map(w => w.seconds_focused));
+      const campTotal = weeks.reduce((a, w) => a + w.camp_days, 0);
+      const unwound = weeks.filter(w => w.weekly_recap).length;
+      const bars = weeks.map(w => {
+        const isBest = w === best && w.seconds_focused > 0;
+        const width = w.seconds_focused > 0 ? Math.max(4, Math.round(w.seconds_focused / maxV * 100)) : 0;
+        return `<div>
+            <div class="flex items-center justify-between text-sm mb-1">
+              <span style="${isBest ? 'color:var(--sage);font-weight:600' : ''}">${escapeHtml(w.label)}${isBest ? ' · best week' : ''}</span>
+              <span style="color:var(--text-muted);font-variant-numeric:tabular-nums">${w.seconds_focused > 0 ? formatHM(w.seconds_focused) : '—'}</span>
+            </div>
+            <div style="height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden"><div style="height:100%;width:${width}%;background:var(--sage);opacity:${isBest ? 1 : 0.5}"></div></div>
+          </div>`;
+      }).join('');
+      return `<p class="section-label" style="margin:0 0 12px">Week by week</p>
+        <div class="flex flex-col gap-2.5">${bars}</div>
+        <p class="text-xs mt-4" style="color:var(--text-muted)">${campTotal} camp${campTotal === 1 ? '' : 's'} · ${formatHM(sum.focused)} focused · ${unwound} of ${weeks.length} week${weeks.length === 1 ? '' : 's'} unwound</p>`;
+    }
+    if (kind === 'day') {
+      if (key === 'overview') {
+        return `<div class="flex gap-5 items-center">
+          <div class="relative flex-shrink-0" style="width:120px;height:120px">
+            <canvas id="chart-unwind" width="120" height="120"></canvas>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+              <span style="font-size:1.1rem;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums">${focusPct(sum)}%</span>
+            </div>
+          </div>
+          <div class="w-full">
+            <p class="serif" style="font-size:1.2rem;font-weight:700;margin:0 0 8px;line-height:1.25">You focused for ${formatHM(sum.focused)} today.</p>
+            <div class="flex flex-col gap-1.5 text-xs">${legendRows(sum)}</div>
+          </div>
+        </div>`;
+      }
+      const byTask = new Map();
+      sessions.forEach(s => { const k = (s.task_name || '').trim() || 'Untitled'; byTask.set(k, (byTask.get(k) || 0) + s.seconds_focused); });
+      const rows = [...byTask.entries()].sort((a, b) => b[1] - a[1]);
+      const maxV = Math.max(1, ...rows.map(r => r[1]));
+      const top = rows.length && rows[0][1] > 0 ? rows[0][0] : null;
+      return `${top ? `<p class="text-sm mb-3" style="color:var(--text-muted)">Your most focused task today was <span style="color:var(--text);font-weight:600">${escapeHtml(top)}</span>.</p>` : ''}
+        <div class="flex flex-col gap-2.5">
+          ${rows.map(([name, sec]) => `
+            <div>
+              <div class="flex items-center justify-between text-sm mb-1"><span class="truncate">${escapeHtml(name)}</span><span style="color:var(--text-muted);font-variant-numeric:tabular-nums">${formatHM(sec)}</span></div>
+              <div style="height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden"><div style="height:100%;width:${Math.max(4, Math.round(sec / maxV * 100))}%;background:var(--sage)"></div></div>
+            </div>`).join('')}
+        </div>`;
+    }
+    if (key === 'overview') {
+      const days = weekDays();
+      return `<p class="serif" style="font-size:1.2rem;font-weight:700;margin:0 0 12px;line-height:1.25">You focused for ${formatHM(sum.focused)} this week.</p>
+        ${weekBarsHtml(days)}
+        <p class="text-xs mt-3" style="color:var(--text-faint)">${focusPct(sum)}% of tracked time focused · ${formatHM(sum.total)} tracked</p>`;
+    }
+    const monday = mondayOf(currentDate());
+    const list = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const key = localDayKey(d);
+      const f = allSessions.filter(s => localDayKey(new Date(s.started_at)) === key).reduce((a, s) => a + s.seconds_focused, 0);
+      list.push({ label: WK_SHORT[i], focused: f });
+    }
+    const best = list.reduce((b, x) => x.focused > b.focused ? x : b, { focused: -1 });
+    const maxV = Math.max(1, ...list.map(x => x.focused));
+    return `<div class="flex flex-col gap-2.5">${list.map(x => {
+      const isBest = x === best && x.focused > 0;
+      const w = x.focused > 0 ? Math.max(4, Math.round(x.focused / maxV * 100)) : 0;
+      return `<div>
+          <div class="flex items-center justify-between text-sm mb-1">
+            <span style="${isBest ? 'color:var(--sage);font-weight:600' : ''}">${x.label}${isBest ? ' · best day' : ''}</span>
+            <span style="color:var(--text-muted);font-variant-numeric:tabular-nums">${x.focused > 0 ? formatHM(x.focused) : '—'}</span>
+          </div>
+          <div style="height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden"><div style="height:100%;width:${w}%;background:var(--sage);opacity:${isBest ? 1 : 0.5}"></div></div>
+        </div>`;
+    }).join('')}</div>`;
+  }
+
+  function renderUnwindStep() {
+    const { kind, step } = unwind;
+    document.getElementById('unwind-title').textContent =
+      kind === 'day' ? 'Daily Unwind' : kind === 'month' ? 'Monthly Unwind' : 'Weekly Unwind';
+    if (kind === 'day') {
+      document.getElementById('unwind-subtitle').textContent = currentDate().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    } else if (kind === 'month') {
+      document.getElementById('unwind-subtitle').textContent = monthLabel(unwind.snapshot.periodKey);
+    } else {
+      const m = mondayOf(currentDate());
+      const e = new Date(m.getFullYear(), m.getMonth(), m.getDate() + 6);
+      document.getElementById('unwind-subtitle').textContent =
+        `${m.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+    }
+    const keys = unwindStepKeys(kind);
+    const key = keys[step];
+    document.getElementById('unwind-dots').innerHTML = keys.map((_, i) => `<span class="step-dot ${i === step ? 'active' : ''}"></span>`).join('');
+    document.getElementById('unwind-body').innerHTML = stepBody(kind, step);
+
+    if (kind === 'day' && key === 'overview') {
+      const sum = unwind.snapshot.sum;
+      buildChart({ id: 'unwind', seconds_focused: sum.focused, seconds_distracted: sum.distracted, seconds_uncertain: sum.uncertain, seconds_away: sum.away });
+    }
+    if (kind === 'month' && key === 'region') {
+      const mapEl = document.getElementById('unwind-region-map');
+      if (mapEl && window.JourneyMap) {
+        JourneyMap.render(mapEl, JourneyMap.buildTrailModel({
+          sessions: unwind.snapshot.sessions,
+          now: parseMonthKey(unwind.snapshot.periodKey),
+          completed: true,
+        }));
+        // The map's own caption uses decimal hours ("11.8 focused hrs"); the stat
+        // strip below shows the same numbers in the app's h/m format, so drop the
+        // duplicate to keep one consistent number format on this step.
+        const cap = mapEl.querySelector('.trail-caption');
+        if (cap) cap.remove();
+      } else if (mapEl) {
+        mapEl.innerHTML = '<p class="text-sm" style="color:var(--text-muted)">The region map is unavailable right now.</p>';
+      }
+    }
+    if (key === 'reflect') { const ta = document.getElementById('unwind-reflection'); if (ta) ta.value = unwind.reflection; }
+    if (key === 'ai') wireAiStep();
+
+    document.getElementById('unwind-back').style.visibility = step === 0 ? 'hidden' : 'visible';
+    document.getElementById('unwind-next').textContent = step === keys.length - 1 ? 'Finish unwind' : 'Next';
+  }
+
+  async function finishUnwind() {
+    const nextBtn = document.getElementById('unwind-next');
+    const { kind, snapshot, reflection } = unwind;
+    const sum = snapshot.sum;
+    nextBtn.disabled = true; nextBtn.textContent = 'Saving…';
+    try {
+      await createWorkPeriod({
+        kind, period_key: snapshot.periodKey, ended_at: endedAtIso(),
+        seconds_focused: sum.focused, seconds_distracted: sum.distracted,
+        seconds_uncertain: sum.uncertain, seconds_away: sum.away, reflection: reflection || '',
+        plan_reality_json: kind === 'day' && snapshot.planReality && snapshot.planReality.has_plan ? JSON.stringify(snapshot.planReality) : null,
+      });
+      workPeriods = await getWorkPeriods();
+      syncLandmarksNow();
+      syncHabitChecksNow();
+      unwind.finished = true;
+      document.getElementById('unwind-dots').innerHTML = '';
+      document.getElementById('unwind-body').innerHTML = `
+        <div class="text-center py-6">
+          <div style="width:42px;height:42px;border-radius:99px;background:var(--sage-soft);display:inline-flex;align-items:center;justify-content:center;color:var(--sage)" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <p class="serif" style="font-size:1.3rem;font-weight:700;margin:0.5rem 0 4px">${kind === 'day' ? 'Done for the day'
+            : kind === 'month' ? (snapshot.periodKey === monthKeyOf(currentDate()) ? 'Region unwound' : 'Region complete')
+            : 'Week complete'}</p>
+          <p class="text-sm" style="color:var(--text-muted)">${kind === 'day'
+            ? `You focused for ${formatHM(sum.focused)} today. Rest well.`
+            : kind === 'month'
+              ? (snapshot.periodKey === monthKeyOf(currentDate())
+                ? `You focused for ${formatHM(sum.focused)} in ${monthLabel(snapshot.periodKey)} so far. The trail continues.`
+                : `You focused for ${formatHM(sum.focused)} in ${monthLabel(snapshot.periodKey)}. A new region begins.`)
+              : `You focused for ${formatHM(sum.focused)} this week. Nicely done.`}</p>
+        </div>`;
+      document.getElementById('unwind-back').style.visibility = 'hidden';
+      nextBtn.disabled = false; nextBtn.textContent = 'Done';
+    } catch {
+      nextBtn.disabled = false; nextBtn.textContent = 'Finish unwind';
+      showToast('Could not save your unwind — is the backend running?', { danger: true });
+    }
+  }
+
+  async function onUnwindNext() {
+    if (unwind.finished) { closeUnwind(); renderAll(); return; }
+    syncReflection();
+    const keys = unwindStepKeys(unwind.kind);
+    if (unwind.step < keys.length - 1) { unwind.step++; renderUnwindStep(); return; }
+    await finishUnwind();
+  }
+
+  document.getElementById('unwind-next').addEventListener('click', onUnwindNext);
+  document.getElementById('unwind-back').addEventListener('click', () => { syncReflection(); if (unwind.step > 0) { unwind.step--; renderUnwindStep(); } });
+  document.getElementById('unwind-close').addEventListener('click', closeUnwind);
+  document.getElementById('unwind-overlay').addEventListener('click', e => { if (e.target.id === 'unwind-overlay') closeUnwind(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('unwind-overlay').style.display === 'flex') closeUnwind(); });
+
+  const replayOverlay = document.getElementById('replay-overlay');
+  let releaseReplayTrap = null;
+  function closeReplay() {
+    replayOverlay.style.display = 'none';
+    document.body.style.overflow = '';
+    if (releaseReplayTrap) { releaseReplayTrap(); releaseReplayTrap = null; }
+  }
+  function openReplay(session) {
+    document.getElementById('replay-title').textContent = 'Session replay';
+    document.getElementById('replay-subtitle').textContent =
+      `${session.task_name || 'Untitled'} · ${formatTime(session.started_at)} · ${formatSeconds(
+        (session.seconds_focused || 0) +
+        (session.seconds_distracted || 0) +
+        (session.seconds_uncertain || 0) +
+        (session.seconds_away || 0)
+      )}`;
+    document.getElementById('replay-body').innerHTML = window.FocusSessionReplay
+      ? FocusSessionReplay.render(session)
+      : '<p class="text-sm" style="color:var(--text-muted)">Replay is unavailable right now.</p>';
+    replayOverlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    releaseReplayTrap = trapModalFocus(replayOverlay.querySelector('.modal'), document.activeElement);
+    document.getElementById('replay-close').focus();
+  }
+  document.getElementById('replay-close').addEventListener('click', closeReplay);
+  replayOverlay.addEventListener('click', e => { if (e.target.id === 'replay-overlay') closeReplay(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && replayOverlay.style.display === 'flex') closeReplay(); });
+
+  async function loadAll() {
+    const main = document.getElementById('analytics-main');
+    try {
+      [allSessions, workPeriods] = await Promise.all([getSessions(), getWorkPeriods()]);
+    } catch {
+      main.innerHTML = `
+        <div class="card text-center py-6" style="border-color:var(--terracotta-soft)">
+          <p class="text-sm font-medium" style="color:var(--terracotta)">Backend not running</p>
+          <p class="text-xs mt-1" style="color:var(--text-muted)">
+            <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px">uvicorn backend.main:app --reload</code>
+          </p>
+        </div>`;
+      return;
+    }
+    renderAll();
+
+    // Deep link from the Trail note: analytics.html?unwind=month&month=YYYY-MM
+    // opens the monthly unwind directly; the params are stripped so a refresh
+    // (or a later loadAll after a delete) doesn't reopen it.
+    const params = new URLSearchParams(window.location.search);
+    const rawMonth = params.get('unwind') === 'month' ? (params.get('month') || '') : '';
+    // 'last' (from the Last month nav button) resolves to the previous calendar
+    // month; the Trail note passes an explicit YYYY-MM.
+    const wantMonth = rawMonth === 'last'
+      ? monthKeyOf(new Date(currentDate().getFullYear(), currentDate().getMonth() - 1, 1))
+      : rawMonth;
+    if (/^\d{4}-\d{2}$/.test(wantMonth)) {
+      params.delete('unwind'); params.delete('month');
+      const qs = params.toString();
+      history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+      const hasData = allSessions.some(s => monthKeyOf(new Date(s.started_at)) === wantMonth);
+      if (hasData) openUnwind('month', wantMonth);
+      else showToast(`No sessions in ${monthLabel(wantMonth)} to unwind yet.`);
+    }
+  }
+
+  document.getElementById('history-list').addEventListener('click', async (e) => {
+    const replay = e.target.closest('[data-replay-session]');
+    if (replay) {
+      const id = parseInt(replay.dataset.replaySession, 10);
+      const session = allSessions.find(s => s.id === id);
+      if (session) openReplay(session);
+      return;
+    }
+
+    const del = e.target.closest('[data-del-session]');
+    if (!del) return;
+    const id = parseInt(del.dataset.delSession, 10);
+    const ok = await confirmDialog("Delete this session? This can't be undone.", { danger: true, confirmText: 'Delete' });
+    if (!ok) return;
+    try { await deleteSession(id); await loadAll(); }
+    catch { showToast('Could not delete the session — is the backend running?', { danger: true }); }
+  });
+
+  loadAll();
+</script>
+</body>
+</html>
