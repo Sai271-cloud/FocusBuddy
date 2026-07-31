@@ -1827,14 +1827,19 @@ def analyze_focus(
     if request.current_url:
         title_part = f' (page title: "{request.current_title}")' if request.current_title else ''
         site = (
-            f'\n\nThe person also currently has this website open: "{request.current_url}"{title_part}. '
-            "Judge relevance by what THIS specific page is about (use the page title), NOT by the "
-            "site's general reputation. A page whose topic relates to the task supports 'focused' — "
-            "even on a site like YouTube. Looking up tutorials, articles, or videos ABOUT the task "
-            "(e.g. a 'how to type faster' video while practicing typing) is part of doing the task, "
-            "so it is 'focused'. Only a page clearly unrelated to the task supports 'distracted'. "
-            "If the page's relevance is unclear, rely on the webcam image rather than assuming "
-            "distraction."
+            f'\n\nWEBSITE SIGNAL (weigh this heavily): the person currently has this website open: '
+            f'"{request.current_url}"{title_part}. The open page is strong evidence of what they are '
+            "actually doing right now, so give it a lot of weight. Judge relevance by what THIS "
+            "specific page is about (use the page title), NOT by the site's general reputation. A "
+            "page whose topic relates to the task means they are working ON the task — even on a site "
+            "like YouTube: looking up tutorials, articles, or videos ABOUT the task (e.g. a 'how to "
+            "type faster' video while practicing typing) is part of doing the task, so it is "
+            "'focused'. BUT if the open page is clearly unrelated to the task, the person is "
+            "'distracted' REGARDLESS of the webcam image — even if they appear to be looking at the "
+            "screen and fully engaged, reading or watching an off-task page IS the distraction (e.g. "
+            "scrolling social media, shopping, or watching unrelated videos during the task). Only "
+            "fall back to the webcam image when the page title is missing or too vague to tell "
+            "whether the page matches the task."
         )
     about = _about_block(db, workspace)
     sensors_block = (

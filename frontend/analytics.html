@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <base href="/" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='11.5' fill='none' stroke='%235e8a65' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='6.5' fill='none' stroke='%235e8a65' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='2' fill='%235e8a65'/%3E%3C/svg%3E" />
   <title>Focus Buddy — Analytics</title>
   <script src="js/theme.js"></script>
   <script src="js/config.js"></script>
@@ -13,6 +14,7 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
+<a href="analytics.html#analytics-main" class="skip-link">Skip to content</a>
 
 <header class="page-header">
   <div class="page-header-row max-w-3xl mx-auto">
@@ -41,7 +43,7 @@
   </div>
 </header>
 
-<main id="analytics-main" class="app-main analytics-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
+<main id="analytics-main" tabindex="-1" class="app-main analytics-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
   <!-- Placeholder is replaced by loadAll() on success or error — avoids a blank pop-in. -->
   <div id="tiles" class="analytics-tiles grid grid-cols-2 md:grid-cols-3 gap-3"><p class="text-sm" style="color:var(--text-muted);grid-column:1/-1">Loading your sessions…</p></div>
   <section id="today-card" class="card"></section>
@@ -264,7 +266,7 @@
       <div class="card" style="padding:1rem 1.1rem">
         <p class="section-label" style="margin:0 0 6px">${label}</p>
         <p class="serif" style="font-size:1.5rem;font-weight:700;color:var(--text);line-height:1;margin:0">${value}</p>
-        <p class="text-xs" style="color:var(--text-faint);margin:4px 0 0">${sub}</p>
+        <p class="text-xs" style="color:var(--text-muted);margin:4px 0 0">${sub}</p>
       </div>`;
 
     document.getElementById('tiles').innerHTML =
@@ -368,14 +370,14 @@
     row.innerHTML = `
       <div class="min-w-0 flex-1">
         <p class="truncate" style="color:var(--text);margin:0">${escapeHtml(session.task_name || 'Untitled')}</p>
-        <p style="color:var(--text-faint);font-variant-numeric:tabular-nums;margin:1px 0 0;font-size:0.72rem">${formatTime(session.started_at)}</p>
+        <p style="color:var(--text-muted);font-variant-numeric:tabular-nums;margin:1px 0 0;font-size:0.72rem">${formatTime(session.started_at)}</p>
       </div>
       <div class="flex items-center gap-2.5 flex-shrink-0">
         <div style="width:72px;height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden" title="${pct}% focused">
           <div style="height:100%;width:${pct}%;background:var(--sage)"></div>
         </div>
         <span style="width:36px;text-align:right;color:var(--text);font-variant-numeric:tabular-nums">${pct}%</span>
-        <span style="width:54px;text-align:right;color:var(--text-faint);font-variant-numeric:tabular-nums">${formatSeconds(total)}</span>
+        <span style="width:54px;text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums">${formatSeconds(total)}</span>
         <button class="icon-btn" data-replay-session="${session.id}" aria-label="View session replay" title="View replay">${ICON_REPLAY}</button>
         <button class="icon-btn danger" data-del-session="${session.id}" aria-label="Delete this session" title="Delete session">${ICON_TRASH}</button>
       </div>`;

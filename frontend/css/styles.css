@@ -25,6 +25,11 @@
 
   --accent:      #5e8a65;
   --accent-hover:#4a7252;
+  /* Filled surfaces that carry white text need a darker green than --accent
+     (white on #5e8a65 is only 3.96:1). These stay the same in both themes
+     because they are always paired with white text. */
+  --accent-strong:#4a7252;
+  --accent-strong-hover:#3d6045;
 
   --trail-ember: #c88f3f;
 
@@ -72,6 +77,8 @@
 
   --accent:      #5e8a65;
   --accent-hover:#96bd9b;
+  --accent-strong:#4a7252;
+  --accent-strong-hover:#3d6045;
 
   --trail-ember: #e2a95c;
 
@@ -84,6 +91,31 @@
   --hero-bg:     #231b15;
   --hero-on:     #e8dcc8;
   --hero-label:  rgba(245, 241, 236, 0.6);
+}
+
+/* Keyboard/screen-reader "skip to content" link: hidden off-screen until it
+   receives focus, then slides into the top-left corner as the first tab stop. */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -60px;
+  z-index: 1000;
+  background: var(--accent-strong);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 8px;
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skip-link { transition: none; }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -205,7 +237,7 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
@@ -220,7 +252,7 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
 .btn-primary:hover {
-  background: var(--accent-hover);
+  background: var(--accent-strong-hover);
   box-shadow: 0 4px 12px rgba(94,138,101,0.28);
 }
 .btn-primary:active { box-shadow: none; }
@@ -375,12 +407,12 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 }
 /* "Last month" — a distinct accent pill (opens the monthly unwind for last month) */
 .page-nav a.nav-monthly {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   font-weight: 600;
 }
 .page-nav a.nav-monthly:hover:not(.active) {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   filter: brightness(1.07);
 }
@@ -758,7 +790,7 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   left: 8px;
   top: -7px;
   font-size: 0.62rem;
-  color: var(--text-faint);
+  color: var(--text-muted);
   background: var(--surface);
   padding-right: 5px;
   font-variant-numeric: tabular-nums;
@@ -780,7 +812,7 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   transition: background 0.15s, border-color 0.15s;
 }
 .cal-block:hover { border-color: color-mix(in srgb, var(--sage) 32%, var(--border)); }
-.cal-block .cal-block-pct { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.cal-block .cal-block-pct { color: var(--text); font-variant-numeric: tabular-nums; }
 .cal-block.focused    { border-left-color: var(--sage);       background: var(--sage-soft); }
 .cal-block.distracted { border-left-color: var(--terracotta); background: var(--terracotta-soft); }
 .cal-block.uncertain  { border-left-color: var(--ochre);      background: var(--ochre-soft); }
@@ -1415,7 +1447,7 @@ input[type="range"].fb-range::-moz-range-thumb {
   transition: background 0.15s, color 0.15s;
 }
 .seg-btn:hover { color: var(--text); }
-.seg-btn[aria-pressed="true"] { background: var(--sage); color: #fff; }
+.seg-btn[aria-pressed="true"] { background: var(--accent-strong); color: #fff; }
 .seg-btn:focus-visible { outline: 2px solid var(--sage); outline-offset: 1px; }
 
 .budget-meter {
@@ -2752,8 +2784,8 @@ input[type="range"].fb-range::-moz-range-thumb {
   margin: 5px 0 0;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--accent);
-  color: var(--surface);
+  background: var(--accent-strong);
+  color: #fff;
   font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;

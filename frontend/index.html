@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <base href="/" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='11.5' fill='none' stroke='%235e8a65' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='6.5' fill='none' stroke='%235e8a65' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='2' fill='%235e8a65'/%3E%3C/svg%3E" />
   <title>Focus Buddy — Today</title>
   <script src="js/theme.js"></script>
   <script src="js/config.js"></script>
@@ -12,6 +13,7 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
+<a href="index.html#main-content" class="skip-link">Skip to content</a>
 
 <header class="page-header">
   <div class="page-header-row max-w-5xl mx-auto">
@@ -40,7 +42,7 @@
   </div>
 </header>
 
-<main class="app-main app-main-wide today-main max-w-5xl mx-auto px-6 py-8">
+<main id="main-content" tabindex="-1" class="app-main app-main-wide today-main max-w-5xl mx-auto px-6 py-8">
   <section id="trail-card" class="trail-card card" style="display:none" aria-label="Your trail">
     <button id="trail-month-label" class="trail-month-label" aria-haspopup="dialog" title="Open the Atlas">
       <span id="trail-month-name"></span>
@@ -72,7 +74,7 @@
           </div>
           <div>
             <label for="task-desc" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
-              Description <span class="font-normal" style="color:var(--text-faint)"> — Add needed websites, tools, or context for focus analysis</span>
+              Description <span class="font-normal" style="color:var(--text-muted)"> — Add needed websites, tools, or context for focus analysis</span>
             </label>
             <textarea id="task-desc" class="input" rows="3"
                       placeholder="Please add context or details about this task."
@@ -82,7 +84,7 @@
                people who don't use goals (progressive disclosure). -->
           <div id="task-goal-wrap" style="display:none">
             <label for="task-goal" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
-              Goal <span class="font-normal" style="color:var(--text-faint)"> — optional; focused time on this task counts toward it</span>
+              Goal <span class="font-normal" style="color:var(--text-muted)"> — optional; focused time on this task counts toward it</span>
             </label>
             <select id="task-goal" class="input" aria-label="Link this task to a goal">
               <option value="">No goal</option>
@@ -120,7 +122,7 @@
     <section class="today-rail">
       <div class="flex items-center justify-between mb-2">
         <p class="section-label" style="margin:0">Today</p>
-        <p id="cal-date" class="text-xs" style="color:var(--text-faint)"></p>
+        <p id="cal-date" class="text-xs" style="color:var(--text-muted)"></p>
       </div>
       <div class="calendar" id="calendar">
         <div class="cal-grid" id="cal-grid"></div>

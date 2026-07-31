@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <base href="/" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='11.5' fill='none' stroke='%235e8a65' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='6.5' fill='none' stroke='%235e8a65' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='2' fill='%235e8a65'/%3E%3C/svg%3E" />
   <title>Focus Buddy — Habits</title>
   <script src="js/theme.js"></script>
   <script src="js/config.js"></script>
@@ -12,6 +13,7 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
+<a href="habits.html#main-content" class="skip-link">Skip to content</a>
 
 <header class="page-header">
   <div class="page-header-row max-w-3xl mx-auto">
@@ -40,7 +42,7 @@
   </div>
 </header>
 
-<main class="app-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
+<main id="main-content" tabindex="-1" class="app-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
 
   <section>
     <p class="section-label">Your habits</p>
@@ -48,7 +50,7 @@
       <p class="text-sm" style="color:var(--text-muted)">Loading your habits…</p>
     </div>
     <div id="habit-empty" class="card flex flex-col items-center gap-2 text-center py-10" style="display:none">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
       <p class="font-medium text-sm" style="color:var(--text)">No habits yet</p>
       <p class="text-sm" style="color:var(--text-muted);max-width:400px">
         Adopt one from the starter set below — or run a weekly unwind, and your coach may
