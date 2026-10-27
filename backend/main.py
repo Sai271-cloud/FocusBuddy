@@ -51,7 +51,6 @@ MAX_FRAME_BASE64_CHARS = 1_400_000
 MAX_FRAME_BYTES = 1_000_000
 
 def _gemini_text(response, context: str) -> str:
-    """Read Gemini text defensively; some valid responses contain no text part."""
     try:
         return response.text or ""
     except Exception:
@@ -59,9 +58,6 @@ def _gemini_text(response, context: str) -> str:
         return ""
 
 def _gemini_error(exc) -> tuple[int, str]:
-    """Turn a Gemini/network exception into (http_status, short honest message)
-    the tracker can show the user. Never leaks raw internals — just enough to know
-    what's wrong (quota, key, model, overloaded, timeout, network)."""
     if isinstance(exc, genai_errors.APIError):
         code = getattr(exc, "code", None)
         if code == 429:
@@ -134,12 +130,6 @@ def frontend_root():
 
 @app.get("/{page_name}.html", include_in_schema=False)
 def frontend_pages(page_name: str):
-    """Serve any top-level frontend page (index/plan/tracker/analytics/habits/
-    goals). One dynamic route instead of one route per page: the hosted app
-    routes page requests through FastAPI, and per-page routes meant every new
-    page silently returned a JSON 404 until someone remembered to add one
-    (goals.html/habits.html broke exactly this way). _frontend_file still 404s
-    anything that isn't a real file inside frontend/."""
     return _frontend_page(f"{page_name}.html")
 
 @app.get("/js/{asset_path:path}", include_in_schema=False)
@@ -152,7 +142,6 @@ def frontend_css(asset_path: str):
 
 @app.get("/img/{asset_path:path}", include_in_schema=False)
 def frontend_img(asset_path: str):
-    # Without this the hosted league badges 404 and fall back to plain discs.
     return FileResponse(_frontend_file(f"img/{asset_path}"))
 
 def get_workspace(
@@ -384,8 +373,6 @@ def delete_session(
     return {"ok": True}
 
 def _collapse_timeline(timeline_json: str) -> str:
-    """Turn a [{minute, state}] log into compact runs, e.g.
-    'focused 0-22m, distracted 22-24m, focused 24-41m'. Returns '' if unusable."""
     try:
         entries = json.loads(timeline_json or "[]")
     except Exception:
@@ -413,8 +400,6 @@ def _collapse_timeline(timeline_json: str) -> str:
     return ", ".join(parts)
 
 def _format_journal(journal_json: str) -> str:
-    """Turn the session journal (list of {t, type, ...}) into a readable timestamped
-    trail for the coach. Returns '' if empty/unusable."""
     try:
         entries = json.loads(journal_json or "[]")
     except Exception:
@@ -482,7 +467,6 @@ def _scrub_planner_text(s):
     )
 
 def _scrub_response(resp):
-    """Scrub every string / list-of-strings field on a coaching response, in place."""
     for field in type(resp).model_fields:
         v = getattr(resp, field)
         if isinstance(v, str):
@@ -492,8 +476,6 @@ def _scrub_response(resp):
     return resp
 
 def _session_gated(secs: dict) -> bool:
-    """True when one session has too little real signal to coach on (too short, or
-    mostly away/uncertain) — then the debrief drops to the summary + win only."""
     total = sum(secs.values())
     if total <= 0:
         return True
@@ -501,14 +483,11 @@ def _session_gated(secs: dict) -> bool:
     return total < 300 or away_unc >= 0.70
 
 def _daily_gated(total_sec: int, uncertain_sec: int) -> bool:
-    """True when the day is too thin or too unreliable (mostly uncertain) to coach on."""
     if total_sec <= 0:
         return True
     return total_sec < 600 or (uncertain_sec / total_sec) >= 0.60
 
 def _weekly_flags(day_tuples: list, prior_weeks: list) -> dict:
-    """day_tuples: list of (focused, distracted, uncertain, away) second tuples.
-    prior_weeks: list of dicts (most-recent first) with seconds_* keys."""
     active = [d for d in day_tuples if sum(d) > 0]
     tot = sum(sum(d) for d in active)
     if tot <= 0:
@@ -530,8 +509,6 @@ def _weekly_flags(day_tuples: list, prior_weeks: list) -> dict:
     }
 
 def _monthly_flags(week_tuples: list, prior_months: list) -> dict:
-    """week_tuples: list of (focused, distracted, uncertain, away) second tuples, one per week.
-    prior_months: list of dicts (most-recent first) with seconds_* keys."""
     active = [w for w in week_tuples if sum(w) > 0]
     tot = sum(sum(w) for w in active)
     if tot <= 0:
@@ -553,8 +530,6 @@ def _monthly_flags(week_tuples: list, prior_months: list) -> dict:
     }
 
 def _daily_dominant_line(secs: dict) -> str:
-    """Authoritative internal line so the model stops fabricating a non-focus state
-    when focus is actually the largest slice. Scrubbed out if the model echoes it."""
     total = sum(secs.values())
     if total <= 0:
         return ""
@@ -568,8 +543,6 @@ def _daily_dominant_line(secs: dict) -> str:
     return f"\n(Internal honesty guide, do NOT quote: in the summary's first clause, say {label}.)\n"
 
 def _weekly_trend_line(day_tuples: list, prior_weeks: list) -> str:
-    """One authoritative line stating the week-over-week trend so the model can't
-    fabricate it. Empty when thin (<2 active days) or there's no prior week."""
     active = [d for d in day_tuples if sum(d) > 0]
     tot = sum(sum(d) for d in active)
     if len(active) < 2 or tot <= 0 or not prior_weeks:
@@ -587,8 +560,6 @@ def _weekly_trend_line(day_tuples: list, prior_weeks: list) -> str:
             "State this as given; do not recompute.\n")
 
 def _week_day_keys(week_key: str) -> list:
-    """The 7 local day keys of a week from its Monday key — plain date
-    arithmetic on stored strings, no timezone math."""
     try:
         monday = datetime.strptime(week_key or "", "%Y-%m-%d")
     except (TypeError, ValueError):
@@ -596,9 +567,6 @@ def _week_day_keys(week_key: str) -> list:
     return [(monday + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
 
 def _weekly_habit_lines(db, workspace, week_key: str) -> str:
-    """Authoritative adherence lines for the user's active habits, computed from
-    stored check rows so the model can't fabricate counts. Empty when there are
-    no active habits (or no usable week key)."""
     day_keys = _week_day_keys(week_key)
     if not day_keys:
         return ""
@@ -621,12 +589,6 @@ def _weekly_habit_lines(db, workspace, week_key: str) -> str:
     )
 
 def _goal_anchor_key(workspace, period_key=None) -> str:
-    """The "what day is it" anchor for goal days-left math. Uses the caller's
-    local day key when it sends a real one (daily unwind / plan advice); otherwise
-    the frozen demo date for demo workspaces, else the server's UTC date (the
-    crud.tick_day_allowed rule). ⚠ Never pass a WEEK key here — the weekly
-    unwind's period_key is the week's Monday, which would skew days-left by up
-    to 6 days; weekly and debrief use the fallback."""
     if period_key:
         try:
             datetime.strptime(period_key, "%Y-%m-%d")
@@ -638,8 +600,6 @@ def _goal_anchor_key(workspace, period_key=None) -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 def _goal_days_phrase(target_day_key: str, anchor_key: str) -> str:
-    """Calm days-left wording — a passed date is stated plainly, never as
-    'overdue' or 'late' (the anti-shame rule)."""
     try:
         target = datetime.strptime(target_day_key, "%Y-%m-%d")
         anchor = datetime.strptime(anchor_key, "%Y-%m-%d")
@@ -663,11 +623,6 @@ def _hm(seconds: int) -> str:
     return f"{minutes}m"
 
 def _goal_lines(db, workspace, anchor_key: str, window_sessions=None, window_label: str = "today") -> str:
-    """Authoritative fact lines for the user's active goals — deadline math and
-    focused-time sums computed here so the model can't fabricate them. Goals are
-    INPUT-ONLY context: no response fields ride on this. `window_sessions` (already
-    workspace-filtered) adds that window's focused time per goal. Empty when there
-    are no active goals."""
     goals = [g for g in crud.get_goals(db, workspace) if g.status == "active"][:crud.MAX_ACTIVE_GOALS]
     if not goals:
         return ""
@@ -701,8 +656,6 @@ def _goal_lines(db, workspace, anchor_key: str, window_sessions=None, window_lab
     )
 
 def _monthly_trend_line(week_tuples: list, prior_months: list) -> str:
-    """One authoritative line stating the month-over-month trend so the model can't
-    fabricate it. Empty when thin (<2 active weeks) or there's no prior month."""
     active = [w for w in week_tuples if sum(w) > 0]
     tot = sum(sum(w) for w in active)
     if len(active) < 2 or tot <= 0 or not prior_months:
@@ -740,11 +693,6 @@ def _norm_title(title: str) -> str:
     return " ".join((title or "").lower().split())
 
 def _enforce_habit_proposal(resp, flags, active_habits):
-    """Zero the proposed habit unless the week can honestly support one: no
-    proposals on thin/healthy/measurement-limited weeks, and never one that
-    duplicates an active habit (exact normalized-title match, or the same
-    check template + params as an active auto habit). Code-enforced because
-    the model only follows mechanical rules ~2/3 of the time."""
     habit = resp.habit if isinstance(resp.habit, schemas.HabitProposal) else None
     if habit is None:
         resp.habit = schemas.HabitProposal()
@@ -775,7 +723,6 @@ def _enforce_weekly(resp, day_tuples, prior_weeks, active_habits=None):
     if isinstance(resp.pomodoro, schemas.PomodoroSuggestion):
         resp.pomodoro.why = _scrub(resp.pomodoro.why)
     if isinstance(resp.habit, schemas.HabitProposal):
-        # Nested BaseModel — _scrub_response only reaches top-level strings.
         resp.habit.title = _scrub(resp.habit.title)
         resp.habit.why = _scrub(resp.habit.why)
     flags = _weekly_flags(day_tuples, prior_weeks)
@@ -798,8 +745,6 @@ def _enforce_monthly(resp, week_tuples, prior_months):
     return resp
 
 def _parse_plan_advice(text: str) -> schemas.PlanAdviceResponse:
-    """Parse the planner's JSON defensively — always returns a valid object; on any
-    problem, fall back to putting the raw text in `summary` so the UI never breaks."""
     raw = (text or "").strip()
     cleaned = raw
     if cleaned.startswith("```"):
@@ -1104,10 +1049,6 @@ def _build_reschedule_response(req: schemas.PlanRescheduleRequest) -> schemas.Pl
     )
 
 def _enforce_plan_advice(resp, entries, available_min, ctx):
-    """Deterministic validation of the planner's output (flash-lite follows mechanical
-    rules only ~2/3 of the time): every plan task is scheduled exactly once, times are
-    valid and non-overlapping, lengths use the real estimates, the over-plan note is
-    authoritative, and pattern advice is gated on thin data."""
     _scrub_response(resp)
     resp.summary = _scrub_planner_text(resp.summary)
     resp.over_plan_note = _scrub_planner_text(resp.over_plan_note)
@@ -1174,8 +1115,6 @@ def _enforce_plan_advice(resp, entries, available_min, ctx):
     return resp
 
 def _parse_debrief(text: str) -> schemas.DebriefResponse:
-    """Parse the model's JSON defensively — always returns a valid object. On any
-    problem, fall back to putting the raw text in `summary` so the UI never breaks."""
     raw = (text or "").strip()
     cleaned = raw
     if cleaned.startswith("```"):
@@ -1208,8 +1147,6 @@ def _parse_debrief(text: str) -> schemas.DebriefResponse:
         )
 
 def _session_summary(session: models.FocusSession) -> tuple[str, int]:
-    """Build the human-readable session summary block used by both the debrief and
-    the pattern-learning call. Returns (summary_text, total_tracked_seconds)."""
     secs = {
         "focused": session.seconds_focused or 0,
         "distracted": session.seconds_distracted or 0,
@@ -1266,8 +1203,6 @@ def debrief_session(
         "away": session.seconds_away or 0,
     }
     about = _about_block(db, workspace)
-    # One computed goal line, only when this session's task serves an active goal
-    # (goals are input-only context — no response fields ride on this).
     goal_line = ""
     task = crud.get_task(db, session.task_id, workspace)
     if task is not None and task.goal_id:
@@ -1468,9 +1403,6 @@ def read_league(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Current league standing. Ratchets on read so a fresh store backfills from
-    session history; reads never report a promotion (backfills are silent).
-    Includes the full ladder so the frontend never duplicates the rank math."""
     points, _ = crud.ratchet_league(db, workspace)
     rank_name, level, progress = crud.rank_for_points(points)
     ladder = []
@@ -1488,9 +1420,6 @@ def sync_league(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """End-of-session sync (fire-and-forget from the tracker, like /learn).
-    A promotion only counts when earned against a live store — a first-ever sync
-    (stored was 0) is treated as a backfill, so it can't trigger the slam."""
     points, stored_before = crud.ratchet_league(db, workspace)
     rank_name, level, progress = crud.rank_for_points(points)
     prev_rank, prev_level, _ = crud.rank_for_points(stored_before)
@@ -1513,7 +1442,6 @@ def read_landmarks(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Every landmark this workspace has earned (Trail Chunk 5)."""
     return crud.get_landmarks(db, workspace)
 
 @app.post("/landmarks/sync", response_model=schemas.LandmarkSyncResult)
@@ -1522,10 +1450,6 @@ def sync_landmarks(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Store frontend-detected landmarks (fire-and-forget, like /league/sync).
-    Insert-only, so re-syncs are idempotent. Filling an EMPTY store is a silent
-    backfill — `newly_earned` reports [] so old history never triggers a toast
-    (the league's first-sync rule)."""
     for item in request.earned:
         if item.code not in crud.LANDMARK_CODES:
             raise HTTPException(status_code=422, detail=f"Unknown landmark code: {item.code}")
@@ -1536,7 +1460,6 @@ def sync_landmarks(
     )
 
 def _habit_out(habit, check_days_map) -> schemas.HabitOut:
-    """Build a HabitOut with its route-computed adherence facts."""
     days = check_days_map.get(habit.id, [])
     return schemas.HabitOut(
         id=habit.id,
@@ -1557,8 +1480,6 @@ def read_habits(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Every habit (active and retired) with its completed days — one call drives
-    the whole habits page."""
     check_days = crud.get_habit_check_days(db, workspace)
     return [_habit_out(h, check_days) for h in crud.get_habits(db, workspace)]
 
@@ -1568,9 +1489,6 @@ def adopt_habit(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Adopt a habit (starter catalog or coach proposal). An auto habit whose
-    check_json fails the crud.HABIT_TEMPLATES whitelist is rejected — our own
-    frontend only sends whitelisted specs, so garbage here is a caller bug."""
     if request.kind == "auto" and crud.clean_check_json(request.check_json) is None:
         raise HTTPException(status_code=422, detail="Unknown or invalid habit check template.")
     habit = crud.adopt_habit(db, request, workspace)
@@ -1583,8 +1501,6 @@ def retire_habit(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Retire (never delete) — history and the lifetime count survive, and the
-    same habit can be re-adopted later."""
     habit = crud.get_habit(db, habit_id, workspace)
     if habit is None:
         raise HTTPException(status_code=404, detail="Habit not found")
@@ -1599,9 +1515,6 @@ def tick_habit(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Manually mark a habit done for a local day. Today-only is a frontend
-    rule; the backend only sanity-bounds the day (±1 of the anchor date) since
-    it can't know the browser's local today. Duplicate ticks are idempotent."""
     habit = crud.get_habit(db, habit_id, workspace)
     if habit is None:
         raise HTTPException(status_code=404, detail="Habit not found")
@@ -1619,9 +1532,6 @@ def sync_habit_checks(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Store frontend-verified auto checks (fire-and-forget, like /landmarks/sync).
-    Insert-only and silently bounded in crud — no reward semantics on purpose:
-    an auto tick just appears, it is never announced."""
     inserted = crud.sync_habit_checks(db, request.checks, workspace)
     return schemas.HabitCheckSyncResult(inserted=inserted)
 
@@ -1630,8 +1540,6 @@ def read_goals(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Every goal, all statuses — the frontend derives task links (TaskOut.goal_id)
-    and focused time from data it already fetches, so GoalOut stays plain."""
     return crud.get_goals(db, workspace)
 
 @app.post("/goals", response_model=schemas.GoalOut)
@@ -1654,8 +1562,6 @@ def update_goal(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Preserve-on-None edit (title/date), mark done, archive, or reopen. Reopening
-    re-checks the active cap — without this, reopen would sneak past the POST cap."""
     goal = crud.get_goal(db, goal_id, workspace)
     if goal is None:
         raise HTTPException(status_code=404, detail="Goal not found")
@@ -1678,8 +1584,6 @@ def attach_goal_task(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Attach a task to a goal. Both are workspace-filtered — the hosted DB has no
-    FK on tasks.goal_id, so this route IS the integrity layer."""
     goal = crud.get_goal(db, goal_id, workspace)
     if goal is None:
         raise HTTPException(status_code=404, detail="Goal not found")
@@ -1706,7 +1610,6 @@ def detach_goal_task(
     return task
 
 def _about_block(db: Session, workspace=None) -> str:
-    """The user's 'About me' context, formatted for a prompt. '' if empty."""
     about = crud.get_profile(db, workspace).about.strip()
     if not about:
         return ''
@@ -1725,9 +1628,6 @@ def _parse_state(reply_text: str) -> str:
     return "uncertain"
 
 def _parse_focus(reply_text: str):
-    """Return (state, note, reason). Tries JSON {state, note, reason}; on ANY problem
-    falls back to scanning for a state word, so the core focus signal is never lost.
-    note/reason may be ''."""
     raw = (reply_text or "").strip()
     cleaned = raw
     if cleaned.startswith("```"):
@@ -1753,9 +1653,6 @@ def set_tracking_state(
     state: schemas.TrackingState,
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """The tracker page reports whether it's actively tracking with website awareness
-    on. The extension checks this (GET) before reporting, so it only reports while a
-    session is live and the toggle is honored."""
     tracking = _tracking_slot(workspace.id)
     tracking["active"] = bool(state.active)
     tracking["ts"] = time.time()
@@ -1768,8 +1665,6 @@ def set_tracking_state(
 
 @app.get("/tracking-state")
 def get_tracking_state(workspace: models.DemoWorkspace = Depends(get_workspace)):
-    """The extension calls this before reporting — true only while the tracker is
-    actively tracking (heartbeating) with website awareness on."""
     return {"active": _tracking_active(workspace.id)}
 
 @app.post("/activity")
@@ -1777,9 +1672,6 @@ def set_activity(
     activity: schemas.ActivityIn,
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Browser extension reports the active tab's URL + title here. Stored in memory
-    only. Ignored unless a tracker session is actively tracking (gate) — this is what
-    makes the extension honor pause/stop and the website-awareness toggle."""
     if not _tracking_active(workspace.id):
         return {"ok": False, "ignored": True}
     latest = _activity_slot(workspace.id)
@@ -1790,8 +1682,6 @@ def set_activity(
 
 @app.get("/activity", response_model=schemas.ActivityOut)
 def get_activity(workspace: models.DemoWorkspace = Depends(get_workspace)):
-    """Latest reported URL + title, or null if none/stale/gate-closed. The tracker
-    reads this each sample."""
     if not _tracking_active(workspace.id):
         return schemas.ActivityOut(url=None, title=None)
     latest = _activity_slot(workspace.id)
@@ -1928,9 +1818,6 @@ def delete_observation(
     return {"ok": True}
 
 def _parse_observations(text: str) -> dict:
-    """Parse the learn call's JSON defensively. Always returns
-    {"affirm": [int], "reject": [int], "new": [str]} — empty lists on any problem,
-    so a bad model response never throws."""
     raw = (text or "").strip()
     if raw.startswith("```"):
         raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
@@ -1966,10 +1853,6 @@ def learn_from_session(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """Best-effort after a session. Two parts: (1) DETERMINISTIC — fold the session's
-    focus % into the hourly profile (runs even if the AI is unavailable); (2) AI —
-    ask the model to affirm/reject the qualitative patterns and propose new ones.
-    Never raises on an AI/parse failure, and never touches the saved session."""
     session = _get_session_or_404(db, session_id, workspace)
 
     summary_lines, total = _session_summary(session)
@@ -2053,7 +1936,6 @@ def _fmt_hour(h: int) -> str:
     return f"{hr}{ap}"
 
 def _day_summary(sessions: list) -> tuple[str, int]:
-    """Aggregate a day's sessions into a coach-readable block. Returns (text, total_seconds)."""
     secs = {"focused": 0, "distracted": 0, "uncertain": 0, "away": 0}
     by_task: dict[str, int] = {}
     for s in sessions:
@@ -2090,7 +1972,6 @@ def _day_summary(sessions: list) -> tuple[str, int]:
     return text, total
 
 def _parse_daily_unwind(text: str) -> schemas.DailyUnwindResponse:
-    """Defensive JSON parse — always returns a valid object (mirrors _parse_debrief)."""
     raw = (text or "").strip()
     cleaned = raw
     if cleaned.startswith("```"):
@@ -2132,9 +2013,6 @@ def daily_unwind(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """AI coaching for one day: reviews today's sessions and compares them against the
-    user's learned patterns, recent daily average, and most-focused hours. Best-effort
-    + defensive parse; the recap is saved by the frontend via the work-period upsert."""
     if _client is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set in .env")
 
@@ -2271,9 +2149,6 @@ Reply with ONLY valid JSON, no markdown, exactly:
         if req.plan_reality_summary:
             parsed.plan_echo = _plan_echo(req.plan_reality_summary)
         else:
-            # No plan today → no "Plan vs reality" line, period. The model is told
-            # to leave plan_echo empty but doesn't always obey (it repurposed the
-            # field for goal context in testing) — enforce it in code.
             parsed.plan_echo = ""
         return parsed
     except Exception:
@@ -2286,11 +2161,6 @@ def plan_advice(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """AI scheduling advice for a day's plan: suggests WHEN to do each task (harder tasks
-    matched to historically higher-focus hours) and gently flags over-planning. Reads the
-    hourly focus profile + learned patterns + About me. Planning-specific — NOT gated on
-    tracked time (a morning plan has none). Best-effort + defensive parse + deterministic
-    validation; the advice is saved by the frontend via the plan upsert."""
     MAX_PLAN_TASKS = 30
     entries_by_id = {}
     for e in req.entries:
@@ -2338,8 +2208,6 @@ def plan_advice(
         for e in entries
     )
 
-    # Goal deadlines for tasks in THIS plan (computed; input-only, skipped when
-    # none of today's tasks serve a goal). First cut line if planner output degrades.
     goal_block = ""
     entry_ids = [e.task_id for e in entries]
     linked = (
@@ -2412,8 +2280,6 @@ POMO_FOCUS_MIN, POMO_FOCUS_MAX = 10, 55
 POMO_BREAK_MIN, POMO_BREAK_MAX = 5, 15
 
 def _week_summary(days: list) -> tuple[str, int]:
-    """Build a week block from the per-day data the frontend sends, folding in any
-    saved daily recap. Returns (text, total_seconds)."""
     total = 0
     per_day = []
     for d in days:
@@ -2445,8 +2311,6 @@ def _week_summary(days: list) -> tuple[str, int]:
     return text, total
 
 def _month_summary(weeks: list) -> tuple[str, int]:
-    """Build a month block from the per-week data the frontend sends, folding in any
-    saved weekly recap. Returns (text, total_seconds)."""
     total = 0
     per_week = []
     for w in weeks:
@@ -2482,8 +2346,6 @@ def _month_summary(weeks: list) -> tuple[str, int]:
     return text, total
 
 def _parse_weekly_unwind(text: str) -> schemas.WeeklyUnwindResponse:
-    """Defensive JSON parse — always returns a valid object; clamps the pomodoro
-    suggestion to the allowed bounds."""
     raw = (text or "").strip()
     cleaned = raw
     if cleaned.startswith("```"):
@@ -2520,8 +2382,6 @@ def _parse_weekly_unwind(text: str) -> schemas.WeeklyUnwindResponse:
         check = None
         c = h.get("check") if isinstance(h.get("check"), dict) else None
         if c is not None:
-            # Unknown template or unusable params → the habit becomes manual
-            # (check stays None) rather than dropping the whole proposal.
             spec = crud.clean_check_spec(c.get("template"), c.get("params"))
             if spec:
                 check = schemas.HabitCheckSpec(**spec)
@@ -2545,8 +2405,6 @@ def _parse_weekly_unwind(text: str) -> schemas.WeeklyUnwindResponse:
         return schemas.WeeklyUnwindResponse(summary=fallback)
 
 def _parse_monthly_unwind(text: str) -> schemas.MonthlyUnwindResponse:
-    """Defensive JSON parse — always returns a valid object; on any problem, fall
-    back to putting the raw text in `summary` so the UI never breaks."""
     raw = (text or "").strip()
     cleaned = raw
     if cleaned.startswith("```"):
@@ -2582,9 +2440,6 @@ def weekly_unwind(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """AI coaching for a week: reasons over the week's days (using saved daily recaps
-    where present), the learned patterns, best hours, and prior weeks (trend), and may
-    recommend new Pomodoro timings. Best-effort + defensive parse."""
     if _client is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set in .env")
 
@@ -2639,9 +2494,6 @@ def weekly_unwind(
     about = _about_block(db, workspace)
     active_habits = [h for h in crud.get_habits(db, workspace) if h.status == "active"]
     habits_block = _weekly_habit_lines(db, workspace, req.week_key)
-    # One IN query (not the daily endpoint's per-id loop — up to 500 ids here).
-    # Anchor: the workspace fallback, NEVER req.week_key — that's the week's
-    # Monday, which would skew days-left by up to 6 days.
     week_sessions = None
     if req.session_ids:
         week_sessions = (
@@ -2758,9 +2610,6 @@ def monthly_unwind(
     db: Session = Depends(get_db),
     workspace: models.DemoWorkspace = Depends(get_workspace),
 ):
-    """AI coaching for a month: reasons over the month's weeks (using saved weekly
-    recaps where present), the learned patterns, best hours, and prior months (trend).
-    Zoomed-out voice, no Pomodoro tuning (that stays weekly). Best-effort + defensive parse."""
     if _client is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set in .env")
 

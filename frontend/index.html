@@ -55,8 +55,6 @@
     </div>
     <div id="trail-browse-foot"></div>
   </section>
-  <!-- Active goals at a glance; hidden until goals load (and on any load failure —
-       this strip must never break the Today page). Whole card opens the Goals page. -->
   <a id="goal-strip" class="card card-hover goal-strip" href="goals.html" style="display:none" aria-label="Your goals">
     <div id="goal-strip-rows" class="flex flex-col gap-1 min-w-0 flex-1"></div>
     <span class="text-xs shrink-0" style="color:var(--text-muted)">Goals →</span>
@@ -80,8 +78,6 @@
                       placeholder="Please add context or details about this task."
                       style="resize:vertical;min-height:58px;line-height:1.5" aria-label="Task description"></textarea>
           </div>
-          <!-- Hidden until at least one active goal exists — no empty dropdown for
-               people who don't use goals (progressive disclosure). -->
           <div id="task-goal-wrap" style="display:none">
             <label for="task-goal" class="block text-xs font-medium mb-1.5" style="color:var(--text-muted)">
               Goal <span class="font-normal" style="color:var(--text-muted)"> — optional; focused time on this task counts toward it</span>
@@ -105,7 +101,6 @@
       <div class="task-stack">
         <p class="section-label">Tasks</p>
         <div id="task-list" class="flex flex-col gap-3"></div>
-        <!-- Hidden until the first load resolves so a slow backend never flashes a false "No active tasks". -->
         <div id="active-empty" class="flex flex-col items-center gap-2 text-center py-10" style="display:none">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8M13 12h8M13 18h8"/></svg>
           <p class="font-medium text-sm" style="color:var(--text)">No active tasks</p>
@@ -287,9 +282,6 @@
   let _tasks = [];
   let editId = null;
 
-  // Active goals, loaded ONCE up front (never throws — [] on failure). Awaited by
-  // loadTasks so goal chips and the composer's goal dropdown are ready on first
-  // render; the goal strip reuses the same list.
   let _goals = [];
   const _goalsReady = (async () => {
     try { _goals = (await getGoals()).filter(g => g.status === 'active'); } catch { _goals = []; }
@@ -369,7 +361,7 @@
 
   async function loadTasks() {
     try {
-      await _goalsReady; // goal chips + dropdowns need the goal titles on first render
+      await _goalsReady;
       const tasks = await getTasks();
       _tasks = tasks;
       const todayKey = window.PlanningInsights ? PlanningInsights.localDayKey() : null;
@@ -585,7 +577,6 @@
     const newGoalId = parseInt(document.getElementById('edit-goal').value, 10) || null;
     try {
       await updateTask(editId, { name, description });
-      // Goal link changes ride the goal routes (goal_id isn't a task-PATCH field).
       if (task && newGoalId !== (task.goal_id || null)) {
         if (newGoalId) await attachGoalTask(newGoalId, editId);
         else if (task.goal_id) await detachGoalTask(task.goal_id, editId);
@@ -607,8 +598,8 @@
   const trailCard = document.getElementById('trail-card');
   const trailMap = document.getElementById('trail-map');
   let _trailModel = null;
-  let _browseKey = null;      // YYYY-MM being browsed; null = the live current month
-  let _trailNav = null;       // the current buildTrailNav result (drives the arrows)
+  let _browseKey = null;
+  let _trailNav = null;
   let _workPeriods = [];
   let _league = null;
   let _todayWorkPeriod = null;
@@ -629,7 +620,6 @@
     });
   }
 
-  // Sync the static chrome (month label, arrow states, unwind foot link) to a nav result.
   function updateTrailChrome(nav) {
     _trailNav = nav;
     document.getElementById('trail-month-name').textContent = nav.label;
@@ -641,9 +631,6 @@
       : '';
   }
 
-  // Browse the card to any month (arrows + atlas tiles land here). The browsed
-  // model is stored in _trailModel so a resize re-render stays on this month.
-  // Never consumes promotion/level-up markers — those belong to refreshTrail only.
   function showTrailMonth(monthKey) {
     if (!window.JourneyMap) return;
     const nav = JourneyMap.buildTrailNav(_allSessions, monthKey, currentDate());
@@ -654,7 +641,7 @@
           sessions: _allSessions,
           now: new Date(Number(nav.monthKey.slice(0, 4)), Number(nav.monthKey.slice(5, 7)) - 1, 1),
           completed: true,
-          league: _league, // the badge is "you, now" — visible on every month
+          league: _league,
           landmarks: _landmarks,
         });
     trailMap.style.opacity = '0';
@@ -689,7 +676,6 @@
       return;
     }
     const todayKey = PlanningInsights.localDayKey();
-    // The trail still renders if any call fails (no unwind signal / badge / cairns).
     const [periodsResult, leagueResult, landmarksResult] = await Promise.allSettled([
       getWorkPeriods(), getLeague(), getLandmarks(),
     ]);
@@ -699,12 +685,12 @@
     _landmarks = landmarksResult.status === 'fulfilled' ? (landmarksResult.value || []) : [];
     const pendingPromotion = localStorage.getItem('fb-pending-promotion');
     const pendingLevelUp = localStorage.getItem('fb-pending-levelup');
-    _browseKey = null; // a refresh always returns to the live current month
+    _browseKey = null;
     _trailModel = buildLiveTrailModel(!!pendingLevelUp && !pendingPromotion);
     trailCard.style.display = 'block';
     JourneyMap.render(trailMap, _trailModel);
     updateTrailChrome(JourneyMap.buildTrailNav(_allSessions, null, currentDate()));
-    if (_trailModel.badge) _trailModel.badge.pulse = false; // don't replay on resize re-renders
+    if (_trailModel.badge) _trailModel.badge.pulse = false;
     if (pendingLevelUp) { try { localStorage.removeItem('fb-pending-levelup'); } catch {} }
     if (pendingPromotion && _trailModel.badge) {
       try { localStorage.removeItem('fb-pending-promotion'); } catch {}
@@ -712,8 +698,6 @@
         onImpact: () => { try { if (window.playChime) playChime(); } catch {} },
       });
     }
-    // Landmarks self-heal/backfill (fire-and-forget): anything history has earned
-    // but the store lacks gets synced; a first-ever fill stays silent (backend rule).
     PlanningInsights.detectAndSyncLandmarks({
       sessions: _allSessions,
       workPeriods: _workPeriods,
@@ -730,9 +714,6 @@
     }, 150);
   });
 
-  // The goal strip loads OUTSIDE the fail-fast Promise.all and hides itself on
-  // any failure — it must never break the Today page. It reuses the tasks and
-  // sessions the page already fetched (_tasks/_allSessions), adding only getGoals().
   async function loadGoalStrip() {
     const strip = document.getElementById('goal-strip');
     if (!strip) return;

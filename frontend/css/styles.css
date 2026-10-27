@@ -25,9 +25,6 @@
 
   --accent:      #5e8a65;
   --accent-hover:#4a7252;
-  /* Filled surfaces that carry white text need a darker green than --accent
-     (white on #5e8a65 is only 3.96:1). These stay the same in both themes
-     because they are always paired with white text. */
   --accent-strong:#4a7252;
   --accent-strong-hover:#3d6045;
 
@@ -93,8 +90,6 @@
   --hero-label:  rgba(245, 241, 236, 0.6);
 }
 
-/* Keyboard/screen-reader "skip to content" link: hidden off-screen until it
-   receives focus, then slides into the top-left corner as the first tab stop. */
 .skip-link {
   position: absolute;
   left: 8px;
@@ -282,8 +277,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 }
 .btn-ghost:active { box-shadow: none; }
 
-/* Secondary unwind entries: accent-toned ghost so the current period's solid
-   button stays the one primary CTA on the analytics screen. */
 .btn-ghost.btn-ghost-accent {
   color: var(--accent-hover);
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
@@ -405,7 +398,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   background: var(--surface-3);
   color: var(--text);
 }
-/* "Last month" — a distinct accent pill (opens the monthly unwind for last month) */
 .page-nav a.nav-monthly {
   background: var(--accent-strong);
   color: #fff;
@@ -539,8 +531,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   transition: background 0.15s, border-color 0.15s;
   position: relative;
 }
-/* Invisible hit-area extension so the drawn 22px circle meets the 44px touch minimum.
-   ::before, because .check.done::after already draws the checkmark. */
 .check::before {
   content: '';
   position: absolute;
@@ -556,7 +546,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   font-weight: 800;
 }
 
-/* --- Habits page (habit tracker v1) --------------------------------------- */
 .habit-row {
   display: flex;
   align-items: flex-start;
@@ -564,7 +553,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   padding: 0.9rem 1.1rem;
 }
 .habit-row .check { margin-top: 2px; }
-/* The auto-habit indicator reuses the .check look but is not a control. */
 .habit-auto { cursor: default; }
 .habit-auto.done { background: var(--sage); border-color: var(--sage); }
 .habit-mode-chip {
@@ -582,8 +570,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   color: var(--accent-hover);
   background: var(--sage-soft);
 }
-/* Last-7-days density dots: completed = sage fill, open = neutral outline,
-   pre-adoption = blank spacer. Deliberately no chain lines and nothing red. */
 .habit-dots { display: inline-flex; gap: 4px; align-items: center; }
 .habit-dot {
   width: 9px;
@@ -594,10 +580,27 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
 }
 .habit-dot.on { background: var(--sage); border-color: var(--sage); }
 .habit-dot.spacer { border-color: transparent; }
+.habit-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+}
+.habit-add-field { display: block; min-width: 0; flex: 1 1 100%; }
+.habit-add-field .input { width: 100%; }
+@media (min-width: 640px) {
+  #habit-check-wrap { flex: 1 1 0; }
+  #habit-min-wrap, #habit-time-wrap { flex: 0 0 9rem; }
+}
+.habit-add-foot {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
 
-/* --- Goals page (goals v1) ------------------------------------------------ */
-/* Disabled buttons must LOOK disabled (audit convention: reduced opacity +
-   cursor change) — the goal cap disables Add goal / Reopen. */
 .btn-primary:disabled,
 .btn-ghost:disabled {
   opacity: 0.45;
@@ -610,14 +613,10 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   padding: 0.9rem 1.1rem;
 }
 .goal-meta { font-variant-numeric: tabular-nums; }
-/* Progress block: the time-invested figure is the card's visual anchor, with a
-   14-day worked-days dot strip beside it (reuses .habit-dots). Deliberately no
-   percent bar — goals carry no time estimate, so a fill level would be a made-up
-   number. Both columns bottom-align so labels sit on one baseline. */
 .goal-progress {
   display: flex;
   align-items: flex-end;
-  flex-wrap: wrap;          /* the figure and the dot strip stack on narrow screens */
+  flex-wrap: wrap;
   gap: 0.5rem 1.5rem;
   margin: 0.65rem 0 0.15rem;
 }
@@ -647,14 +646,11 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   align-items: flex-end;
   gap: 0.4rem;
 }
-/* On narrow screens the card stacks and the actions become one row. */
 @media (max-width: 560px) {
   .goal-row { flex-direction: column; }
   .goal-actions { flex-direction: row; align-items: center; width: 100%; }
   .goal-actions > .flex { margin-left: auto; }
 }
-/* Small goal chip on Today's task cards — same pill language as the plan chip,
-   neutral tone so "Next up" keeps its emphasis. */
 .goal-link-chip {
   display: inline-flex;
   align-items: center;
@@ -696,9 +692,7 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   border-radius: 50%;
 }
 .goal-chip-x:hover { color: var(--text); }
-/* Invisible hit area so the tiny × meets the 44px-ish target rule. */
 .goal-chip-x::before { content: ''; position: absolute; inset: -8px; }
-/* The Today strip: one slim row per active goal, whole card links to goals.html. */
 .goal-strip {
   align-items: center;
   gap: 1rem;
@@ -963,8 +957,6 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   transition: background 0.15s, color 0.15s;
   position: relative;
 }
-/* Hit-area extension: -6px keeps adjacent edit/delete targets from overlapping
-   inside the cards' 12px flex gap while reaching ~42px effective size. */
 .icon-btn::before {
   content: '';
   position: absolute;
@@ -1397,34 +1389,20 @@ h1, h2, h3, .serif { font-family: var(--font-serif); letter-spacing: 0; }
   color: var(--text);
   font-size: 0.85rem;
 }
-
-input[type="range"].fb-range {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--surface-2);
-  outline: none;
-  cursor: pointer;
+.plan-field-head:has(.plan-min-field) { align-items: center; }
+.plan-min-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
-input[type="range"].fb-range:focus-visible { box-shadow: 0 0 0 3px var(--sage-soft); }
-input[type="range"].fb-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: var(--sage);
-  border: 2px solid var(--bg);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-}
-input[type="range"].fb-range::-moz-range-thumb {
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: var(--sage);
-  border: 2px solid var(--bg);
-  cursor: pointer;
+.plan-min-field .plan-field-val { color: var(--text-muted); font-weight: 500; }
+.plan-min-input.input {
+  width: 4.75rem;
+  padding: 0.35rem 0.55rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .seg {
@@ -2068,8 +2046,6 @@ input[type="range"].fb-range::-moz-range-thumb {
     overflow-x: auto;
     justify-content: flex-start;
     scrollbar-width: none;
-    /* Right-edge fade: hints that more items (the settings gear) sit past the
-       edge, since the scrollbar is hidden. */
     -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent);
     mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent);
   }
@@ -2350,7 +2326,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   }
 }
 
-/* ---- The Trail (monthly journey strip on Today) ---- */
 .trail-card {
   margin-bottom: 20px;
   padding: 14px 18px 10px;
@@ -2375,8 +2350,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   stroke: var(--surface);
   stroke-width: 2;
 }
-/* Landmarks (Chunk 5): quiet stacked-stone cairns above their camp.
-   A muted stone tone from the theme's own text/surface mix — calm in both themes. */
 .trail-cairn ellipse {
   fill: color-mix(in srgb, var(--text) 40%, var(--surface));
   stroke: var(--surface);
@@ -2454,7 +2427,6 @@ input[type="range"].fb-range::-moz-range-thumb {
 }
 .trail-note-unwind:hover { text-decoration: underline; }
 
-/* Monthly Unwind — step 1 stat strip (focus rate / focused time / camps) */
 .mu-stats {
   display: flex;
   gap: 10px;
@@ -2484,7 +2456,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   color: var(--text-muted);
 }
 
-/* ---- The Trail: league badge (Chunk 2) ---- */
 .trail-row {
   display: flex;
   align-items: center;
@@ -2513,7 +2484,7 @@ input[type="range"].fb-range::-moz-range-thumb {
   inset: 6px;
   width: 44px;
   height: 44px;
-  border-radius: 50%;   /* circle-crop hides any opaque corners in the art */
+  border-radius: 50%;
   object-fit: cover;
 }
 .trail-badge-fallback {
@@ -2530,7 +2501,7 @@ input[type="range"].fb-range::-moz-range-thumb {
   inset: 0;
   width: 56px;
   height: 56px;
-  transform: rotate(-90deg); /* arc starts at 12 o'clock */
+  transform: rotate(-90deg);
 }
 .trail-badge-arc .arc-track {
   fill: none;
@@ -2569,7 +2540,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   60%  { transform: scale(1); }
 }
 
-/* ---- The badge slam (rank-name promotions) ---- */
 .trail-slam-overlay {
   position: fixed;
   inset: 0;
@@ -2596,7 +2566,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   .trail-pip.pip-pulse { animation: none; }
 }
 
-/* ---- The League breakdown modal (click the badge) ---- */
 .trail-badge { cursor: pointer; }
 .trail-badge:focus-visible {
   outline: 2px solid var(--accent);
@@ -2673,7 +2642,6 @@ input[type="range"].fb-range::-moz-range-thumb {
 }
 .league-next svg { width: 15px; height: 15px; flex: none; }
 .league-summit { color: var(--text); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
-/* League progress bar — how much time is left to the next level/rank */
 .league-progress {
   width: 100%;
   max-width: 380px;
@@ -2800,7 +2768,6 @@ input[type="range"].fb-range::-moz-range-thumb {
   border-top: 1px solid var(--border);
 }
 
-/* ---- The Trail: region browsing + the Atlas (Chunk 4) ---- */
 .trail-month-label {
   display: flex;
   align-items: center;
@@ -2823,7 +2790,7 @@ input[type="range"].fb-range::-moz-range-thumb {
 .trail-browse { position: relative; }
 .trail-arrow {
   position: absolute;
-  top: 45px; /* vertical center of the 90px SVG band */
+  top: 45px;
   transform: translateY(-50%);
   width: 28px;
   height: 28px;

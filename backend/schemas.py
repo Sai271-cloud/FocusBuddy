@@ -169,15 +169,10 @@ class ProfileOut(BaseModel):
         from_attributes = True
 
 class LeagueRank(BaseModel):
-    """One rank in the ladder: its name and the points (minutes) where each of
-    its 3 levels begins — e.g. Walker → [900, 1500, 2100]."""
     rank_name: str
     levels: list[int] = []
 
 class LeagueStatus(BaseModel):
-    """Current league standing, derived from ratcheted lifetime focused minutes.
-    `ladder` is filled by GET /league (for the breakdown modal); the sync
-    response leaves it empty to stay lean."""
     points_min: int = 0
     rank_name: str = 'Wanderer'
     level: int = 1
@@ -185,18 +180,12 @@ class LeagueStatus(BaseModel):
     ladder: list[LeagueRank] = []
 
 class LeagueSyncResult(LeagueStatus):
-    """End-of-session sync result. promoted = the rank NAME changed this session
-    (the badge-slam moment); leveled_up = a quieter level gain within the rank.
-    Both stay false on a first-ever backfill (stored points were 0 before)."""
     promoted: bool = False
     leveled_up: bool = False
     previous_rank_name: str = ''
     previous_level: int = 0
 
 class LandmarkIn(BaseModel):
-    """One landmark the frontend detected. `code` is checked against the crud
-    whitelist in the route (so the list lives in one place); `day_key` is the
-    frontend-computed local day it was earned on."""
     code: str = Field(..., min_length=1, max_length=40)
     day_key: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
 
@@ -211,28 +200,19 @@ class LandmarkSyncRequest(BaseModel):
     earned: list[LandmarkIn] = Field(default_factory=list, max_length=40)
 
 class LandmarkSyncResult(BaseModel):
-    """Sync result. `newly_earned` lists codes stored by THIS call — except on a
-    first-ever fill of an empty store, which is a silent backfill (mirrors the
-    league's first-sync rule) and reports []."""
     landmarks: list[LandmarkOut] = []
     newly_earned: list[str] = []
 
 class HabitIn(BaseModel):
-    """One habit being adopted (from the starter catalog or a coach proposal).
-    `check_json` is a JSON string {"template","params"} for auto habits; the
-    route validates the template against crud.HABIT_TEMPLATES (one whitelist)."""
     code: str = Field(..., min_length=1, max_length=60)
     title: str = Field(..., min_length=1, max_length=60)
     why: str = Field('', max_length=200)
     kind: str = Field(..., pattern=r"^(auto|manual)$")
     check_json: Optional[str] = Field(None, max_length=400)
-    source: str = Field('catalog', pattern=r"^(catalog|coach)$")
+    source: str = Field('catalog', pattern=r"^(catalog|coach|custom)$")
     created_day_key: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 class HabitOut(BaseModel):
-    """A habit plus its adherence facts. `check_days` (all completed local days,
-    sorted ascending) and `done_count` are computed by the route from
-    habit_checks — the ratcheting lifetime count is just the row count."""
     id: int
     code: str
     title: str
@@ -259,24 +239,17 @@ class HabitCheckSyncResult(BaseModel):
     inserted: int = 0
 
 class GoalCreate(BaseModel):
-    """One goal being created. Day keys are frontend-computed local YYYY-MM-DD
-    (the demo frozen clock rides on the frontend's date helpers)."""
     title: str = Field(..., min_length=1, max_length=80)
     target_day_key: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     created_day_key: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 class GoalUpdate(BaseModel):
-    """Preserve-on-None update: only fields the caller sends are changed. Marking
-    done sends status='done' + done_day_key together; reopening sends
-    status='active' (the route re-checks the active-goal cap on that transition)."""
     title: Optional[str] = Field(None, min_length=1, max_length=80)
     target_day_key: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     status: Optional[Literal['active', 'done', 'archived']] = None
     done_day_key: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 class GoalOut(BaseModel):
-    """A goal as stored. No computed totals here — the frontend derives task links
-    (TaskOut.goal_id) and focused time from data it already fetches."""
     id: int
     title: str
     target_day_key: str
@@ -330,8 +303,6 @@ class WeeklyDay(BaseModel):
 class WeeklyUnwindRequest(BaseModel):
     week_key: Optional[str] = None
     days: list[WeeklyDay] = []
-    # The week's session ids, so the goal fact block can state this week's focused
-    # time per goal (the backend never buckets sessions by local day itself).
     session_ids: list[int] = Field(default_factory=list, max_length=500)
     pomo_focus_min: Optional[int] = None
     pomo_break_min: Optional[int] = None
@@ -344,16 +315,10 @@ class PomodoroSuggestion(BaseModel):
     why: str = ''
 
 class HabitCheckSpec(BaseModel):
-    """The machine-checkable part of a proposed habit — a template name from
-    crud.HABIT_TEMPLATES plus its params. A proposal without one (check=None)
-    becomes a manually ticked habit."""
     template: str = ''
     params: dict = {}
 
 class HabitProposal(BaseModel):
-    """At most one habit the weekly unwind proposes. Rides the weekly response
-    like PomodoroSuggestion; _enforce_weekly zeroes it on thin/healthy/
-    measurement-limited weeks and when it duplicates an active habit."""
     propose: bool = False
     title: str = ''
     why: str = ''

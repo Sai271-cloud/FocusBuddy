@@ -31,9 +31,9 @@
       </div>
     </div>
     <div class="flex items-center gap-3">
-      <div class="flex items-center gap-1.5 text-xs" style="color:var(--text-muted)">
+      <div id="status-pill" class="flex items-center gap-1.5 text-xs hidden" style="color:var(--text-muted)">
         <span id="status-dot" class="live-dot" aria-hidden="true"></span>
-        <span id="status-text">Live</span>
+        <span id="status-text"></span>
       </div>
       <a href="#" id="about-nav" role="button" class="btn-ghost" style="padding:0.4rem 0.8rem;font-size:0.8rem;min-height:40px">About me</a>
       <div class="settings-menu" style="position:relative">
@@ -184,7 +184,6 @@
     <div id="debrief-body">
       <p class="text-sm" style="color:var(--text-muted);animation:pulse 1.4s ease-in-out infinite">Analyzing your session…</p>
     </div>
-    <!-- League note lives OUTSIDE #debrief-body so debrief re-renders can't wipe it -->
     <p id="debrief-league-note" class="text-sm" style="display:none;margin:14px 0 0;padding:8px 10px;border-radius:8px;background:rgba(94,138,101,0.12);color:var(--text)"></p>
     <div class="flex justify-end" style="margin-top:18px">
       <button id="debrief-done" class="btn-primary" style="min-height:44px">Done</button>
@@ -194,7 +193,6 @@
 
 <script src="js/api.js"></script>
 <script src="js/notify.js"></script>
-<!-- planning-insights + journey-map: pure helpers only here (landmark detection after the save) -->
 <script src="js/planning-insights.js"></script>
 <script src="js/journey-map.js"></script>
 <script src="js/session-replay.js"></script>
@@ -367,7 +365,7 @@
       };
     }
     const shorts = { 429: 'Rate-limited', 401: 'Key problem', 403: 'Key problem',
-                     404: 'Model problem', 503: 'AI overloaded', 504: 'AI slow' };
+                     404: 'Model problem', 503: 'AI overloaded' };
     return {
       key: 'http-' + err.status,
       short: shorts[err.status] || 'AI unavailable',
@@ -378,13 +376,11 @@
   function setStatus(ok, err) {
     const dot = document.getElementById('status-dot');
     const txt = document.getElementById('status-text');
-    // While the camera is down the pill must keep saying so — "Live" would
-    // contradict the "Camera off" state badge (detection isn't running).
     if (cameraDown) return;
+    if (!ok && err && err.status === 504) return;
     if (ok) {
       aiEverLive = true;
-      dot.style.background = '';
-      txt.textContent = 'Live';
+      document.getElementById('status-pill').classList.add('hidden');
       if (lastAiErrorKey) {
         lastAiErrorKey = null;
         if (window.showToast) showToast('Focus detection reconnected.');
@@ -394,6 +390,7 @@
     const info = aiErrorInfo(err);
     dot.style.background = 'var(--ochre)';
     txt.textContent = info.short;
+    document.getElementById('status-pill').classList.remove('hidden');
     if (!aiEverLive) {
       const badge = document.getElementById('state-badge');
       badge.className = 'badge badge-neutral state-badge-lg';
@@ -610,6 +607,7 @@
     cameraDown = true;
     document.getElementById('status-dot').style.background = 'var(--ochre)';
     document.getElementById('status-text').textContent = 'Camera off';
+    document.getElementById('status-pill').classList.remove('hidden');
     if (window.showToast) showToast('Focus detection is off — ' + (name === 'NotFoundError' ? 'no camera found.' : 'camera unavailable.'), { danger: true });
   }
 
@@ -702,7 +700,6 @@
       '<p class="section-label" style="margin:0 0 6px">AI debrief</p>' +
       '<p class="text-sm" style="color:var(--text-muted);animation:pulse 1.4s ease-in-out infinite">Analyzing your session...</p>';
     debriefOverlay.style.display = 'flex';
-    // No release needed: every exit from the debrief navigates to index.html.
     trapModalFocus(debriefOverlay.querySelector('.modal'), null);
     document.getElementById('debrief-done').focus();
   }
@@ -768,8 +765,6 @@
       learnFromSession(sessionId, startH, endH).catch(() => {});
     } catch (e) {}
 
-    // League sync — fire-and-forget like /learn; a failure changes nothing.
-    // A rank promotion sets the marker the Today page uses to play the badge slam.
     try {
       syncLeague().then(league => {
         if (!league) return;
@@ -790,7 +785,6 @@
       }).catch(() => {});
     } catch (e) {}
 
-    // Landmark sync — fire-and-forget; a new one shows a soft toast (Chunk 5).
     try {
       const todayKey = PlanningInsights.localDayKey();
       Promise.all([getSessions(), getWorkPeriods(), getPlan(todayKey).catch(() => null)])

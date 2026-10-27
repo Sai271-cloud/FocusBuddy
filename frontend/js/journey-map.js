@@ -1,16 +1,11 @@
-// The Trail (Chunk 1): a calm monthly journey strip for the Today page.
-// Two layers, same pattern as session-replay.js:
-//   buildTrailModel(...)  — pure data → model, no DOM (node-testable)
-//   render(container, model) — draws the SVG + caption from the model
 (function () {
   var PATH_SAMPLES = 120;
   var SVG_HEIGHT = 90;
   var X_PAD = 26;
-  var NO_PLAN_REF_MIN = 60; // soft reference only — never shown as a target
+  var NO_PLAN_REF_MIN = 60;
 
   function pad(n) { return String(n).padStart(2, '0'); }
 
-  // --- month-key-seeded curve (each month bends differently) ---
 
   function hashString(str) {
     var h = 1779033703 ^ str.length;
@@ -42,7 +37,6 @@
     };
   }
 
-  // y (in a 0..SVG_HEIGHT band) for a fraction 0..1 along the trail
   function curveY(frac, curve) {
     var x = frac * 1000;
     return SVG_HEIGHT / 2 +
@@ -50,7 +44,6 @@
       curve.a2 * Math.sin(x * curve.f2 + curve.p2);
   }
 
-  // --- small formatters ---
 
   function fmtDur(minutes) {
     var m = Math.max(0, Math.round(minutes));
@@ -74,9 +67,6 @@
     return when + ' · ' + fmtDur(focusedMin) + ' focused';
   }
 
-  // --- landmarks (Chunk 5) ---
-  // The FRONTEND detects landmarks (it owns the local-day rules); the backend
-  // only stores them, insert-only. Codes must match crud.LANDMARK_CODES.
 
   var LANDMARK_LABELS = {
     'first-camp': 'The first camp',
@@ -100,8 +90,6 @@
     try { return JSON.parse(text); } catch (e) { return null; }
   }
 
-  // ≥25 consecutive per-minute 'focused' entries with contiguous minute values
-  // (a pause or state change breaks the run).
   function hasUnbroken25(timeline) {
     var run = 0, prevMinute = null;
     for (var i = 0; i < (timeline || []).length; i += 1) {
@@ -117,8 +105,6 @@
     return false;
   }
 
-  // Pure detector: everything this history has earned, as [{code, day_key}].
-  // day_key = the local day each landmark was earned on (places its cairn).
   function buildLandmarks(opts) {
     var PI = window.PlanningInsights;
     var sessions = (opts && opts.sessions) || [];
@@ -136,7 +122,6 @@
       if (campDays.length >= n) add(code, campDays[n - 1]);
     });
 
-    // First 7 consecutive camp days — earned on the day that completed the run.
     var run = 1;
     for (var i = 1; i < campDays.length; i += 1) {
       var prev = PI.dateFromKey(campDays[i - 1]);
@@ -145,12 +130,10 @@
       if (run >= 7) { add('streak-7', campDays[i]); break; }
     }
 
-    // First local day with ≥2h focused.
     for (var d = 0; d < campDays.length; d += 1) {
       if (byKey[campDays[d]] >= 7200) { add('deep-day', campDays[d]); break; }
     }
 
-    // First session with a 25-minute unbroken focused run in its timeline.
     var ordered = sessions.slice().sort(function (a, b) {
       return new Date(a.started_at) - new Date(b.started_at);
     });
@@ -161,7 +144,6 @@
       }
     }
 
-    // First unwind of each kind — earned the day the unwind was saved.
     ['day', 'week', 'month'].forEach(function (kind) {
       var rows = workPeriods.filter(function (p) {
         return p.kind === kind && ((p.ai_recap || '') !== '' || (p.reflection || '') !== '');
@@ -172,7 +154,6 @@
       add(code, kind === 'day' ? rows[0].period_key : PI.localDayKey(new Date(rows[0].ended_at)));
     });
 
-    // Plans: today's live plan, or any saved day whose plan-vs-reality had a plan.
     var planEntries = opts && opts.todayPlan ? PI.parsePlanEntries(opts.todayPlan) : [];
     var realityDays = workPeriods.filter(function (p) {
       var r = parseJsonQuiet(p.plan_reality_json);
@@ -181,7 +162,6 @@
     if (planEntries.length) add('first-plan', PI.localDayKey(now));
     else if (realityDays.length) add('first-plan', realityDays[0].period_key);
 
-    // First saved day where actual landed within 20% of the plan.
     for (var r = 0; r < realityDays.length; r += 1) {
       var rep = parseJsonQuiet(realityDays[r].plan_reality_json);
       var planned = (rep && rep.planned_total_min) || 0;
@@ -194,9 +174,6 @@
     return earned;
   }
 
-  // Anchor earned landmarks to this month's packed camps: the camp of the earned
-  // day, else the most recent camp before it in the same month, else undrawn.
-  // Several landmarks on one camp share a single cairn (joined label).
   function cairnsForCamps(landmarks, camps, monthKey) {
     var byCamp = {};
     (landmarks || []).forEach(function (lm) {
@@ -218,7 +195,6 @@
     });
   }
 
-  // --- the pure model ---
 
   function focusedSecondsByDay(sessions) {
     var byKey = {};
@@ -229,7 +205,6 @@
     return byKey;
   }
 
-  // Consecutive camp days ending today (today counts once it has ≥1 focused minute).
   function streakDays(byKey, todayKey) {
     var PI = window.PlanningInsights;
     var count = (byKey[todayKey] || 0) >= 60 ? 1 : 0;
@@ -248,8 +223,6 @@
       .reduce(function (sum, e) { return sum + (e.estimate_min || 0); }, 0);
   }
 
-  // Split today's focused minutes into before/after the daily unwind,
-  // so the planted camp sits where the walker stood when the day was closed.
   function splitAroundUnwind(sessions, todayKey, unwindAt) {
     var PI = window.PlanningInsights;
     var pre = 0, post = 0;
@@ -273,13 +246,10 @@
     var monthKey = year + '-' + pad(month + 1);
     var todayKey = PI.localDayKey(now);
     var segLen = 1 / daysInMonth;
-    // completed: render a whole (finished) month read-only — every day is past,
-    // so there is no walker, ring, note, or badge; camps only.
     var completed = !!opts.completed;
 
     var byKey = focusedSecondsByDay(sessions);
 
-    // Past camps, packed consecutively — missed days leave no gap.
     var camps = [];
     var lastPastDay = completed ? daysInMonth + 1 : todayDay;
     for (var day = 1; day < lastPastDay; day += 1) {
@@ -305,9 +275,7 @@
     var targetRing = (!completed && planMin > 0) ? { pos: Math.min(segStart + segLen, 1), reached: false } : null;
 
     if (completed) {
-      // no walker on a finished month — the trail simply ends at the last camp
     } else if (unwound && todayFocusedMin >= 1) {
-      // The unwind plants today's camp where the walker stood.
       var split = splitAroundUnwind(sessions, todayKey, new Date(wp.ended_at));
       var campPos = Math.min(segStart + segLen * Math.min(split.preMin / refMin, 1), 1);
       camps.push({
@@ -317,7 +285,7 @@
         label: campLabel(todayKey, todayFocusedMin),
         planted: true,
       });
-      targetRing = null; // an unreached ring quietly disappears once camp is planted
+      targetRing = null;
       if (split.postMin >= 1) {
         walker = {
           pos: Math.min(campPos + segLen * Math.min(split.postMin / NO_PLAN_REF_MIN, 0.5), 1),
@@ -349,17 +317,10 @@
       walker = { pos: camps[camps.length - 1].pos, state: 'resting', label: 'Resting at camp' };
     }
 
-    // Cairns: earned landmarks anchored to this month's camps ([] when the
-    // caller passes no landmarks — e.g. atlas mini-tiles stay clean).
     var cairns = cairnsForCamps(opts.landmarks, camps, monthKey);
 
     var empty = !camps.length && todayFocusedMin < 1;
 
-    // The league badge (Chunk 2) — appears with the first lifetime focused minute.
-    // The badge is "you, now": pass league and it shows on ANY month (Chunk 4 lets
-    // you browse past regions with your current lifetime rank still visible).
-    // Callers that want a badge-less completed render (analytics, atlas tiles)
-    // simply pass no league.
     var league = opts.league || null;
     var badge = null;
     if (league && (league.points_min || 0) >= 1 && league.rank_name) {
@@ -368,11 +329,10 @@
         level: league.level || 1,
         levelProgress: Math.min(1, Math.max(0, league.level_progress || 0)),
         imgSrc: 'img/badges/' + String(league.rank_name).toLowerCase() + '.png',
-        pulse: !completed && !!opts.levelPulse, // one soft pip pulse after a level-up
+        pulse: !completed && !!opts.levelPulse,
       };
     }
 
-    // Caption: rank · month · camps · focused hrs · streak (streak only when ≥2)
     var monthSeconds = 0;
     var lastCountDay = completed ? daysInMonth : todayDay;
     for (var dd = 1; dd <= lastCountDay; dd += 1) {
@@ -381,17 +341,14 @@
     var caption = null;
     if (!empty) {
       var streak = completed ? 0 : streakDays(byKey, todayKey);
-      // Rank prefix only on the live month — a browsed May caption must not
-      // imply that rank was held back then.
       caption = ((!completed && badge) ? badge.rankName + ' ' + badge.level + ' · ' : '') +
         monthName(now) + ' · ' + camps.length + ' camp' + (camps.length === 1 ? '' : 's') +
         ' · ' + fmtHours(monthSeconds) + ' focused hrs' +
         (streak >= 2 ? ' · ' + streak + '-day streak' : '');
     }
 
-    // Month-boundary note: first 3 days, once, if last month had camps.
     var monthNote = null;
-    var noteMonthKey = null; // the finished month's YYYY-MM, for the "Unwind the month" link
+    var noteMonthKey = null;
     if (!completed && todayDay <= 3 && !opts.noteDismissed) {
       var lastMonthEnd = new Date(year, month, 0);
       var lmKey = lastMonthEnd.getFullYear() + '-' + pad(lastMonthEnd.getMonth() + 1);
@@ -423,12 +380,11 @@
       noteMonthKey: noteMonthKey,
       completed: completed,
       badge: badge,
-      league: league, // full /league response (incl. ladder) for the breakdown modal
+      league: league,
       empty: empty,
     };
   }
 
-  // --- renderer ---
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -453,7 +409,7 @@
   }
 
   function badgeHtml(badge) {
-    var C = 2 * Math.PI * 24; // progress-arc circumference (r=24 in a 56px box)
+    var C = 2 * Math.PI * 24;
     var pips = '';
     for (var i = 1; i <= 3; i += 1) {
       var cls = 'trail-pip' + (i <= badge.level ? ' filled' : '') +
@@ -500,8 +456,6 @@
         '" r="5"><title>' + esc(camp.label) + '</title></circle>');
     });
 
-    // Cairns: three quiet stacked stones just above their camp; the tooltip
-    // names the landmark(s). Same calm language as the rest of the map.
     (model.cairns || []).forEach(function (cairn) {
       var cp = pointAt(c, cairn.pos, width);
       parts.push('<g class="trail-cairn" transform="translate(' + cp.x.toFixed(1) + ' ' +
@@ -530,7 +484,7 @@
     }
 
     parts.push('</svg>');
-    parts.push('</div></div>'); // close .trail-svg-wrap + .trail-row
+    parts.push('</div></div>');
 
     var captionText = model.empty
       ? (model.completed
@@ -559,7 +513,6 @@
       });
     }
 
-    // If a badge image is missing, fall back to a plain disc with the rank initial.
     var badgeImg = container.querySelector('.trail-badge-img');
     if (badgeImg && model.badge) {
       badgeImg.addEventListener('error', function () {
@@ -570,7 +523,6 @@
       });
     }
 
-    // Clicking the badge (or Enter/Space on it) opens the league breakdown.
     var badgeEl = container.querySelector('.trail-badge');
     if (badgeEl) {
       badgeEl.addEventListener('click', function () { openLeagueModal(model, badgeEl); });
@@ -583,9 +535,7 @@
     }
   }
 
-  // --- the league breakdown modal (click the badge) ---
 
-  // Check icon shared by the league tiles (reached ranks) and atlas tiles (unwound months).
   var CHECK_SVG = '<svg class="league-check" viewBox="0 0 20 20" aria-hidden="true">' +
     '<path d="M5 10.5l3.2 3.2L15 6.8" fill="none" stroke="currentColor" stroke-width="2.2" ' +
     'stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -597,7 +547,6 @@
     return out + ' h';
   }
 
-  // Pure: /league response -> everything the modal shows (node-testable, no DOM).
   function buildLeagueBreakdown(league) {
     if (!league || !league.ladder || !league.ladder.length) return null;
     var points = league.points_min || 0;
@@ -610,16 +559,11 @@
         rankName: row.rank_name,
         imgSrc: 'img/badges/' + String(row.rank_name).toLowerCase() + '.png',
         levels: row.levels.map(hoursLabel),
-        // Bare hour numbers ('15', '25', '35') so the renderer can set one BIG
-        // entry figure per tile and keep the later levels as a short sub-line.
         levelsShort: row.levels.map(function (m) { return hoursLabel(m).replace(' h', ''); }),
         state: state,
       };
     });
 
-    // Flatten the ladder to ordered milestones, find where we stand, and build a
-    // progress model toward the very next milestone (the next level, which may also
-    // be the next rank). This drives the progress bar in the modal.
     var flat = [];
     league.ladder.forEach(function (row) {
       row.levels.forEach(function (start, idx) {
@@ -672,12 +616,8 @@
       pips += '<span class="trail-pip' + (i <= info.currentLevel ? ' filled' : '') + '"></span>';
     }
 
-    // Side-by-side rank tiles. Hierarchy per tile: badge → name → ONE big entry
-    // figure ("starts at 15 h") → later levels as a small sub-line. Reached ranks
-    // get a check icon (never color alone); future art is dimmed.
     var tiles = info.ranks.map(function (r) {
       var entry = r.levelsShort[0] === '0' ? 'Start' : r.levelsShort[0] + ' h';
-      // Two deliberate lines — an inline "L2 at 25 · L3 at 35 h" wraps badly in a tile.
       var sub = esc('L2 at ' + r.levelsShort[1] + ' h') + '<br>' + esc('L3 at ' + r.levelsShort[2] + ' h');
       return '<div class="league-tile ' + r.state + '">' +
         (r.state === 'reached' ? CHECK_SVG : '') +
@@ -689,8 +629,6 @@
       '</div>';
     }).join('');
 
-    // A clear progress bar toward the next level: prominent "X h to go", a filled
-    // track, and the band's start/target labelled at each end.
     var pg = info.progress;
     var progressBlock;
     if (pg.atSummit) {
@@ -741,13 +679,11 @@
     document.addEventListener('keydown', onKey);
     overlay.querySelector('.league-close').focus();
 
-    // Animate the progress fill from 0 to its target once the modal is on screen.
     requestAnimationFrame(function () {
       var fill = overlay.querySelector('.league-progress-fill');
       if (fill) fill.style.width = (fill.getAttribute('data-target') || '0') + '%';
     });
 
-    // Missing art falls back to a plain disc with the rank initial (same as the card).
     overlay.querySelectorAll('.league-tile-img, .league-hero-img').forEach(function (img) {
       img.addEventListener('error', function () {
         var fb = document.createElement('span');
@@ -758,7 +694,6 @@
     });
   }
 
-  // --- region browsing + the atlas (Chunk 4) ---
 
   function monthKeyOfDate(d) {
     return d.getFullYear() + '-' + pad(d.getMonth() + 1);
@@ -772,14 +707,12 @@
     return label;
   }
 
-  // Ascending YYYY-MM keys from the first session's month through now's month,
-  // gap months included. [current month] when there are no sessions.
   function listRegionMonths(sessions, now) {
     var currentKey = monthKeyOfDate(now);
     var firstKey = currentKey;
     (sessions || []).forEach(function (s) {
       var k = monthKeyOfDate(new Date(s.started_at));
-      if (k < firstKey) firstKey = k; // zero-padded keys compare correctly as strings
+      if (k < firstKey) firstKey = k;
     });
     var keys = [];
     var y = Number(firstKey.slice(0, 4));
@@ -794,7 +727,6 @@
     return keys;
   }
 
-  // Everything the ‹ › arrows and month label need for one browse position.
   function buildTrailNav(sessions, browseKey, now) {
     var months = listRegionMonths(sessions, now);
     var currentKey = months[months.length - 1];
@@ -814,7 +746,6 @@
     };
   }
 
-  // Pure: sessions + saved work periods -> one tile entry per month, NEWEST first.
   function buildAtlasModel(opts) {
     var sessions = (opts && opts.sessions) || [];
     var workPeriods = (opts && opts.workPeriods) || [];
@@ -838,7 +769,7 @@
       });
       return {
         monthKey: key,
-        label: monthLabelFromKey(key, now, true), // the atlas always shows the year
+        label: monthLabelFromKey(key, now, true),
         campCount: campCount,
         statLine: statLine,
         hasRecap: hasRecap,
@@ -851,8 +782,6 @@
     return { months: out };
   }
 
-  // The Atlas: a wide modal grid of mini-maps, one per month. Clicking a tile
-  // closes the modal and hands the month key to onPick (the card browses there).
   function openAtlasModal(atlasModel, openerEl, onPick) {
     if (!atlasModel || !atlasModel.months || !atlasModel.months.length) return;
     if (document.querySelector('.atlas-overlay')) return;
@@ -893,8 +822,6 @@
     document.addEventListener('keydown', onKey);
     overlay.querySelector('.league-close').focus();
 
-    // Draw the mini-maps once the tiles have a real width (render reads
-    // clientWidth); drop each tile's caption — the name/stat lines replace it.
     requestAnimationFrame(function () {
       var tileEls = overlay.querySelectorAll('.atlas-tile');
       atlasModel.months.forEach(function (m, i) {
@@ -915,7 +842,6 @@
     });
   }
 
-  // --- the badge slam (rank-name promotions) ---
 
   function prefersReducedMotion() {
     try {
@@ -923,7 +849,6 @@
     } catch (e) { return false; }
   }
 
-  // Soft radial nudge: cards get pushed away from the impact point, then settle.
   function rippleFrom(originEl) {
     var origin = originEl.getBoundingClientRect();
     var ox = origin.left + origin.width / 2;
@@ -935,8 +860,8 @@
       var dx = r.left + r.width / 2 - ox;
       var dy = r.top + r.height / 2 - oy;
       var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      var push = Math.max(3, 12 - dist / 90); // closer cards get the bigger nudge
-      var delay = Math.min(240, dist * 0.25); // the wave travels outward
+      var push = Math.max(3, 12 - dist / 90);
+      var delay = Math.min(240, dist * 0.25);
       el.style.transition = 'transform 0.18s ease-out ' + delay.toFixed(0) + 'ms';
       el.style.transform = 'translate(' + (dx / dist * push).toFixed(1) + 'px,' +
         (dy / dist * push).toFixed(1) + 'px)';
@@ -948,9 +873,6 @@
     });
   }
 
-  // The new badge appears large + centered, holds a beat, slams into the badge
-  // place on the card, and the impact ripples across the page. Plays once per
-  // promotion (the caller clears the pending marker). Reduced motion → crossfade.
   function playPromotion(container, rankName, opts) {
     opts = opts || {};
     var disc = container && container.querySelector('.trail-badge-disc');
@@ -974,7 +896,7 @@
     big.alt = rankName + ' badge';
     overlay.appendChild(big);
     document.body.appendChild(overlay);
-    if (img) img.style.visibility = 'hidden'; // no double badge until impact
+    if (img) img.style.visibility = 'hidden';
 
     requestAnimationFrame(function () { overlay.classList.add('show'); });
 
@@ -1001,7 +923,6 @@
     buildTrailModel: buildTrailModel,
     buildLandmarks: buildLandmarks,
     LANDMARK_LABELS: LANDMARK_LABELS,
-    // Shared per-day derivations, reused by the habit verifier (habits.js).
     focusedSecondsByDay: focusedSecondsByDay,
     hasUnbroken25: hasUnbroken25,
     render: render,

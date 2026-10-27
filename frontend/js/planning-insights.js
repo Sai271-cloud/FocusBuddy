@@ -101,10 +101,6 @@
     return candidates[0] || null;
   }
 
-  // Trail Chunk 5: detect earned landmarks from history and sync them to the
-  // backend's insert-only store (fire-and-forget, like /learn). One soft toast
-  // when something NEW is earned — the backend keeps a first-ever fill silent
-  // (that's a backfill of old history, not a moment). Never throws.
   async function detectAndSyncLandmarks({ sessions, workPeriods, todayPlan } = {}) {
     try {
       if (!window.JourneyMap || typeof getLandmarks !== 'function') return;
@@ -121,7 +117,6 @@
         : `${newly.length} new cairns on the trail.`;
       window.showToast(message);
     } catch {
-      // Landmarks are a reward layer — a failure here must never touch the caller.
     }
   }
 

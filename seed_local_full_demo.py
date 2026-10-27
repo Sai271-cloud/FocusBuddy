@@ -1,27 +1,7 @@
-"""TEMPORARY local-only FULL-DEMO seeder — NOT part of the app, safe to delete.
 
-Builds a throwaway SQLite database (focus-demo-full.db) holding a LIVED-IN account:
-a master's student ~10 weeks into Focus Buddy, with a coherent story every drill-down
-supports — interleaved session timelines with real journals, historical daily plans
-with plan-vs-reality reports, full AI-voice daily/weekly recaps, goals in every state
-(including a genuinely finished one), habits with a lifecycle, and a rising
-month-over-month arc (~55% → ~75% → ~82%).
 
-The story:
-  Month before last — finals season, thesis barely started. Rocky.
-  Last month        — the turn: course project driven to DONE, thesis ramping,
-                      evening reading begins, weekly unwinds adopted.
-  This month        — the thesis push: daily plans, morning deep blocks, a live streak.
 
-Your real focus_buddy.db is untouched (*.db is gitignored). Re-run to reset.
-All dates are offsets from the REAL clock — run it right before the demo.
 
-Run:   python seed_local_full_demo.py
-Then (terminal 1, project root):
-       $env:DATABASE_URL = "sqlite:///./focus-demo-full.db"; uvicorn backend.main:app --reload
-And (terminal 2, frontend folder):
-       python -m http.server 5500
-"""
 import json
 import os
 from datetime import datetime, timedelta, timezone
@@ -30,7 +10,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(HERE, "focus-demo-full.db")
 if os.path.exists(DB_PATH):
     os.unlink(DB_PATH)
-# Point the engine at the throwaway DB *before* importing backend.database.
 os.environ["DATABASE_URL"] = "sqlite:///" + DB_PATH.replace("\\", "/")
 
 from backend import crud, models, schemas  # noqa: E402
@@ -63,8 +42,6 @@ def at(offset, hour, minute=0):
 
 
 def timeline(*runs):
-    """Interleaved per-minute timeline from (state, minutes) runs — real sessions
-    wobble; a single solid block reads as synthetic."""
     entries, minute = [], 0
     for state, length in runs:
         for _ in range(int(length)):
@@ -74,8 +51,6 @@ def timeline(*runs):
 
 
 def journal(*events):
-    """(minute, 'note'|'site', payload) → journal_json events. Sites are
-    (domain, title) pairs."""
     out = []
     for t, kind, val in events:
         if kind == "site":
@@ -92,7 +67,6 @@ db.add(models.UserProfile(
            "Two-monitor desk: papers open on the second screen."),
 ))
 
-# --- tasks ------------------------------------------------------------------
 def task(name, desc="", completed=False, completed_offset=None):
     t = models.Task(
         workspace_id=ws.id, name=name, description=desc, completed=completed,
@@ -110,11 +84,10 @@ t_portfolio = task("Portfolio site refresh", "Rewrite the intro, swap the projec
 t_reading = task("Evening reading", "Current book: Deep Work.")
 t_project = task("Course project — final report", "", completed=True, completed_offset=-24)
 t_finals = task("Spring finals revision", "", completed=True, completed_offset=-55)
-t_advisor = task("Email the advisor", "Send the updated thesis timeline.")     # unlinked, no time
-t_meals = task("Plan next week's meals", "Sunday batch-cook list.")            # unlinked, HAS time
+t_advisor = task("Email the advisor", "Send the updated thesis timeline.")
+t_meals = task("Plan next week's meals", "Sunday batch-cook list.")
 db.flush()
 
-# --- goals ------------------------------------------------------------------
 def goal(title, target_offset, created_offset, status="active", done_offset=None, tasks=()):
     g = models.Goal(
         workspace_id=ws.id, title=title,
@@ -133,11 +106,10 @@ goal("Finish my research paper", +12, -20, tasks=(t_chapter, t_figures, t_outlin
 goal("Pass the statistics final", +3, -15, tasks=(t_stats,))
 goal("Ship my portfolio site refresh", 0, -10, tasks=(t_portfolio,))
 goal("Read three books this summer", -5, -40, tasks=(t_reading,))
-goal("Learn to touch type", +45, -3)  # no tasks yet — shows the guidance copy
+goal("Learn to touch type", +45, -3)
 goal("Submit the course project", -25, -60, status="done", done_offset=-24, tasks=(t_project,))
 goal("5am mornings experiment", -30, -70, status="archived")
 
-# --- sessions ---------------------------------------------------------------
 day_secs, week_secs, month_secs = {}, {}, {}
 sessions_by_offset = {}
 total_focused_min = 0
@@ -188,19 +160,17 @@ def session(t, offset, hour, minute, runs, intention=None, journal_js=None, star
             b[k] += secs[k] * 60
 
 
-# Common run shapes (minutes, hand-varied at call sites). Focus rates by tier:
-# choppy ~53% (finals-season), light ~66%, mid ~74% (the turn), deep ~90% (the push).
-def choppy(a, b, c):      # short bursts, real drift, an away stretch
+def choppy(a, b, c):
     return [("focused", a), ("distracted", 8), ("focused", b), ("distracted", 7),
             ("uncertain", 5), ("focused", c), ("away", 8)]
 
 
-def mid(lead, main):      # solid work with visible leaks around it
+def mid(lead, main):
     return [("focused", lead), ("distracted", 5), ("focused", main), ("distracted", 6),
             ("uncertain", 3), ("away", 2)]
 
 
-def deep(lead, main):     # a wobble, then a long clean block (≥25 keeps landmarks honest)
+def deep(lead, main):
     return [("focused", lead), ("distracted", 3), ("focused", main), ("uncertain", 2)]
 
 
@@ -208,7 +178,6 @@ def light(main):
     return [("focused", main), ("distracted", 7), ("uncertain", 4), ("away", 3)]
 
 
-# ── Month before last: finals + thesis barely started (~55%) ────────────────
 session(t_finals, -72, 14, 10, choppy(12, 9, 11), "Get through two past papers.", J_DRIFT)
 session(t_finals, -71, 19, 30, light(24), "One more revision pass before bed.")
 session(t_finals, -69, 14, 45, choppy(14, 11, 13), journal_js=J_DRIFT)
@@ -221,7 +190,6 @@ session(t_finals, -55, 9, 40, deep(14, 26), "Last exam tomorrow — targeted rev
 session(t_project, -53, 10, 10, mid(16, 27), "First real project morning post-finals.")
 session(t_project, -50, 15, 20, choppy(12, 10, 11), journal_js=J_DRIFT)
 
-# ── Last month: the turn — project driven to done, reading begins (~75%) ────
 session(t_project, -47, 9, 30, mid(17, 29), "Results section, first pass.")
 session(t_project, -45, 9, 5, mid(19, 36), "Finish the results tables.", J_RESEARCH)
 session(t_project, -45, 15, 40, light(21))
@@ -244,7 +212,6 @@ session(t_chapter, -22, 9, 20, mid(14, 27), "Thesis becomes the main thing now."
 session(t_chapter, -20, 9, 45, deep(18, 34), "Chapter 3 skeleton.", J_RESEARCH)
 session(t_reading, -20, 20, 45, [("focused", 28), ("distracted", 2)])
 
-# ── This month: the thesis push (~82%) ──────────────────────────────────────
 session(t_outline, -16, 9, 10, deep(16, 27), "Map the literature review sections.")
 session(t_outline, -15, 9, 30, deep(19, 31), "Finish the outline today.", J_RESEARCH)
 session(t_reading, -15, 20, 20, [("focused", 25), ("uncertain", 2)])
@@ -270,10 +237,6 @@ session(t_chapter, 0, 0, 0, deep(14, 31), "Morning block before the demo.",
         start=_today_start.astimezone(timezone.utc))
 db.flush()
 
-# --- plan history: recent past days with plans + plan-vs-reality -------------
-# Built directly against schemas.PlanRealityRow/Report with LOCAL minutes (the
-# crud seed helpers use UTC starts — right for the frozen-clock personas, wrong
-# for real-clock local data).
 DIFFS = {t_chapter.id: "hard", t_figures.id: "medium", t_outline.id: "medium",
          t_stats.id: "medium", t_portfolio.id: "medium", t_reading.id: "easy",
          t_meals.id: "easy"}
@@ -285,8 +248,6 @@ def local_start_min(s):
 
 
 def seed_plan_day(offset, tweaks=None):
-    """A saved plan for that day derived from what actually happened, with small
-    story tweaks (started late, ran long) so plan-vs-reality shows real variety."""
     tweaks = tweaks or {}
     todays = sessions_by_offset.get(offset, [])
     entries, rows = [], []
@@ -335,12 +296,11 @@ def seed_plan_day(offset, tweaks=None):
 
 plan_reality = {
     -6: seed_plan_day(-6),
-    -4: seed_plan_day(-4, {t_chapter.id: (15, 0)}),        # chapter ran long
-    -2: seed_plan_day(-2, {t_chapter.id: (20, 0)}),        # the big block ran long (good long)
-    -1: seed_plan_day(-1, {t_portfolio.id: (0, 25)}),      # portfolio started late
+    -4: seed_plan_day(-4, {t_chapter.id: (15, 0)}),
+    -2: seed_plan_day(-2, {t_chapter.id: (20, 0)}),
+    -1: seed_plan_day(-1, {t_portfolio.id: (0, 25)}),
 }
 
-# --- work periods ------------------------------------------------------------
 def wp(kind, period_key, secs, ended_at, reflection="", recap=None, plan_reality_json=""):
     db.add(models.WorkPeriod(
         workspace_id=ws.id, kind=kind, period_key=period_key, ended_at=ended_at,
@@ -443,7 +403,6 @@ if prior_mk in month_secs:
               "improvements": ["Once exams end, longer uninterrupted blocks should come back quickly."],
               "carry_forward": "Protect the first morning hour — it survived finals; build on it."})
 
-# --- habits ------------------------------------------------------------------
 db.add(models.Habit(
     workspace_id=ws.id, code=f"coach-{monday_key(-42)}",
     title="Complete 25 focused minutes",
@@ -475,14 +434,13 @@ retired = models.Habit(
 )
 db.add(retired)
 db.flush()
-for off in (-11, -8, -6, -3, -1):   # manual habit: scattered real ticks, none today
+for off in (-11, -8, -6, -3, -1):
     db.add(models.HabitCheck(workspace_id=ws.id, habit_id=manual.id,
                              day_key=day_key(off), source="manual"))
-for off in (-48, -46, -44, -41):    # the retired experiment's kept history
+for off in (-48, -46, -44, -41):
     db.add(models.HabitCheck(workspace_id=ws.id, habit_id=retired.id,
                              day_key=day_key(off), source="manual"))
 
-# --- today's plan: laid out on the calendar ----------------------------------
 db.add(models.DailyPlan(
     workspace_id=ws.id, period_key=day_key(0), available_min=195,
     plan_json=json.dumps([
@@ -495,7 +453,6 @@ db.add(models.DailyPlan(
     ]),
 ))
 
-# --- memory layer ------------------------------------------------------------
 HOURLY = {8: 84, 9: 91, 10: 87, 11: 78, 12: 55, 13: 52, 14: 58, 15: 62,
           16: 60, 17: 57, 20: 68, 21: 64}
 for hour, pct in HOURLY.items():

@@ -1,9 +1,5 @@
 name: tests
 
-# Runs the backend unit test suite on every push and pull request so a
-# regression is caught automatically instead of during a demo. No Gemini API
-# key is needed: backend.main guards the client (_client stays None without a
-# key) and the tests either mock Gemini or exercise the no-key path.
 
 on:
   push:

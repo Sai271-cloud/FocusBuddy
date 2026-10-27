@@ -73,8 +73,6 @@
     try { new Notification(title, { body: body, silent: true }); } catch (e) {}
   };
 
-  // Keeps Tab cycling inside an open modal and returns focus to the element
-  // that opened it. Returns a release() to call when the modal closes.
   window.trapModalFocus = function (modalEl, opener) {
     function focusables() {
       var nodes = modalEl.querySelectorAll(
@@ -138,7 +136,6 @@
         if (act) close(act.dataset.act === 'ok');
       });
       document.addEventListener('keydown', onKey);
-      // A destructive confirm starts on Cancel so Enter can't instantly delete.
       overlay.querySelector(opts.danger ? '[data-act="cancel"]' : '[data-act="ok"]').focus();
     });
   };

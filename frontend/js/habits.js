@@ -1,16 +1,6 @@
-// Habit tracker v1 (coaching-seeded habits). Three jobs, all reward-layer:
-//  - CATALOG: the starter habits anyone can adopt before their first weekly unwind
-//  - verifyHabit: pure check "was this auto habit completed on this local day?"
-//  - detectAndSyncHabitChecks: fire-and-forget sync of verified days to the
-//    backend's insert-only habit_checks store (no toast BY DESIGN — an auto tick
-//    quietly appears; announcing it would turn a calm record into a reward ping).
-// The backend never does timezone math: this file owns the local-day reasoning,
-// like journey-map.js does for landmarks.
 (function () {
   'use strict';
 
-  // Starter catalog. `check` mirrors the backend's crud.HABIT_TEMPLATES specs;
-  // adopting stringifies it into the habit's check_json.
   const CATALOG = [
     {
       code: 'cat-any-session',
@@ -68,9 +58,6 @@
     return spec && spec.template ? spec : null;
   }
 
-  // Pure: was `habit` completed on `dayKey`, judged from ctx = {sessions,
-  // workPeriods, todayPlan}? Manual habits always return false here — only the
-  // user's tick can complete those.
   function verifyHabit(habit, dayKey, ctx) {
     const PI = window.PlanningInsights;
     const spec = checkSpec(habit);
@@ -101,8 +88,6 @@
         return daySessions.some(s =>
           window.JourneyMap && window.JourneyMap.hasUnbroken25(parseJsonQuiet(s.timeline_json)));
       case 'made-a-plan': {
-        // Today's live plan counts before any reality row exists; past days use
-        // the saved plan-vs-reality record (same predicate as the landmark).
         const todayKey = PI.localDayKey(PI.currentDate());
         if (dayKey === todayKey && ctx && ctx.todayPlan
             && PI.parsePlanEntries(ctx.todayPlan).length) return true;
@@ -121,7 +106,61 @@
     }
   }
 
-  // The last n local day keys, oldest → today (demo-clock aware via currentDate).
+  function describeCheck(spec) {
+    if (!spec) return '';
+    const p = spec.params || {};
+    switch (spec.template) {
+      case 'any-session': return 'Any focus session that day';
+      case 'focus-minutes': return 'Focus at least ' + (p.min || 25) + ' minutes';
+      case 'session-before': return 'Start a session before ' + (p.time || '10:00');
+      case 'unbroken-25': return 'A 25-minute unbroken focus run';
+      case 'made-a-plan': return 'Made a plan that day';
+      case 'did-daily-unwind': return 'Did the daily unwind';
+      default: return '';
+    }
+  }
+
+  const WORK_WORDS = /\b(focus|focused|work|working|study|studying|deep|session|concentrat\w*)\b/;
+  function guessCheckSpec(title) {
+    const t = String(title || '').toLowerCase();
+    if (!t.trim()) return null;
+
+    if (/\bunbroken\b|without (a )?break|\bno breaks?\b/.test(t)) {
+      return { template: 'unbroken-25', params: {} };
+    }
+
+    const dur = t.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m)\b/);
+    if (dur && WORK_WORDS.test(t)) {
+      const n = parseFloat(dur[1]);
+      const minutes = Math.round(dur[2].startsWith('h') ? n * 60 : n);
+      return { template: 'focus-minutes', params: { min: Math.max(5, Math.min(240, minutes)) } };
+    }
+
+    const startWords = /\b(session|start|starting|begin|focus|work|study)\b/;
+    if (/\bbefore noon\b/.test(t) && startWords.test(t)) {
+      return { template: 'session-before', params: { time: '12:00' } };
+    }
+    const before = t.match(/\bbefore\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?/);
+    if (before && startWords.test(t)) {
+      let hour = parseInt(before[1], 10);
+      const minute = before[2] ? parseInt(before[2], 10) : 0;
+      const meridiem = (before[3] || '').replace(/\./g, '');
+      if (meridiem === 'pm' && hour < 12) hour += 12;
+      if (meridiem === 'am' && hour === 12) hour = 0;
+      if (hour <= 23 && minute <= 59) {
+        const pad = n => String(n).padStart(2, '0');
+        return { template: 'session-before', params: { time: pad(hour) + ':' + pad(minute) } };
+      }
+    }
+
+    if (/\bplan\b|\bplanning\b/.test(t)) return { template: 'made-a-plan', params: {} };
+    if (/\bunwind\b|\breflect\w*\b/.test(t)) return { template: 'did-daily-unwind', params: {} };
+    if (/\b(a|one|any|1)\s+(\w+\s+)?session\b/.test(t) || /\bfocus (every|each) day\b/.test(t)) {
+      return { template: 'any-session', params: {} };
+    }
+    return null;
+  }
+
   function lastNDayKeys(n, now) {
     const PI = window.PlanningInsights;
     const base = now || PI.currentDate();
@@ -137,10 +176,6 @@
     return count + ' of the last 7 days';
   }
 
-  // Fire-and-forget (the detectAndSyncLandmarks contract): verify every active
-  // auto habit over the recent window and store any missing days. Never throws,
-  // never toasts. Scans at most 60 days back and never before the habit's
-  // adoption day, so history stays honest and the payload stays bounded.
   async function detectAndSyncHabitChecks({ sessions, workPeriods, todayPlan, habits } = {}) {
     try {
       if (!window.PlanningInsights || typeof syncHabitChecks !== 'function') return;
@@ -164,13 +199,14 @@
       });
       if (fresh.length) await syncHabitChecks(fresh.slice(0, 200));
     } catch (e) {
-      // Habits are a reward layer — a failure here must never touch the caller.
     }
   }
 
   window.FocusHabits = {
     CATALOG,
     verifyHabit,
+    describeCheck,
+    guessCheckSpec,
     detectAndSyncHabitChecks,
     lastNDayKeys,
     densityLabel,

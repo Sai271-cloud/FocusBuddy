@@ -98,7 +98,6 @@
 <script src="js/notify.js"></script>
 <script src="js/settings-menu.js"></script>
 <script src="js/planning-insights.js"></script>
-<!-- journey-map: pure landmark detection only on this page (no map rendered) -->
 <script src="js/journey-map.js"></script>
 <script src="js/plan-calendar.js"></script>
 <script>
@@ -128,6 +127,27 @@
     if (h && m) return `${h}h ${m}m`;
     if (h) return `${h}h`;
     return `${m}m`;
+  }
+  function bindMinutesInput(input, lo, hi, setValue) {
+    let last = parseInt(input.value, 10);
+    const apply = v => {
+      if (v === last) return;
+      last = v;
+      setValue(v);
+      markPlanChanged();
+      refreshBudget();
+      scheduleAutoSave();
+    };
+    input.addEventListener('input', () => {
+      const v = parseInt(input.value, 10);
+      if (Number.isFinite(v) && v >= lo && v <= hi) apply(v);
+    });
+    input.addEventListener('change', () => {
+      const v = parseInt(input.value, 10);
+      const fixed = Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : last;
+      input.value = fixed;
+      apply(fixed);
+    });
   }
   function normalizeScheduledMin(entry, min, snap) {
     if (!Number.isFinite(min) || !window.PlanCalendar || !window.PlanCalendar.normalizeScheduledMin) {
@@ -203,7 +223,6 @@
     addTaskReturnFocus = trigger || el('open-add-task');
     const modal = addTaskModal();
     modal.hidden = false;
-    // Focus return is handled below via addTaskReturnFocus, so the trap gets no opener.
     releaseAddTaskTrap = trapModalFocus(el('add-task-form'), null);
     el('add-task-form').reset();
     setTimeout(() => el('add-task-name').focus(), 0);
@@ -357,10 +376,14 @@
         <p class="serif mb-2" style="font-size:0.95rem;font-weight:500;color:var(--text)">${escapeHtml(e.name)}</p>
         <div class="plan-field-head">
           <label for="est-${e.task_id}" class="text-xs" style="color:var(--text-muted)">Estimated time</label>
-          <span class="plan-field-val" id="estval-${e.task_id}" aria-live="polite">${fmtMins(e.estimate_min)}</span>
+          <span class="plan-min-field">
+            <span class="plan-field-val" id="estval-${e.task_id}" aria-live="polite">${fmtMins(e.estimate_min)}</span>
+            <input id="est-${e.task_id}" class="input plan-min-input" type="number" min="10" max="120" step="5"
+                   inputmode="numeric" value="${e.estimate_min}" data-est="${e.task_id}"
+                   aria-label="Estimated minutes for ${escapeHtml(e.name)}" />
+            <span>min</span>
+          </span>
         </div>
-        <input id="est-${e.task_id}" class="fb-range" type="range" min="10" max="120" step="5"
-               value="${e.estimate_min}" data-est="${e.task_id}" aria-label="Estimated minutes for ${escapeHtml(e.name)}" />
         ${calibrationNoteHtml(e)}
         <div class="flex items-center justify-between gap-3 mt-3">
           <span class="text-xs" style="color:var(--text-muted)">Difficulty</span>
@@ -376,10 +399,14 @@
       <div class="plan-field" style="margin-top:1.2rem">
         <div class="plan-field-head">
           <label for="avail" class="text-xs" style="color:var(--text-muted)">Time available today</label>
-          <span class="plan-field-val" id="availval" aria-live="polite">${fmtMins(state.availableMin)}</span>
+          <span class="plan-min-field">
+            <span class="plan-field-val" id="availval" aria-live="polite">${fmtMins(state.availableMin)}</span>
+            <input id="avail" class="input plan-min-input" type="number" min="30" max="600" step="15"
+                   inputmode="numeric" value="${state.availableMin}"
+                   aria-label="Total time available today, in minutes" />
+            <span>min</span>
+          </span>
         </div>
-        <input id="avail" class="fb-range" type="range" min="30" max="600" step="15"
-               value="${state.availableMin}" aria-label="Total time available today, in minutes" />
       </div>
       <div class="mt-3">${budgetMeterHtml()}</div>`;
   }
@@ -755,24 +782,18 @@
       });
     } else if (key === 'size') {
       el('plan-body').querySelectorAll('input[data-est]').forEach(r => {
-        r.addEventListener('input', () => {
-          const id = parseInt(r.dataset.est, 10);
+        const id = parseInt(r.dataset.est, 10);
+        bindMinutesInput(r, 10, 120, v => {
           const entry = state.entries.get(id);
           if (!entry) return;
-          entry.estimate_min = parseInt(r.value, 10);
-          el(`estval-${id}`).textContent = fmtMins(entry.estimate_min);
-          markPlanChanged();
-          refreshBudget();
-          scheduleAutoSave();
+          entry.estimate_min = v;
+          el(`estval-${id}`).textContent = fmtMins(v);
         });
       });
       const avail = el('avail');
-      if (avail) avail.addEventListener('input', () => {
-        state.availableMin = parseInt(avail.value, 10);
-        el('availval').textContent = fmtMins(state.availableMin);
-        markPlanChanged();
-        refreshBudget();
-        scheduleAutoSave();
+      if (avail) bindMinutesInput(avail, 30, 600, v => {
+        state.availableMin = v;
+        el('availval').textContent = fmtMins(v);
       });
       el('plan-body').querySelectorAll('.seg[data-diff]').forEach(group => {
         const id = parseInt(group.dataset.diff, 10);
@@ -993,8 +1014,6 @@
         state.hadSavedAdvice = true;
         state.adviceGeneratedThisVisit = false;
       }
-      // Trail Chunk 5: a deliberately saved plan can earn the first-plan cairn
-      // (fire-and-forget; session-based landmarks self-heal on the Today page).
       PlanningInsights.detectAndSyncLandmarks({ todayPlan: { plan_json: payload.plan_json } });
       showCurrentPlan();
     } catch {

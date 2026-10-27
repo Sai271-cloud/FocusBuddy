@@ -48,10 +48,6 @@ def init_db():
         logger.exception("Pattern-memory init failed; continuing")
 
 def _init_pattern_memory():
-    """Startup maintenance for the Pattern Memory:
-    - seed the starter hypotheses + 24-hour focus profile on a fresh DB (no-op once seeded),
-    - one-time cleanup of the obsolete time-of-day seeds on older DBs (idempotent),
-    - decay notes not touched in 30+ days (so stale habits fade)."""
     from . import crud
 
     db = SessionLocal()
@@ -64,9 +60,6 @@ def _init_pattern_memory():
         db.close()
 
 def _prune_empty_sessions():
-    """Remove abandoned sessions — ones opened then closed before a single tick
-    was recorded (started_at == ended_at and all four second-counts are 0).
-    Any session that recorded time (autosave bumped ended_at) is left untouched."""
     inspector = inspect(engine)
     if "focus_sessions" not in inspector.get_table_names():
         return
@@ -113,8 +106,6 @@ def _repair_sqlite_schema():
                 text("ALTER TABLE tasks ADD COLUMN completed_at DATETIME")
             )
     if "goal_id" not in task_columns:
-        # Nullable, so SQLite allows the REFERENCES clause on ADD COLUMN (unlike
-        # the NOT NULL workspace_id case above).
         with engine.begin() as connection:
             connection.execute(
                 text("ALTER TABLE tasks ADD COLUMN goal_id INTEGER REFERENCES goals(id)")
@@ -208,12 +199,6 @@ def _repair_sqlite_schema():
             _rebuild_hourly_focus_with_workspace()
 
 def _repair_added_columns():
-    """Postgres-safe column repair. create_all makes missing TABLES but never adds
-    missing COLUMNS to existing tables, so a model column added after the DB was first
-    created would break saves on Neon. For every mapped column the DB is missing, add it
-    as a nullable column (safe for existing rows — the app always sets values on write)
-    via ADD COLUMN IF NOT EXISTS (idempotent). Does NOT change types or constraints; a
-    real type migration still needs manual care."""
     if _IS_SQLITE:
         return
     inspector = inspect(engine)

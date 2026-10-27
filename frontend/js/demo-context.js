@@ -52,14 +52,10 @@
 
   var explicit = parsePathSlug() || parseQuerySlug();
   var slug = validSlug(explicit) ? explicit : '';
-  // On the hosted site, a visitor with no demo slug must never fall into the shared
-  // default workspace — treat them as the anonymous sandbox. Local dev stays plain.
   var host = window.location.hostname;
   var isLocalHost = !host || host === 'localhost' || host === '127.0.0.1';
   if (!slug && !isLocalHost) slug = 'new';
   var active = !!slug;
-  // The browser's private demo identity. 'new' uses it as its whole workspace;
-  // seeded personas use it to give each judge their own private copy.
   var anonymousId = '';
   if (active) {
     try {
@@ -80,7 +76,6 @@
   function headers() {
     if (!active) return {};
     if (slug === 'new') return { 'X-Demo-Anonymous-Id': anonymousId };
-    // Slug picks the persona; the anonymous id makes the copy private per judge.
     if (anonymousId) return { 'X-Demo-Slug': slug, 'X-Demo-Anonymous-Id': anonymousId };
     return { 'X-Demo-Slug': slug };
   }
@@ -124,8 +119,6 @@
     document.querySelectorAll('a[href]').forEach(decorateLink);
   }
 
-  // Links built after page load (innerHTML templates) miss the one-shot decorateLinks(),
-  // so fix the clicked link just before navigation.
   document.addEventListener('click', function (e) {
     if (!active) return;
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;

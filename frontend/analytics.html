@@ -44,7 +44,6 @@
 </header>
 
 <main id="analytics-main" tabindex="-1" class="app-main analytics-main max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6">
-  <!-- Placeholder is replaced by loadAll() on success or error — avoids a blank pop-in. -->
   <div id="tiles" class="analytics-tiles grid grid-cols-2 md:grid-cols-3 gap-3"><p class="text-sm" style="color:var(--text-muted);grid-column:1/-1">Loading your sessions…</p></div>
   <section id="today-card" class="card"></section>
   <section id="week-card" class="card"></section>
@@ -196,13 +195,10 @@
   function focusPct(sum) { return sum.total > 0 ? Math.round(sum.focused / sum.total * 100) : 0; }
   function findPeriod(kind, key) { return workPeriods.find(p => p.kind === kind && p.period_key === key) || null; }
 
-  // Trail Chunk 5: after an unwind save, sync any newly earned landmarks
-  // (fire-and-forget; one soft toast when something new is earned).
   function syncLandmarksNow() {
     PlanningInsights.detectAndSyncLandmarks({ sessions: allSessions, workPeriods });
   }
 
-  // Habit auto-checks piggyback the same save moments (fire-and-forget, quiet).
   function syncHabitChecksNow() {
     if (!window.FocusHabits) return;
     FocusHabits.detectAndSyncHabitChecks({ sessions: allSessions, workPeriods });
@@ -408,7 +404,6 @@
 
     let lastMonthKey = null;
     keys.forEach(key => {
-      // A small month label whenever the month changes keeps the long list scannable.
       const mk = key.slice(0, 7);
       if (mk !== lastMonthKey) {
         lastMonthKey = mk;
@@ -665,9 +660,6 @@
     if (hd) hd.addEventListener('click', dismissProposedHabit);
   }
 
-  // Re-save the weekly recap after the proposal's state changes (adopted /
-  // dismissed), so reopening the unwind never shows a stale Adopt button. The
-  // coach-<week_key> habit code makes a stray double-adopt harmless anyway.
   async function saveWeeklyRecapQuiet() {
     const sum = unwind.snapshot.sum;
     try {
@@ -745,8 +737,6 @@
   function buildMonthWeeks(monthKey) {
     const first = parseMonthKey(monthKey);
     const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
-    // Sessions are bucketed into the month FIRST, then by week, so a session on the
-    // other side of a month border never leaks into this month's edge weeks.
     const monthSessions = allSessions.filter(s => monthKeyOf(new Date(s.started_at)) === monthKey);
     const weeks = [];
     for (let m = mondayOf(first); m <= last; m = new Date(m.getFullYear(), m.getMonth(), m.getDate() + 7)) {
@@ -757,7 +747,7 @@
       sess.forEach(s => { const k = localDayKey(new Date(s.started_at)); byDay[k] = (byDay[k] || 0) + s.seconds_focused; });
       const campDays = Object.values(byDay).filter(v => v >= 60).length;
       const wp = findPeriod('week', weekKey);
-      const start = m < first ? first : m; // edge week labels show the month's own start
+      const start = m < first ? first : m;
       weeks.push({
         label: 'Week of ' + start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
         week_key: weekKey,
@@ -780,9 +770,6 @@
     };
   }
 
-  // The coach's proposed habit inside the weekly recap. Old saved recaps have
-  // no `habit` field and render unchanged; an adopted or dismissed proposal is
-  // remembered in the saved recap so reopening never shows a stale live button.
   function habitProposalHtml(r) {
     const h = r.habit;
     if (!h || !h.title) return '';
@@ -904,8 +891,6 @@
       const r = await getWeeklyUnwind({
         week_key: unwind.snapshot.periodKey,
         days: buildWeekDays(),
-        // The week's session ids so the backend's goal fact block can state
-        // this week's focused time per goal (it never buckets by local day itself).
         session_ids: unwind.snapshot.sessions.map(s => s.id).slice(0, 500),
         ...pomoSettings(),
       });
@@ -1059,8 +1044,6 @@
         </div>`;
     }
     if (key === 'monthbreak') {
-      // Only weeks with tracked time are real "weeks of the month" — a trailing
-      // empty week (mostly the next month) shouldn't dilute the bars or the count.
       const weeks = buildMonthWeeks(unwind.snapshot.periodKey)
         .filter(w => (w.seconds_focused + w.seconds_distracted + w.seconds_uncertain + w.seconds_away) > 0);
       const best = weeks.reduce((b, w) => w.seconds_focused > b.seconds_focused ? w : b, { seconds_focused: -1 });
@@ -1171,9 +1154,6 @@
           now: parseMonthKey(unwind.snapshot.periodKey),
           completed: true,
         }));
-        // The map's own caption uses decimal hours ("11.8 focused hrs"); the stat
-        // strip below shows the same numbers in the app's h/m format, so drop the
-        // duplicate to keep one consistent number format on this step.
         const cap = mapEl.querySelector('.trail-caption');
         if (cap) cap.remove();
       } else if (mapEl) {
@@ -1286,13 +1266,8 @@
     }
     renderAll();
 
-    // Deep link from the Trail note: analytics.html?unwind=month&month=YYYY-MM
-    // opens the monthly unwind directly; the params are stripped so a refresh
-    // (or a later loadAll after a delete) doesn't reopen it.
     const params = new URLSearchParams(window.location.search);
     const rawMonth = params.get('unwind') === 'month' ? (params.get('month') || '') : '';
-    // 'last' (from the Last month nav button) resolves to the previous calendar
-    // month; the Trail note passes an explicit YYYY-MM.
     const wantMonth = rawMonth === 'last'
       ? monthKeyOf(new Date(currentDate().getFullYear(), currentDate().getMonth() - 1, 1))
       : rawMonth;

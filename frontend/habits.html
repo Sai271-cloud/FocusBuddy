@@ -53,10 +53,53 @@
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
       <p class="font-medium text-sm" style="color:var(--text)">No habits yet</p>
       <p class="text-sm" style="color:var(--text-muted);max-width:400px">
-        Adopt one from the starter set below — or run a weekly unwind, and your coach may
-        suggest one grounded in your real week.
+        Add your own below, adopt one from the starter set — or run a weekly unwind, and your
+        coach may suggest one grounded in your real week.
       </p>
     </div>
+  </section>
+
+  <section>
+    <p class="section-label">Add your own</p>
+    <form id="habit-add" class="card habit-add-form">
+      <label class="habit-add-field">
+        <span class="text-xs block mb-1" style="color:var(--text-muted)">Habit</span>
+        <input id="habit-title" class="input" type="text" maxlength="60" required autocomplete="off"
+               placeholder="e.g. Focus 30 minutes, or Read 10 pages" />
+      </label>
+      <label class="habit-add-field">
+        <span class="text-xs block mb-1" style="color:var(--text-muted)">Why (optional)</span>
+        <input id="habit-why" class="input" type="text" maxlength="200" autocomplete="off"
+               placeholder="What it does for you" />
+      </label>
+      <label id="habit-check-wrap" class="habit-add-field">
+        <span class="text-xs block mb-1" style="color:var(--text-muted)">How it's checked</span>
+        <select id="habit-check" class="input">
+          <option value="manual">I'll tick it myself</option>
+          <option value="any-session">Any focus session that day</option>
+          <option value="focus-minutes">Focus at least … minutes</option>
+          <option value="session-before">Start a session before …</option>
+          <option value="unbroken-25">A 25-minute unbroken focus run</option>
+          <option value="made-a-plan">Made a plan that day</option>
+          <option value="did-daily-unwind">Did the daily unwind</option>
+        </select>
+      </label>
+      <label id="habit-min-wrap" class="habit-add-field" style="display:none">
+        <span class="text-xs block mb-1" style="color:var(--text-muted)">Minutes</span>
+        <input id="habit-min" class="input" type="number" min="5" max="240" step="5" value="25" />
+      </label>
+      <label id="habit-time-wrap" class="habit-add-field" style="display:none">
+        <span class="text-xs block mb-1" style="color:var(--text-muted)">Before</span>
+        <input id="habit-time" class="input" type="time" value="10:00" />
+      </label>
+      <div class="habit-add-foot">
+        <p id="habit-check-hint" class="text-xs" style="color:var(--text-muted);margin:0" aria-live="polite">
+          Type a habit — if the app can measure it, it will check itself.
+        </p>
+        <button type="submit" id="habit-add-btn" class="btn-ghost btn-ghost-accent" disabled
+                style="padding:0.45rem 1rem;font-size:0.85rem;min-height:40px">Add habit</button>
+      </div>
+    </form>
   </section>
 
   <section>
@@ -94,9 +137,6 @@
 
   const todayKey = () => PlanningInsights.localDayKey(PlanningInsights.currentDate());
 
-  // The last-7-days density strip. Days before adoption render as blank spacers
-  // (not misses), completed days fill sage, open days stay a neutral outline —
-  // no chains, nothing red (the Trail's anti-shame rules apply here too).
   function dotsHtml(habit) {
     const completed = new Set(habit.check_days || []);
     return '<span class="habit-dots" aria-hidden="true">' +
@@ -124,6 +164,7 @@
           <p class="serif" style="font-size:0.95rem;font-weight:500;color:var(--text);margin:0">${escapeHtml(habit.title)}</p>
           ${habit.kind === 'auto' ? '<span class="habit-mode-chip">checks itself</span>' : ''}
           ${habit.source === 'coach' ? '<span class="habit-mode-chip coach">from your coach</span>' : ''}
+          ${habit.source === 'custom' ? '<span class="habit-mode-chip">your own</span>' : ''}
         </div>
         ${habit.why ? `<p class="text-xs mt-0.5 leading-relaxed" style="color:var(--text-muted)">${escapeHtml(habit.why)}</p>` : ''}
         <div class="flex items-center gap-3 mt-1.5 flex-wrap">
@@ -221,7 +262,6 @@
     todayPlan = planR.status === 'fulfilled' ? planR.value : null;
     habits = habitsR.value || [];
     render();
-    // Auto habits self-verify quietly, then the counts refresh in place.
     await FocusHabits.detectAndSyncHabitChecks({ sessions, workPeriods, todayPlan, habits });
     try { await refreshHabits(); } catch {}
   }
@@ -229,7 +269,7 @@
   document.addEventListener('click', async (e) => {
     const tick = e.target.closest('[data-tick]');
     if (tick) {
-      if (tick.getAttribute('aria-pressed') === 'true') return; // already done today
+      if (tick.getAttribute('aria-pressed') === 'true') return;
       try {
         const updated = await tickHabit(parseInt(tick.dataset.tick, 10), todayKey());
         habits = habits.map(h => (h.id === updated.id ? updated : h));
@@ -264,13 +304,10 @@
       const habit = habits.find(h => h.id === parseInt(readopt.dataset.readopt, 10));
       if (!habit) return;
       try {
-        await adoptHabit({
+        await adoptAndSync({
           code: habit.code, title: habit.title, why: habit.why, kind: habit.kind,
           check_json: habit.check_json, source: habit.source, created_day_key: todayKey(),
         });
-        await refreshHabits();
-        await FocusHabits.detectAndSyncHabitChecks({ sessions, workPeriods, todayPlan, habits });
-        try { await refreshHabits(); } catch {}
       } catch {
         showToast('Could not re-adopt the habit — is the backend running?', { danger: true });
       }
@@ -282,18 +319,118 @@
       const entry = FocusHabits.CATALOG.find(c => c.code === adopt.dataset.adopt);
       if (!entry) return;
       try {
-        await adoptHabit({
+        await adoptAndSync({
           code: entry.code, title: entry.title, why: entry.why, kind: entry.kind,
           check_json: entry.check ? JSON.stringify(entry.check) : null,
           source: 'catalog', created_day_key: todayKey(),
         });
-        await refreshHabits();
-        await FocusHabits.detectAndSyncHabitChecks({ sessions, workPeriods, todayPlan, habits });
-        try { await refreshHabits(); } catch {}
         showToast(`Adopted — ${entry.title}.`);
       } catch {
         showToast('Could not adopt the habit — is the backend running?', { danger: true });
       }
+    }
+  });
+
+  async function adoptAndSync(payload) {
+    await adoptHabit(payload);
+    await refreshHabits();
+    await FocusHabits.detectAndSyncHabitChecks({ sessions, workPeriods, todayPlan, habits });
+    try { await refreshHabits(); } catch {}
+  }
+
+  const addForm = document.getElementById('habit-add');
+  const titleEl = document.getElementById('habit-title');
+  const whyEl = document.getElementById('habit-why');
+  const checkEl = document.getElementById('habit-check');
+  const minEl = document.getElementById('habit-min');
+  const timeEl = document.getElementById('habit-time');
+  const hintEl = document.getElementById('habit-check-hint');
+  const addBtn = document.getElementById('habit-add-btn');
+  const DEFAULT_HINT = 'Type a habit — if the app can measure it, it will check itself.';
+  let checkPickedByUser = false;
+
+  function formCheckSpec() {
+    const template = checkEl.value;
+    if (template === 'manual') return null;
+    if (template === 'focus-minutes') {
+      const min = Math.max(5, Math.min(240, parseInt(minEl.value, 10) || 25));
+      return { template, params: { min } };
+    }
+    if (template === 'session-before') return { template, params: { time: timeEl.value || '10:00' } };
+    return { template, params: {} };
+  }
+
+  function updateCheckFields() {
+    document.getElementById('habit-min-wrap').style.display = checkEl.value === 'focus-minutes' ? '' : 'none';
+    document.getElementById('habit-time-wrap').style.display = checkEl.value === 'session-before' ? '' : 'none';
+    const spec = formCheckSpec();
+    if (!titleEl.value.trim()) hintEl.textContent = DEFAULT_HINT;
+    else if (spec) hintEl.textContent = `This one can check itself — ${FocusHabits.describeCheck(spec)}.`;
+    else hintEl.textContent = "You'll tick this one yourself.";
+    addBtn.disabled = !titleEl.value.trim();
+  }
+
+  function applyGuess() {
+    if (!checkPickedByUser) {
+      const guess = FocusHabits.guessCheckSpec(titleEl.value);
+      checkEl.value = guess ? guess.template : 'manual';
+      if (guess && guess.params.min) minEl.value = guess.params.min;
+      if (guess && guess.params.time) timeEl.value = guess.params.time;
+    }
+    updateCheckFields();
+  }
+
+  let guessTimer = null;
+  titleEl.addEventListener('input', () => {
+    addBtn.disabled = !titleEl.value.trim();
+    clearTimeout(guessTimer);
+    guessTimer = setTimeout(applyGuess, 250);
+  });
+  checkEl.addEventListener('change', () => { checkPickedByUser = true; updateCheckFields(); });
+  minEl.addEventListener('input', updateCheckFields);
+  timeEl.addEventListener('input', updateCheckFields);
+
+  function isDuplicate(title, spec) {
+    const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const specKey = s => (s ? JSON.stringify([s.template, s.params || {}]) : null);
+    const wanted = specKey(spec);
+    return habits.some(h => {
+      if (h.status !== 'active') return false;
+      if (norm(h.title) === norm(title)) return true;
+      if (!wanted || h.kind !== 'auto' || !h.check_json) return false;
+      try { return specKey(JSON.parse(h.check_json)) === wanted; } catch { return false; }
+    });
+  }
+
+  addForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearTimeout(guessTimer);
+    applyGuess();
+    const title = titleEl.value.trim();
+    if (!title) return;
+    const spec = formCheckSpec();
+    if (isDuplicate(title, spec)) {
+      showToast('You already have that habit.');
+      return;
+    }
+    addBtn.disabled = true;
+    try {
+      await adoptAndSync({
+        code: 'custom-' + Date.now().toString(36),
+        title,
+        why: whyEl.value.trim(),
+        kind: spec ? 'auto' : 'manual',
+        check_json: spec ? JSON.stringify(spec) : null,
+        source: 'custom',
+        created_day_key: todayKey(),
+      });
+      addForm.reset();
+      checkPickedByUser = false;
+      updateCheckFields();
+      showToast(`Added — ${title}.`);
+    } catch {
+      addBtn.disabled = false;
+      showToast('Could not add the habit — is the backend running?', { danger: true });
     }
   });
 

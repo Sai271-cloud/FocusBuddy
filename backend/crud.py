@@ -238,12 +238,10 @@ def resolve_demo_workspace(
     anonymous_id: str | None = None,
 ) -> models.DemoWorkspace | None:
     if demo_slug and anonymous_id:
-        # Per-judge private copy of a seeded persona.
         return ensure_seeded_workspace(db, demo_slug, anonymous_id)
     if anonymous_id:
         return ensure_anonymous_workspace(db, anonymous_id)
     if demo_slug:
-        # Slug-only fallback: the shared seeded workspace (old links, blocked localStorage).
         return ensure_seeded_workspace(db, demo_slug)
     return ensure_default_workspace(db)
 
@@ -471,7 +469,6 @@ def delete_plan(db: Session, period_key: str, workspace=None) -> bool:
     return True
 
 def get_profile(db: Session, workspace=None) -> models.UserProfile:
-    """The workspace's 'About me' row, created empty on first access."""
     wid = _workspace_id(db, workspace)
     profile = db.query(models.UserProfile).filter(models.UserProfile.workspace_id == wid).first()
     if profile is None:
@@ -488,18 +485,12 @@ def update_profile(db: Session, about: str, workspace=None) -> models.UserProfil
     db.refresh(profile)
     return profile
 
-# ---- The League (Trail Chunk 2) ----
-# Traveler ranks driven by lifetime focused minutes, uncapped. Each rank name has
-# 3 levels; one level costs a fixed step of minutes, and the step DOUBLES each
-# time the rank name changes (Wanderer 300/level, Walker 600, ... Cartographer 9,600).
 
 LEAGUE_RANKS = ["Wanderer", "Walker", "Pathfinder", "Trailblazer", "Voyager", "Cartographer"]
 LEAGUE_FIRST_STEP_MIN = 300
 LEAGUE_LEVELS_PER_RANK = 3
 
 def league_ladder() -> list:
-    """Every level in order with the points total where it begins, generated from
-    the doubling rule: [{rank, level, start}, ...] — Wanderer 1 starts at 0."""
     ladder = []
     start = 0
     step = LEAGUE_FIRST_STEP_MIN
@@ -511,8 +502,6 @@ def league_ladder() -> list:
     return ladder
 
 def rank_for_points(points_min: int) -> tuple:
-    """(rank_name, level, level_progress 0..1) for a points total. Progress is
-    within the current level; the summit (Cartographer 3) pins at 1.0."""
     points = max(0, int(points_min or 0))
     ladder = league_ladder()
     current_index = 0
@@ -527,8 +516,6 @@ def rank_for_points(points_min: int) -> tuple:
     return current["rank"], current["level"], round(min(1.0, max(0.0, progress)), 4)
 
 def compute_league_points(db: Session, workspace=None) -> int:
-    """Lifetime focused minutes across the workspace's saved sessions — a plain
-    aggregate, no local-day or timezone math."""
     wid = _workspace_id(db, workspace)
     total_seconds = (
         db.query(func.coalesce(func.sum(models.FocusSession.seconds_focused), 0))
@@ -538,9 +525,6 @@ def compute_league_points(db: Session, workspace=None) -> int:
     return int(total_seconds or 0) // 60
 
 def ratchet_league(db: Session, workspace=None) -> tuple:
-    """Write max(stored, computed) league points — points only ever increase, so
-    the league structurally cannot demote (deleting sessions keeps the credit,
-    and a lost store self-heals from history). Returns (points, stored_before)."""
     profile = get_profile(db, workspace)
     stored_before = int(profile.league_points or 0)
     points = max(stored_before, compute_league_points(db, workspace))
@@ -550,9 +534,6 @@ def ratchet_league(db: Session, workspace=None) -> tuple:
         db.refresh(profile)
     return points, stored_before
 
-# --- landmarks (Trail Chunk 5) ---------------------------------------------
-# The whitelist of earnable landmark codes. The FRONTEND detects these (it owns
-# the local-day math); the backend only stores them, insert-only (the ratchet).
 
 LANDMARK_CODES = frozenset([
     "first-camp",
@@ -580,10 +561,6 @@ def get_landmarks(db: Session, workspace=None) -> list:
     )
 
 def sync_landmarks(db: Session, items: list, workspace=None) -> tuple:
-    """Store any not-yet-earned landmarks from `items` ([{code, day_key}] with
-    codes already whitelisted by the route). Insert-only — nothing is ever
-    updated or deleted, so re-syncs are idempotent and landmarks can't be lost.
-    Returns (all_rows, newly_earned_codes, store_was_empty_before)."""
     wid = _workspace_id(db, workspace)
     existing = {row.code for row in get_landmarks(db, wid)}
     was_empty = not existing
@@ -597,34 +574,23 @@ def sync_landmarks(db: Session, items: list, workspace=None) -> tuple:
             newly.append(item.code)
             existing.add(item.code)
         except IntegrityError:
-            # A parallel request won the insert — their row is the same landmark.
             db.rollback()
             existing.add(item.code)
     return get_landmarks(db, wid), newly, was_empty
 
-# --- habits (habit tracker v1) ---------------------------------------------
-# Habits are adopted from the starter catalog or a weekly-unwind proposal. The
-# FRONTEND verifies 'auto' habits from session/plan data (it owns local-day
-# math); the backend stores habits + insert-only check rows, so the lifetime
-# done count is a row count that only ever grows.
 
-# Whitelist of machine-checkable templates. One source of truth shared by the
-# adopt route and the weekly-unwind proposal parser (like LANDMARK_CODES).
 HABIT_TEMPLATES = frozenset([
-    "any-session",      # at least one session that day
-    "focus-minutes",    # params {min: 5..240} — focused minutes that day
-    "session-before",   # params {time: "HH:MM"} — a session started before HH:MM
-    "unbroken-25",      # a 25-min unbroken focused run in some session that day
-    "made-a-plan",      # a plan existed that day
-    "did-daily-unwind", # the day was unwound (recap or reflection saved)
+    "any-session",
+    "focus-minutes",
+    "session-before",
+    "unbroken-25",
+    "made-a-plan",
+    "did-daily-unwind",
 ])
 
 _HHMM_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 def clean_check_spec(template, params):
-    """Validate + clamp one check spec. Returns a canonical {"template","params"}
-    dict, or None when the template is unknown or the params are unusable — the
-    caller then treats the habit as manual instead of rejecting it."""
     if template not in HABIT_TEMPLATES:
         return None
     params = params if isinstance(params, dict) else {}
@@ -642,7 +608,6 @@ def clean_check_spec(template, params):
     return {"template": template, "params": {}}
 
 def clean_check_json(check_json):
-    """Same validation for the JSON-string form stored on a habit row."""
     if not check_json:
         return None
     try:
@@ -672,8 +637,6 @@ def get_habit(db: Session, habit_id: int, workspace=None):
     )
 
 def get_habit_check_days(db: Session, workspace=None) -> dict:
-    """All completed days for the workspace, as {habit_id: [day_key, ...]} sorted
-    ascending — one query drives every habit's density dots + lifetime count."""
     wid = _workspace_id(db, workspace)
     rows = (
         db.query(models.HabitCheck.habit_id, models.HabitCheck.day_key)
@@ -687,11 +650,6 @@ def get_habit_check_days(db: Session, workspace=None) -> dict:
     return days
 
 def adopt_habit(db: Session, data, workspace=None):
-    """Create a habit, or reactivate the retired row with the same code — the
-    (workspace, code) unique constraint makes a duplicate structurally
-    impossible, so double-adopts and stale Adopt buttons are harmless. On
-    reactivation the title/why/check refresh and `created_day_key` moves to the
-    new adoption day, so auto-verification never backfills the retired gap."""
     wid = _workspace_id(db, workspace)
     check_json = clean_check_json(data.check_json) if data.kind == "auto" else None
     kind = data.kind if check_json or data.kind == "manual" else "manual"
@@ -725,7 +683,6 @@ def adopt_habit(db: Session, data, workspace=None):
     try:
         db.commit()
     except IntegrityError:
-        # A parallel request won the insert — reuse their row.
         db.rollback()
         return (
             db.query(models.Habit)
@@ -741,10 +698,6 @@ def retire_habit(db: Session, habit) -> None:
     db.refresh(habit)
 
 def tick_day_allowed(workspace, day_key: str) -> bool:
-    """Sanity bound for manual ticks: within ±1 day of the anchor date — the
-    frozen demo date for demo workspaces, else the server's UTC date. ±1 covers
-    every real timezone (UTC-12..+14) while making backfill scripting pointless.
-    Pure string/date arithmetic; today-only stays a frontend rule."""
     anchor_key = (
         DEMO_TODAY_KEY
         if workspace is not None and getattr(workspace, "workspace_type", "local") != "local"
@@ -758,8 +711,6 @@ def tick_day_allowed(workspace, day_key: str) -> bool:
     return abs((day - anchor).days) <= 1
 
 def add_habit_check(db: Session, habit, day_key: str, source: str) -> bool:
-    """Insert one completed day (insert-only). Returns True when a row was added;
-    a duplicate (same habit + day) is swallowed as idempotent."""
     db.add(models.HabitCheck(
         workspace_id=habit.workspace_id,
         habit_id=habit.id,
@@ -774,9 +725,6 @@ def add_habit_check(db: Session, habit, day_key: str, source: str) -> bool:
         return False
 
 def sync_habit_checks(db: Session, checks, workspace=None) -> int:
-    """Store frontend-verified auto checks. Silently skips rows for habits that
-    aren't this workspace's, aren't auto, are retired, or predate the habit's
-    adoption day — the verifier is trusted but bounded. Insert-only per row."""
     wid = _workspace_id(db, workspace)
     habits = {h.id: h for h in get_habits(db, wid)}
     inserted = 0
@@ -831,9 +779,6 @@ def create_goal(db: Session, data, workspace=None):
     return goal
 
 def update_goal(db: Session, goal, update) -> None:
-    """Preserve-on-None: only sent fields change. Reopening (status back to
-    'active') clears done_day_key so a reopened goal doesn't still claim a
-    finish date; the active-goal cap on reopen is the ROUTE's job."""
     if update.title is not None:
         goal.title = update.title.strip()
     if update.target_day_key is not None:
@@ -848,21 +793,15 @@ def update_goal(db: Session, goal, update) -> None:
     db.refresh(goal)
 
 def attach_task_to_goal(db: Session, goal, task) -> None:
-    """Sets the link (a task already linked elsewhere moves silently — the UI
-    only offers unlinked tasks, so this only happens via direct API use)."""
     task.goal_id = goal.id
     db.commit()
 
 def detach_task_from_goal(db: Session, goal, task) -> None:
-    """Clears the link only when it points at THIS goal (idempotent; a stale
-    detach can't clobber another goal's link)."""
     if task.goal_id == goal.id:
         task.goal_id = None
         db.commit()
 
 def goal_focus_seconds(db: Session, workspace=None) -> dict:
-    """Lifetime focused seconds per goal, summed over sessions of attached tasks
-    in ONE join query: {goal_id: seconds}. Goals with no attached work are absent."""
     wid = _workspace_id(db, workspace)
     rows = (
         db.query(models.Task.goal_id, func.sum(models.FocusSession.seconds_focused))
@@ -904,9 +843,6 @@ LEGACY_TIME_OBSERVATIONS = [
 DECAY_DAYS = 30
 
 def cleanup_legacy_time_observations(db: Session, workspace=None) -> int:
-    """Remove the obsolete time-of-day seed patterns by exact text. Idempotent —
-    after the first run nothing matches. Only the three known seed strings are
-    targeted, so AI-made or user notes are never touched. Returns rows deleted."""
     q = db.query(models.Observation).filter(models.Observation.text.in_(LEGACY_TIME_OBSERVATIONS))
     if workspace is not None:
         q = q.filter(models.Observation.workspace_id == _workspace_id(db, workspace))
@@ -915,11 +851,6 @@ def cleanup_legacy_time_observations(db: Session, workspace=None) -> int:
     return deleted
 
 def decay_stale_observations(db: Session, days: int = DECAY_DAYS, workspace=None) -> int:
-    """Erode confidence in notes not affirmed/rejected in `days`: move each stale
-    note's net one step toward 0 (a confirmed note drifts back to emerging; a
-    retired note can get another chance), then re-stamp updated_at so it only
-    decays again after another `days` of inactivity. Reflects that habits change —
-    old conclusions fade unless reinforced. Returns how many notes decayed."""
     from datetime import datetime, timezone, timedelta
 
     now = datetime.now(timezone.utc)
@@ -950,10 +881,6 @@ def decay_stale_observations(db: Session, days: int = DECAY_DAYS, workspace=None
     return changed
 
 def seed_observations(db: Session, workspace=None) -> None:
-    """Insert the starter hypotheses, but ONLY when the table is empty. Note: if the
-    user deletes every observation and the app restarts, the starters come back —
-    that's acceptable (it just restores neutral direction, never resurrects a single
-    pattern the user removed while others remain)."""
     wid = _workspace_id(db, workspace)
     if db.query(models.Observation).filter(models.Observation.workspace_id == wid).count() > 0:
         return
@@ -977,8 +904,6 @@ def get_observation(db: Session, obs_id: int, workspace=None) -> models.Observat
     )
 
 def _apply_retire_rule(obs: models.Observation) -> None:
-    """Recompute active from the counts so an affirm can revive a retired pattern
-    and a pile of rejections can retire one."""
     net = (obs.affirmations or 0) - (obs.rejections or 0)
     obs.active = (-net) < RETIRE_NET
 
@@ -1003,8 +928,6 @@ def reject_observation(db: Session, obs: models.Observation) -> models.Observati
     return obs
 
 def create_observation(db: Session, text: str, workspace=None) -> models.Observation | None:
-    """Add a new active pattern. Skips if the active count is already at the cap or
-    a same-text active pattern already exists (cheap de-dup). Returns None if skipped."""
     wid = _workspace_id(db, workspace)
     clean = (text or "").strip()[:200]
     if not clean:
@@ -1025,7 +948,6 @@ def delete_observation(db: Session, obs: models.Observation) -> None:
     db.commit()
 
 def seed_hourly_focus(db: Session, workspace=None) -> None:
-    """Preboot all 24 hour rows (0-23) once, if the table is empty."""
     wid = _workspace_id(db, workspace)
     if db.query(models.HourlyFocus).filter(models.HourlyFocus.workspace_id == wid).count() > 0:
         return
@@ -1043,8 +965,6 @@ def get_hourly_focus(db: Session, workspace=None) -> list[models.HourlyFocus]:
     )
 
 def _hours_in_range(start_hour: int, end_hour: int) -> list[int]:
-    """Inclusive list of clock hours a session touched, handling midnight wrap
-    (e.g. 23 -> 1 gives [23, 0, 1])."""
     start = start_hour % 24
     end = end_hour % 24
     hours = []
@@ -1057,8 +977,6 @@ def _hours_in_range(start_hour: int, end_hour: int) -> list[int]:
     return hours
 
 def update_hourly_focus(db: Session, start_hour: int, end_hour: int, session_pct: float, workspace=None) -> int:
-    """Fold one session's focus % into every hour it touched (running average).
-    Returns how many hour rows were updated. Deterministic — no AI involved."""
     wid = _workspace_id(db, workspace)
     pct = max(0.0, min(100.0, float(session_pct)))
     touched = 0
@@ -1282,7 +1200,6 @@ def clear_workspace_data(db: Session, workspace) -> None:
     db.query(models.Habit).filter(models.Habit.workspace_id == wid).delete(synchronize_session=False)
     db.query(models.FocusSession).filter(models.FocusSession.workspace_id == wid).delete(synchronize_session=False)
     db.query(models.Task).filter(models.Task.workspace_id == wid).delete(synchronize_session=False)
-    # Goals AFTER tasks: tasks.goal_id references goals, so the children go first.
     db.query(models.Goal).filter(models.Goal.workspace_id == wid).delete(synchronize_session=False)
     db.query(models.WorkPeriod).filter(models.WorkPeriod.workspace_id == wid).delete(synchronize_session=False)
     db.query(models.DailyPlan).filter(models.DailyPlan.workspace_id == wid).delete(synchronize_session=False)
@@ -1291,10 +1208,6 @@ def clear_workspace_data(db: Session, workspace) -> None:
     db.query(models.HourlyFocus).filter(models.HourlyFocus.workspace_id == wid).delete(synchronize_session=False)
     db.commit()
 
-# Light April/May 2026 history per persona so the Trail's region browsing and
-# atlas (Chunk 4) have past regions to show on the frozen June-28 demo clock.
-# Day numbers only — the sessions themselves are reused from each persona's June
-# `days` patterns, so past months stay persona-flavored without hand-writing them.
 DEMO_PAST_MONTH_DAYS = {
     "early-morning": {"2026-05": [4, 7, 12, 18, 21, 26], "2026-04": [7, 14, 21, 28]},
     "doomscroller": {"2026-05": [6, 13, 20, 27], "2026-04": [9, 16, 23]},
@@ -1303,9 +1216,6 @@ DEMO_PAST_MONTH_DAYS = {
     "self-improver": {"2026-05": [11, 18, 25, 28], "2026-04": [6, 13, 20, 27, 30]},
 }
 
-# A saved May monthly recap per persona (the exact field set the monthly unwind
-# saves/reads) so June's monthly unwind gets a real month-over-month trend and
-# the May atlas tile shows its "unwound" check. April intentionally has none.
 DEMO_MAY_MONTH_RECAPS = {
     "early-morning": {
         "summary": "May proved your mornings carry you — nearly every camp was pitched before noon, and the few evening tries faded fast.",
@@ -1360,9 +1270,6 @@ DEMO_MAY_MONTH_RECAPS = {
 }
 
 def _seed_past_months(db: Session, workspace, seed: dict, tasks: list) -> None:
-    """Seed the light April/May history: sessions only (no day work_periods or
-    plans, so existing DEMO_HISTORY_DATES-keyed behavior is untouched), plus one
-    saved May monthly recap row."""
     months = DEMO_PAST_MONTH_DAYS.get(seed["slug"], {})
     may_secs = {"focused": 0, "distracted": 0, "uncertain": 0, "away": 0}
     for month_key, day_nums in months.items():
@@ -1405,15 +1312,6 @@ def _seed_past_months(db: Session, workspace, seed: dict, tasks: list) -> None:
             ai_recap=json.dumps(recap),
         ))
 
-# Earlier-June history: session days for the weeks of Mon June 8 and Mon June 15,
-# so June holds three active weeks on the frozen June-28 clock. Without these the
-# June monthly unwind is gated as a thin month (only one active week), the weekly
-# trend has no prior weeks to compare against, and the June Trail map shows camps
-# in one corner only. Sessions reuse each persona's June day patterns (like the
-# April/May seeding) but DO include timeline_json, because the habit verifier's
-# unbroken-25 template and the landmark backfill both read per-minute timelines.
-# No day work_periods or daily plans for these days — the daily-unwind history
-# window stays exactly DEMO_HISTORY_DATES.
 DEMO_JUNE_WEEK_DAYS = {
     "early-morning": {"2026-06-08": [8, 9, 11, 12], "2026-06-15": [15, 16, 17, 19, 20]},
     "doomscroller": {"2026-06-08": [9, 11, 13], "2026-06-15": [16, 18, 20]},
@@ -1422,11 +1320,6 @@ DEMO_JUNE_WEEK_DAYS = {
     "self-improver": {"2026-06-08": [9, 11, 13], "2026-06-15": [15, 16, 18, 19, 20]},
 }
 
-# One saved weekly recap per prior June week (the exact field set the weekly
-# unwind saves), so the June monthly unwind can fold real weekly notes and the
-# month view reads "2 of 3 weeks unwound". The current week (Mon June 22) is
-# deliberately NOT unwound — judges generate that one live. Pomodoro/habit ride
-# along inert (recommend/propose false), matching what a healthy saved week holds.
 def _inert_weekly_extras() -> dict:
     return {
         "pomodoro": {"recommend": False, "focus_min": 25, "break_min": 5, "why": ""},
@@ -1547,9 +1440,6 @@ DEMO_JUNE_WEEK_RECAPS = {
 }
 
 def _seed_prior_june_weeks(db: Session, workspace, seed: dict, tasks: list, extra_week_secs: dict | None = None) -> None:
-    """Seed the two prior June weeks: sessions (with timelines) plus one saved
-    weekly recap row per week. `extra_week_secs` folds in the done-goal task
-    sessions (seeded by _seed_goals) so each week row's totals stay coherent."""
     weeks = DEMO_JUNE_WEEK_DAYS.get(seed["slug"], {})
     recaps = DEMO_JUNE_WEEK_RECAPS.get(seed["slug"], {})
     for week_key, day_nums in weeks.items():
@@ -1597,13 +1487,6 @@ def _seed_prior_june_weeks(db: Session, workspace, seed: dict, tasks: list, extr
                 ai_recap=json.dumps({**recap, **_inert_weekly_extras()}),
             ))
 
-# One coach-proposed AUTO habit per persona (focus-minutes 25 — every persona's
-# seeded days clear 25 focused minutes). Its check rows are deliberately NOT
-# seeded: the frontend verifier backfills them from the seeded June sessions on
-# the judge's first habits-page visit, so the demo shows the real system, not
-# hand-written data. The two phone-prone personas also get a MANUAL habit with a
-# few ticked late-June days so the density dots and tick button read instantly
-# on the frozen June-28 clock.
 DEMO_HABIT_WHY = {
     "early-morning": "Your strong mornings carry the week — a small daily block keeps them coming.",
     "doomscroller": "On days you got one real block in, the scroll pull lost its grip.",
@@ -1614,13 +1497,6 @@ DEMO_HABIT_WHY = {
 DEMO_MANUAL_HABIT_SLUGS = {"doomscroller", "self-improver"}
 DEMO_MANUAL_HABIT_DAYS = ["2026-06-23", "2026-06-25", "2026-06-26"]
 
-# One RETIRED habit per persona so the habits page's retired section, the kept
-# lifetime count, and the re-adopt flow are all visible. Framed as a coach
-# proposal from the week of Mon June 1 (code coach-2026-06-01 — no collision
-# with the active coach-2026-06-15 or with catalog codes) that the persona tried
-# for a few days and then quietly retired. Manual on purpose: the verifier and
-# the checks-sync route both skip retired/auto mismatches, so seeded history here
-# can never be rewritten by the frontend. Shape: (title, why).
 DEMO_RETIRED_HABITS = {
     "early-morning": ("No phone before the first morning block",
                       "You tried it for a week — mornings were already strong without it."),
@@ -1635,13 +1511,6 @@ DEMO_RETIRED_HABITS = {
 }
 DEMO_RETIRED_HABIT_DAYS = ["2026-06-02", "2026-06-03", "2026-06-05"]
 
-# A second ACTIVE auto habit per persona so more than one check template is live
-# in the demo. Catalog entries copy code/title/why verbatim from the habits.js
-# CATALOG (so the catalog page shows them as adopted); night-owl's is a coach
-# proposal instead, because unbroken-25 isn't a catalog habit. created_day_key is
-# June 8, so the frontend verifier backfills checks from the seeded sessions on
-# first load — no check rows are seeded here, same rule as the focus-25 habit.
-# Shape: (code, title, why, template, params, source).
 DEMO_SECOND_AUTO_HABITS = {
     "early-morning": ("cat-before-10", "Start something before 10:00",
                       "An early first session sets the tone before the day gets loud.",
@@ -1727,17 +1596,6 @@ def _seed_habits(db: Session, workspace, seed) -> None:
             source="manual",
         ))
 
-# Persona goals (goals v1) — every judge link shows the full state set: the
-# original active goal with measured June progress, one DONE goal (its work
-# lives on a separate completed task with a couple of mid-June sessions, so the
-# goals page shows real lifetime time), and one ARCHIVED goal. Two extras:
-# doomscroller gets an active goal past its target date (the calm "past its
-# target date — still open" copy) and self-improver gets an active goal with no
-# tasks yet (the attach-guidance empty copy). The done-goal task is created here,
-# NOT in seed["tasks"], so the historical daily plans never schedule it.
-# Dict keys: title, target, status, created, and optionally done_day,
-# task_indexes (into seed["tasks"]), done_task (name, desc),
-# done_task_sessions [(day_key, hour, minute, f, d, u, a), ...].
 DEMO_GOALS = {
     "early-morning": [
         {"title": "Ship the client project milestone", "target": "2026-07-08",
@@ -1796,13 +1654,9 @@ DEMO_GOALS = {
 }
 
 def _june_week_key(day_key: str) -> str:
-    """Monday week key for a 2026-06-08..21 day (the two seeded prior weeks)."""
     return "2026-06-08" if int(day_key[-2:]) <= 14 else "2026-06-15"
 
 def _seed_goals(db: Session, workspace, seed, tasks: list) -> dict:
-    """Seed the persona's goals. Returns {week_key: seconds dict} for the
-    done-goal task sessions, so _seed_prior_june_weeks can fold them into the
-    saved weekly rows' totals."""
     extra_week_secs: dict = {}
     for entry in DEMO_GOALS.get(seed["slug"], []):
         if not tasks:
@@ -1859,16 +1713,6 @@ def _seed_goals(db: Session, workspace, seed, tasks: list) -> dict:
             secs["away"] += away * 60
     return extra_week_secs
 
-# "Today" (the frozen June 28) starts lived-in, not blank: one small finished
-# morning session plus a saved plan for the day. That makes today's donut, the
-# daily unwind's Generate, plan-vs-reality, and the recommended-first highlight
-# all work the moment a judge arrives — and they can still run their own live
-# tracker session on top. The session's task is marked completed at the
-# session's end, so Today's "Completed (1)" section shows too. Deliberately NO
-# work_period row for June 28 — the day is still open for the judge to unwind.
-# Times are UTC: a ~12:00Z start reads as early morning in US timezones against
-# the frozen 9am demo clock (same convention as every other seeded session).
-# Shape: (task_index, utc_hour, utc_minute, f, d, u, a, journal_note).
 DEMO_TODAY_SESSIONS = {
     "early-morning": (0, 11, 45, 26, 3, 1, 0,
                       "First block of the day done before breakfast settled."),
@@ -1882,11 +1726,6 @@ DEMO_TODAY_SESSIONS = {
                       "Reset routine done and the intention written before starting."),
 }
 
-# Today's saved plan per persona: (task_index, scheduled_min, estimate_min,
-# difficulty). The first entry matches the finished morning session's task, so
-# plan-vs-reality has a real "done" row immediately. Overplanner plans all five
-# tasks into less time than available_min allows, so the saved AI advice keeps
-# the over-plan note in character.
 DEMO_TODAY_PLANS = {
     "early-morning": [(0, 480, 30, "hard"), (1, 540, 25, "medium"), (3, 1140, 20, "easy")],
     "doomscroller": [(2, 480, 15, "easy"), (0, 510, 30, "hard"), (1, 840, 30, "hard")],
@@ -2063,8 +1902,6 @@ def reset_seeded_workspace(
         ))
 
     _seed_past_months(db, workspace, seed, tasks)
-    # Goals first: they return the done-goal task sessions' seconds so the prior
-    # June week rows can fold them into coherent weekly totals.
     extra_week_secs = _seed_goals(db, workspace, seed, tasks)
     _seed_prior_june_weeks(db, workspace, seed, tasks, extra_week_secs)
     _seed_habits(db, workspace, seed)
